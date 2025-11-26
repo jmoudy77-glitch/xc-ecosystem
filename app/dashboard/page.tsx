@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import {
+  orgHasActiveSubscription,
+  orgHasAiFeatures,
+  BillingStatus,
+  SubscriptionTier,
+} from "@/lib/billing";
 
 type Recruit = {
   id: string;
@@ -14,12 +20,22 @@ type Recruit = {
   notes: string | null;
 };
 
+type Organization = {
+  id: string;
+  name: string;
+  subscription_tier: SubscriptionTier;
+  billing_status: BillingStatus;
+};
+
+// ⚠️ Use the SAME id as in organizations + billing page
+const ORG_ID = "e6581ece-3386-4e70-bd05-7feb2e7fd5d9";
+
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
   const [recruits, setRecruits] = useState<Recruit[]>([]);
-  const [orgId, setOrgId] = useState<string | null>(null);
+  const [org, setOrg] = useState<Organization | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,7 +43,7 @@ export default function DashboardPage() {
       setLoading(true);
       setErrorMsg(null);
 
-      // 1) Get current user
+      // 1) Ensure user is logged in
       const {
         data: { user },
         error: userError,
@@ -40,32 +56,33 @@ export default function DashboardPage() {
 
       setEmail(user.email ?? null);
 
-      // 2) Look up memberships for this user
-      const { data: memberships, error: membershipError } = await supabase
-        .from("memberships")
-        .select("organization_id")
+      // 2) Fetch organization
+      const { data: orgData, error: orgError } = await supabase
+        .from("organizations")
+        .select("id, name, subscription_tier, billing_status")
+        .eq("id", ORG_ID)
         .limit(1);
 
-      if (membershipError) {
-        setErrorMsg(`Error loading memberships: ${membershipError.message}`);
+      if (orgError) {
+        setErrorMsg(`Error loading organization: ${orgError.message}`);
         setLoading(false);
         return;
       }
 
-      if (!memberships || memberships.length === 0) {
-        setErrorMsg("No organization found for this user.");
+      if (!orgData || orgData.length === 0) {
+        setErrorMsg("No organization found for this id.");
         setLoading(false);
         return;
       }
 
-      const organizationId = memberships[0].organization_id as string;
-      setOrgId(organizationId);
+      const organization = orgData[0] as Organization;
+      setOrg(organization);
 
-      // 3) Load recruits for this organization
+      // 3) Fetch recruits for this organization
       const { data: recruitsData, error: recruitsError } = await supabase
         .from("recruits")
         .select("*")
-        .eq("organization_id", organizationId)
+        .eq("organization_id", ORG_ID)
         .order("grad_year", { ascending: true });
 
       if (recruitsError) {
@@ -88,11 +105,27 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <p>Loading dashboard...</p>
       </div>
     );
   }
+
+  if (!org) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <p className="mb-2 font-semibold">No organization found.</p>
+        {errorMsg && (
+          <p className="text-xs text-red-600 max-w-md text-center">
+            {errorMsg}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const isActive = orgHasActiveSubscription(org.billing_status);
+  const hasAi = orgHasAiFeatures(org.subscription_tier);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -109,48 +142,90 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto py-8 px-4">
-        <h2 className="text-xl font-semibold mb-4">Recruits</h2>
-
-        {errorMsg && (
-          <p className="mb-4 text-sm text-red-600">{errorMsg}</p>
-        )}
-
-        {recruits.length === 0 ? (
-          <p className="text-sm text-slate-700">
-            No recruits found for this organization yet.
-          </p>
-        ) : (
-          <div className="overflow-x-auto border rounded bg-white shadow-sm">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="px-3 py-2 text-left">Name</th>
-                  <th className="px-3 py-2 text-left">Grad Year</th>
-                  <th className="px-3 py-2 text-left">Event Group</th>
-                  <th className="px-3 py-2 text-left">Status</th>
-                  <th className="px-3 py-2 text-left">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recruits.map((r) => (
-                  <tr key={r.id} className="border-t">
-                    <td className="px-3 py-2">
-                      {r.first_name} {r.last_name}
-                    </td>
-                    <td className="px-3 py-2">{r.grad_year}</td>
-                    <td className="px-3 py-2">{r.event_group}</td>
-                    <td className="px-3 py-2 capitalize">{r.status}</td>
-                    <td className="px-3 py-2 max-w-xs truncate">
-                      {r.notes}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <main className="max-w-5xl mx-auto py-8 px-4 space-y-6">
+        {/* Billing summary card */}
+        <section className="bg-white shadow rounded-md p-4 text-sm flex justify-between items-center">
+          <div>
+            <p className="font-semibold">{org.name}</p>
+            <p className="text-slate-600">
+              Tier: <span className="font-medium">{org.subscription_tier ?? "none"}</span> · Status:{" "}
+              <span className="font-medium">{org.billing_status ?? "none"}</span>
+            </p>
           </div>
+          <div className="text-right text-xs">
+            <p>
+              Active subscription?{" "}
+              <span className="font-semibold">
+                {isActive ? "Yes" : "No"}
+              </span>
+            </p>
+            <p>
+              AI features:{" "}
+              <span className="font-semibold">
+                {hasAi ? "Enabled" : "Not included"}
+              </span>
+            </p>
+          </div>
+        </section>
+
+        {/* AI banner */}
+        {!hasAi && (
+          <section className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-md p-3">
+            <p className="font-semibold mb-1">
+              Upgrade to Elite to unlock AI tools.
+            </p>
+            <p>
+              AI recruiting pipeline projections and AI training plan suggestions
+              are available on the Elite tier.
+            </p>
+          </section>
         )}
+
+        {/* Recruits table */}
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Recruits</h2>
+
+          {errorMsg && (
+            <p className="mb-4 text-sm text-red-600">{errorMsg}</p>
+          )}
+
+          {recruits.length === 0 ? (
+            <p className="text-sm text-slate-700">
+              No recruits found for this organization yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto border rounded bg-white shadow-sm">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Name</th>
+                    <th className="px-3 py-2 text-left">Grad Year</th>
+                    <th className="px-3 py-2 text-left">Event Group</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recruits.map((r) => (
+                    <tr key={r.id} className="border-t">
+                      <td className="px-3 py-2">
+                        {r.first_name} {r.last_name}
+                      </td>
+                      <td className="px-3 py-2">{r.grad_year}</td>
+                      <td className="px-3 py-2">{r.event_group}</td>
+                      <td className="px-3 py-2 capitalize">{r.status}</td>
+                      <td className="px-3 py-2 max-w-xs truncate">
+                        {r.notes}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );
 }
+

@@ -1,8 +1,9 @@
+// app/billing/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   orgHasActiveSubscription,
   orgHasAiFeatures,
@@ -17,21 +18,24 @@ type Organization = {
   billing_status: BillingStatus;
 };
 
-// ⚠️ Use the SAME org id as in your dashboard:
+// ⚠️ Use your org ID from Supabase organizations table
 const ORG_ID = "e6581ece-3386-4e70-bd05-7feb2e7fd5d9";
 
 export default function BillingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [org, setOrg] = useState<Organization | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const statusParam = searchParams.get("status");
 
   useEffect(() => {
     async function loadBilling() {
       setLoading(true);
       setErrorMsg(null);
 
-      // 1) Make sure user is logged in
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -41,7 +45,6 @@ export default function BillingPage() {
         return;
       }
 
-      // 2) Fetch org by id (no .single(), do explicit length checks)
       const { data, error } = await supabase
         .from("organizations")
         .select("id, name, subscription_tier, billing_status")
@@ -69,6 +72,40 @@ export default function BillingPage() {
     loadBilling();
   }, [router]);
 
+  async function handleUpgradeToElite() {
+    try {
+      setActionLoading(true);
+      setErrorMsg(null);
+
+      const res = await fetch("/api/checkout/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          priceId: process.env.STRIPE_PRICE_COLLEGE_ELITE, // won't exist at runtime; we'll just send null
+          orgId: ORG_ID,
+          tier: "elite",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to create checkout session");
+      }
+
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned from server");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error starting checkout");
+      setActionLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -95,11 +132,23 @@ export default function BillingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <main className="max-w-xl mx-auto py-10 px-4">
-        <h1 className="text-2xl font-semibold mb-4">Billing</h1>
+      <main className="max-w-xl mx-auto py-10 px-4 space-y-4">
+        <h1 className="text-2xl font-semibold mb-2">Billing</h1>
+
+        {statusParam === "success" && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm rounded-md p-3">
+            Subscription updated successfully.
+          </div>
+        )}
+
+        {statusParam === "cancelled" && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-md p-3">
+            Checkout was cancelled. No changes were made.
+          </div>
+        )}
 
         {errorMsg && (
-          <p className="mb-4 text-xs text-red-600">{errorMsg}</p>
+          <p className="text-xs text-red-600">{errorMsg}</p>
         )}
 
         <div className="bg-white shadow rounded-md p-4 space-y-2 text-sm">
@@ -124,19 +173,26 @@ export default function BillingPage() {
           </p>
         </div>
 
-        <div className="mt-6 space-y-2 text-sm">
-          <button
-            className="w-full py-2 rounded bg-slate-900 text-white font-semibold text-sm disabled:opacity-50"
-            disabled
-          >
-            Upgrade / Manage Subscription (coming in Day 3)
-          </button>
-          <p className="text-xs text-slate-500">
-            This button will open Stripe Checkout or Customer Portal once the
-            billing flow is wired up.
-          </p>
+        <div className="space-y-2 text-sm">
+          {!hasAi && (
+            <button
+              className="w-full py-2 rounded bg-slate-900 text-white font-semibold text-sm disabled:opacity-50"
+              onClick={handleUpgradeToElite}
+              disabled={actionLoading}
+            >
+              {actionLoading
+                ? "Redirecting to checkout..."
+                : "Upgrade to Elite (Unlock AI Tools)"}
+            </button>
+          )}
+          {hasAi && (
+            <p className="text-xs text-slate-600">
+              You already have Elite / AI features enabled.
+            </p>
+          )}
         </div>
       </main>
     </div>
   );
 }
+

@@ -7,6 +7,15 @@ export const runtime = 'nodejs';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
+// Simple GET for debugging in the browser
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: 'Stripe webhook endpoint is alive',
+  });
+}
+
+// Actual Stripe webhook handler
 export async function POST(req: NextRequest) {
   const signature = req.headers.get('stripe-signature');
   if (!signature) {
@@ -17,7 +26,7 @@ export async function POST(req: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    const body = await req.text();
+    const body = await req.text(); // raw body
     event = stripe.webhooks.constructEvent(
       body,
       signature,
@@ -41,6 +50,7 @@ export async function POST(req: NextRequest) {
 
         const userId = session.metadata?.userId;
         if (userId) {
+          // TODO: real DB upgrade
           // await db.user.update({ where: { id: userId }, data: { tier: 'elite' } });
           console.log('✨ Upgrade user to elite:', userId);
         }

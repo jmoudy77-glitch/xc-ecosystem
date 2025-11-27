@@ -3,11 +3,22 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+// ⬇️ adjust these import paths to match your project structure
+import { supabase } from '@/lib/supabaseClient';
+import { orgHasActiveSubscription, orgHasAiFeatures } from '@/lib/billing';
+import type { Organization } from '@/types/organization';
+
+// If you hard-coded ORG_ID before, keep that here or import it instead:
+const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID as string | undefined;
 
 export default function BillingPageClient() {
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [org, setOrg] = useState<Organization | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // ✅ make searchParams access null-safe
   const searchParams = useSearchParams();
   const statusParam = searchParams?.get('status') ?? null;
 

@@ -1,7 +1,7 @@
 // app/billing/BillingPageClient.tsx
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 // ⬇️ adjust these import paths to match your project structure
 import { supabase } from '@/lib/supabaseClient';

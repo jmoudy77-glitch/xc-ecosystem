@@ -28,5 +28,3 @@
 ### `PATCH /api/recruits/:id`
 - Update recruit fields (status, notes, etc.).
 
-### `GET /api/pipeline/forecast` (AI upgrade)
-- Returns recruiting pipeline projection based on roster + recruits.

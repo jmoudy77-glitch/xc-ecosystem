@@ -127,8 +127,14 @@ export default function BillingPageClient() {
       );
     }
   
-    const isActive = orgHasActiveSubscription(org.billing_status);
-    const hasAi = orgHasAiFeatures(org.subscription_tier);
+    const isActive = orgHasActiveSubscription(
+  (org.billing_status ?? undefined) as any
+);
+
+const hasAi = orgHasAiFeatures(
+  (org.subscription_tier ?? undefined) as any
+);
+
   
     return (
       <div className="min-h-screen bg-slate-50">

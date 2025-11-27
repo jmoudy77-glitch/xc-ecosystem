@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   let event: Stripe.Event;
 
   try {
-    const body = await req.text();
+    const body = await req.text(); // raw body for signature verification
     event = stripe.webhooks.constructEvent(
       body,
       signature,
@@ -30,21 +30,36 @@ export async function POST(req: Request) {
     return new Response(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
-  switch (event.type) {
-    case "payment_intent.succeeded": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      console.log("💸 payment_intent.succeeded", paymentIntent.id);
-      break;
+  try {
+    switch (event.type) {
+      case "payment_intent.succeeded": {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        console.log("💸 payment_intent.succeeded", paymentIntent.id);
+        break;
+      }
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        console.log("✅ checkout.session.completed", session.id);
+
+        // 🔑 This is where we upgrade the coach/program to "elite"
+        const userId = session.metadata?.userId;
+        if (userId) {
+          // TODO: replace with your real DB call
+          // await db.user.update({
+          //   where: { id: userId },
+          //   data: { tier: "elite" },
+          // });
+          console.log("✨ Upgrading user to elite:", userId);
+        }
+        break;
+      }
+      default: {
+        console.log(`ℹ️ Unhandled event type: ${event.type}`);
+      }
     }
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      console.log("✅ checkout.session.completed", session.id);
-      // TODO: upgrade coach/program to elite here
-      break;
-    }
-    default: {
-      console.log(`ℹ️ Unhandled event type: ${event.type}`);
-    }
+  } catch (err) {
+    console.error("❌ Error handling Stripe event:", err);
+    return new Response("Webhook handler failed", { status: 500 });
   }
 
   return NextResponse.json({ received: true });

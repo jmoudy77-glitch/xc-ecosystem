@@ -6,9 +6,8 @@ export const dynamic = "force-dynamic";
 // ❗ important: ensures Node.js runtime + raw body access
 export const runtime = "nodejs"; // do NOT use "edge"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
 
 export async function POST(req: Request) {
   const signature = req.headers.get("stripe-signature");

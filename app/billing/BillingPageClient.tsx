@@ -6,7 +6,14 @@ import { useEffect, useState } from 'react';
 // ⬇️ adjust these import paths to match your project structure
 import { supabase } from '@/lib/supabaseClient';
 import { orgHasActiveSubscription, orgHasAiFeatures } from '@/lib/billing';
-import type { Organization } from '@/types/organization';
+// Minimal shape used in this component
+type Organization = {
+  id: string;
+  name: string;
+  subscription_tier: string | null;
+  billing_status: string | null;
+};
+
 
 // If you hard-coded ORG_ID before, keep that here or import it instead:
 const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID as string | undefined;

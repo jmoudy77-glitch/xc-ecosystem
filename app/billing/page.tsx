@@ -29,7 +29,8 @@ export default function BillingPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const statusParam = searchParams.get("status");
+  const statusParam = searchParams?.get("status") ?? null;
+
 
   useEffect(() => {
     async function loadBilling() {

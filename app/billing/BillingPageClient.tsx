@@ -15,8 +15,11 @@ type Organization = {
 };
 
 
-// If you hard-coded ORG_ID before, keep that here or import it instead:
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID as string | undefined;
+/* If you hard-coded ORG_ID before, keep that here or import it instead:
+const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID as string | undefined;*/
+
+// ⚠️ Use the SAME id as in organizations + billing page
+const ORG_ID = "e6581ece-3386-4e70-bd05-7feb2e7fd5d9";
 
 export default function BillingPageClient() {
   const router = useRouter();

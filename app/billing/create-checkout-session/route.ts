@@ -1,94 +1,87 @@
 // app/billing/create-checkout-session/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import Stripe from "stripe";
+import type { PlanCode } from "@/lib/billingPlans";
 
-// Base app URL for Stripe redirect
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// Stripe price IDs from env
-const ORG_ELITE_PRICE_ID = process.env.STRIPE_PRICE_COLLEGE_ELITE;
-const ATHLETE_ELITE_PRICE_ID = process.env.STRIPE_PRICE_HS_ATHLETE_ELITE;
+type BillingScope = "org" | "athlete";
 
-if (!ORG_ELITE_PRICE_ID) {
-  console.warn("STRIPE_PRICE_COLLEGE_ELITE is not set in env vars.");
-}
-if (!ATHLETE_ELITE_PRICE_ID) {
-  console.warn("STRIPE_PRICE_HS_ATHLETE_ELITE is not set in env vars.");
-}
+type CheckoutBody = {
+  scope: BillingScope;
+  ownerId: string;      // orgId or userId
+  planCode: PlanCode;   // one of the 9 codes above
+};
+
+// Map planCode → Stripe price ID
+const PRICE_BY_PLAN: Record<PlanCode, string> = {
+  hs_athlete_basic: process.env.STRIPE_PRICE_HS_ATHLETE_BASIC || "",
+  hs_athlete_pro: process.env.STRIPE_PRICE_HS_ATHLETE_PRO || "",
+  hs_athlete_elite: process.env.STRIPE_PRICE_HS_ATHLETE_ELITE || "",
+  hs_starter: process.env.STRIPE_PRICE_HS_STARTER || "",
+  hs_pro: process.env.STRIPE_PRICE_HS_PRO || "",
+  hs_elite: process.env.STRIPE_PRICE_HS_ELITE || "",
+  college_starter: process.env.STRIPE_PRICE_COLLEGE_STARTER || "",
+  college_pro: process.env.STRIPE_PRICE_COLLEGE_PRO || "",
+  college_elite: process.env.STRIPE_PRICE_COLLEGE_ELITE || "",
+};
 
 export async function POST(req: NextRequest) {
   try {
-    const { scope, tier, orgId, athleteId } = await req.json();
-    // scope: "org" | "athlete"
-    // tier:  "basic" | "pro" | "elite" (optional label for your logic)
+    const body = (await req.json()) as CheckoutBody;
 
-    if (scope !== "org" && scope !== "athlete") {
+    const { scope, ownerId, planCode } = body;
+
+    if (!ownerId) {
       return NextResponse.json(
-        { error: "Invalid scope. Must be 'org' or 'athlete'." },
-        { status: 400 }
+        { error: "Missing ownerId for checkout" },
+        { status: 400 },
       );
     }
 
-    let priceId: string;
-
-    if (scope === "org") {
-      // Program / coach subscription
-      if (!orgId) {
-        return NextResponse.json(
-          { error: "Missing orgId for org-level subscription." },
-          { status: 400 }
-        );
-      }
-      if (!ORG_ELITE_PRICE_ID) {
-        throw new Error("STRIPE_PRICE_COLLEGE_ELITE is not configured.");
-      }
-      priceId = ORG_ELITE_PRICE_ID;
-    } else {
-      // scope === "athlete" → personal athlete subscription
-      if (!ATHLETE_ELITE_PRICE_ID) {
-        throw new Error("STRIPE_PRICE_HS_ATHLETE_ELITE is not configured.");
-      }
-      // Optional: enforce athleteId if you want
-      // if (!athleteId) {
-      //   return NextResponse.json(
-      //     { error: "Missing athleteId for athlete-level subscription." },
-      //     { status: 400 }
-      //   );
-      // }
-      priceId = ATHLETE_ELITE_PRICE_ID;
+    const priceId = PRICE_BY_PLAN[planCode];
+    if (!priceId) {
+      return NextResponse.json(
+        { error: `No Stripe price configured for plan ${planCode}` },
+        { status: 500 },
+      );
     }
+
+    const metadata = {
+      scope,           // "org" | "athlete"
+      owner_id: ownerId,
+      plan_code: planCode, // 👈 core link between Stripe and DB
+    };
+
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "https://xc-ecosystem.vercel.app";
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${APP_URL}/billing?status=success`,
-      cancel_url: `${APP_URL}/billing?status=cancelled`,
-      metadata: {
-        scope,                 // "org" or "athlete"
-        tier: tier ?? "elite", // default
-        orgId: orgId ?? "",
-        athleteId: athleteId ?? "",
-        // userId: "" // you can add this later when auth exists
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${appUrl}/billing?success=1`,
+      cancel_url: `${appUrl}/billing?canceled=1`,
+      metadata,
+      subscription_data: {
+        metadata,
       },
     });
 
+    if (!session.url) {
+      return NextResponse.json(
+        { error: "No checkout URL returned from Stripe" },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (err: unknown) {
+    console.error("Error creating checkout session:", err);
     const message =
-      err instanceof Error ? err.message : "Unknown error creating session";
-
-    console.error("Error creating checkout session:", message);
-
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+      err instanceof Error ? err.message : "Failed to create checkout session";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
 

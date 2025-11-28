@@ -45,29 +45,62 @@ export async function POST(req: NextRequest) {
         break;
       }
       case 'checkout.session.completed': {
-  const session = event.data.object as Stripe.Checkout.Session;
-  console.log('✅ checkout.session.completed', {
-    id: session.id,
-    metadata: session.metadata,
+        const session = event.data.object as Stripe.Checkout.Session;
+        const metadata = session.metadata || {};
+
+        console.log('✅ checkout.session.completed', {
+          id: session.id,
+          metadata,
+        });
+
+        const scope = metadata.scope as 'org' | 'athlete' | undefined;
+        const tier = (metadata.tier as string) || 'elite';
+        const orgId = metadata.orgId || metadata.org_id || null;
+
+        const stripeCustomerId = session.customer as string | null;
+        const stripeSubscriptionId = session.subscription as string | null;
+
+        if (scope === 'org') {
+          if (!orgId) {
+            console.warn('⚠️ Org-level checkout but no orgId in metadata');
+            break;
+          }
+
+          // 🔥 THIS is your org subscription update
+          await db.organizations.update({
+            where: { id: orgId },
+            data: {
+              subscription_tier: tier,
+              stripe_customer_id: stripeCustomerId ?? undefined,
+              stripe_subscription_id: stripeSubscriptionId ?? undefined,
+              billing_status: 'active',
+            },
+          });
+
+          console.log('✨ Org upgraded to', tier, 'orgId:', orgId);
+        } else if (scope === 'athlete') {
+          const userId = metadata.userId;
+          if (!userId) {
+          console.warn('⚠️ Athlete-level checkout but no userId in metadata');
+    break;
+  }
+
+  await db.users.update({
+    where: { id: userId },
+    data: {
+      subscription_tier: tier,
+      stripe_customer_id: stripeCustomerId ?? undefined,
+      stripe_subscription_id: stripeSubscriptionId ?? undefined,
+      billing_status: 'active',
+    },
   });
 
-  const userId = session.metadata?.userId;
-  console.log('userId from metadata:', userId);
-
-  if (userId) {
-    // 🔥 ACTUAL DB UPDATE GOES HERE
-    await db.user.update({
-      where: { id: userId },
-      data: { tier: 'elite' },
-    });
-
-    console.log('✨ Upgrade user to elite:', userId);
-  } else {
-    console.warn('⚠️ No userId in session.metadata');
-  }
+  console.log('✨ Athlete user upgraded to', tier, 'userId:', userId);
+}
 
   break;
 }
+
 
       default: {
         console.log(`ℹ️ Unhandled event type: ${event.type}`);

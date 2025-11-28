@@ -15,7 +15,7 @@ export default function BillingPageClient() {
       setLoadingScope(scope);
 
       // TODO: replace these with real IDs once auth / DB is wired up
-      const orgId = "org-demo-id";
+      const orgId = "e6581ece-3386-4e70-bd05-7feb2e7fd5d9";
       const athleteId = "athlete-demo-id";
 
       const body =

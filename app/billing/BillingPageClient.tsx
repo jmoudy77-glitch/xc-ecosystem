@@ -1,206 +1,107 @@
 // app/billing/BillingPageClient.tsx
-'use client';
+"use client";
 
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-// ⬇️ adjust these import paths to match your project structure
-import { supabase } from '@/lib/supabaseClient';
-import { orgHasActiveSubscription, orgHasAiFeatures } from '@/lib/billing';
-// Minimal shape used in this component
-type Organization = {
-  id: string;
-  name: string;
-  subscription_tier: string | null;
-  billing_status: string | null;
-};
+import { useState } from "react";
 
-
-/* If you hard-coded ORG_ID before, keep that here or import it instead:
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID as string | undefined;*/
-
-// ⚠️ Use the SAME id as in organizations + billing page
-const ORG_ID = "e6581ece-3386-4e70-bd05-7feb2e7fd5d9";
+type Scope = "org" | "athlete";
 
 export default function BillingPageClient() {
-  const router = useRouter();
+  const [loadingScope, setLoadingScope] = useState<Scope | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [org, setOrg] = useState<Organization | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  async function startCheckout(scope: Scope) {
+    try {
+      setError(null);
+      setLoadingScope(scope);
 
-  const searchParams = useSearchParams();
-  const statusParam = searchParams?.get('status') ?? null;
+      // TODO: replace these with real IDs once auth / DB is wired up
+      const orgId = "org-demo-id";
+      const athleteId = "athlete-demo-id";
 
-  // 🔁 If you already had a useEffect that depended on searchParams/status
-  useEffect(() => {
-    async function loadBilling() {
-      setLoading(true);
-            setErrorMsg(null);
-      
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-      
-            if (!user) {
-              router.replace("/login");
-              return;
-            }
-      
-            const { data, error } = await supabase
-              .from("organizations")
-              .select("id, name, subscription_tier, billing_status")
-              .eq("id", ORG_ID)
-              .limit(1);
-      
-            if (error) {
-              setErrorMsg(`Supabase error: ${error.message}`);
-              setOrg(null);
-              setLoading(false);
-              return;
-            }
-      
-            if (!data || data.length === 0) {
-              setErrorMsg("No organization row returned from Supabase.");
-              setOrg(null);
-              setLoading(false);
-              return;
-            }
-      
-            setOrg(data[0] as Organization);
-            setLoading(false);
-    }
+      const body =
+        scope === "org"
+          ? { scope: "org", tier: "elite", orgId }
+          : { scope: "athlete", tier: "elite", athleteId };
 
-    loadBilling();
-  }, [router,statusParam]); // or [] if you had no deps
+      const res = await fetch("/billing/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-  // ⬇️ Paste the rest of your existing JSX from page.tsx here
-  async function handleUpgradeToElite() {
-      try {
-        setActionLoading(true);
-        setErrorMsg(null);
-  
-        const res = await fetch("/api/checkout/session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            priceId: process.env.STRIPE_PRICE_COLLEGE_ELITE, // won't exist at runtime; we'll just send null
-            orgId: ORG_ID,
-            tier: "elite",
-          }),
-        });
-  
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to create checkout session");
-        }
-  
-        const data = await res.json();
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          throw new Error("No checkout URL returned from server");
-        }
-      } catch (err: any) {
-        setErrorMsg(err.message || "Error starting checkout");
-        setActionLoading(false);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = (data as any).error || "Failed to start checkout";
+        throw new Error(msg);
       }
-    }
-  
-    if (loading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <p>Loading billing...</p>
-        </div>
-      );
-    }
-  
-    if (!org) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-          <p className="mb-2 font-semibold">No organization found.</p>
-          {errorMsg && (
-            <p className="text-xs text-red-600 max-w-md text-center">
-              {errorMsg}
-            </p>
-          )}
-        </div>
-      );
-    }
-  
-    const isActive = orgHasActiveSubscription(
-  (org.billing_status ?? undefined) as any
-);
 
-const hasAi = orgHasAiFeatures(
-  (org.subscription_tier ?? undefined) as any
-);
+      const data = await res.json();
+      const url = (data as any).url as string | undefined;
 
-  
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <main className="max-w-xl mx-auto py-10 px-4 space-y-4">
-          <h1 className="text-2xl font-semibold mb-2">Billing</h1>
-  
-          {statusParam === "success" && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm rounded-md p-3">
-              Subscription updated successfully.
-            </div>
-          )}
-  
-          {statusParam === "cancelled" && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-md p-3">
-              Checkout was cancelled. No changes were made.
-            </div>
-          )}
-  
-          {errorMsg && (
-            <p className="text-xs text-red-600">{errorMsg}</p>
-          )}
-  
-          <div className="bg-white shadow rounded-md p-4 space-y-2 text-sm">
-            <p>
-              <span className="font-medium">Organization:</span> {org.name}
-            </p>
-            <p>
-              <span className="font-medium">Subscription Tier:</span>{" "}
-              {org.subscription_tier ?? "none"}
-            </p>
-            <p>
-              <span className="font-medium">Billing Status:</span>{" "}
-              {org.billing_status ?? "none"}
-            </p>
-            <p>
-              <span className="font-medium">Active subscription?</span>{" "}
-              {isActive ? "Yes" : "No"}
-            </p>
-            <p>
-              <span className="font-medium">AI features?</span>{" "}
-              {hasAi ? "Enabled" : "Not included"}
-            </p>
-          </div>
-  
-          <div className="space-y-2 text-sm">
-            {!hasAi && (
-              <button
-                className="w-full py-2 rounded bg-slate-900 text-white font-semibold text-sm disabled:opacity-50"
-                onClick={handleUpgradeToElite}
-                disabled={actionLoading}
-              >
-                {actionLoading
-                  ? "Redirecting to checkout..."
-                  : "Upgrade to Elite (Unlock AI Tools)"}
-              </button>
-            )}
-            {hasAi && (
-              <p className="text-xs text-slate-600">
-                You already have Elite / AI features enabled.
-              </p>
-            )}
-          </div>
-        </main>
-      </div>
-    );
+      if (!url) {
+        throw new Error("No checkout URL returned from server");
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = url;
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Unexpected checkout error";
+      console.error("Checkout error:", message);
+      setError(message);
+    } finally {
+      setLoadingScope(null);
+    }
+  }
+
+  return (
+    <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      <h1 className="text-2xl font-bold mb-4">Billing & Plans</h1>
+
+      {error && (
+        <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Coach / Program Plan */}
+      <section className="border rounded-lg p-4 space-y-2">
+        <h2 className="text-xl font-semibold">Coach / Program Plan</h2>
+        <p className="text-sm text-gray-600">
+          Unlock recruiting tools for your entire program: coach dashboards,
+          recruiting boards, pipeline, and AI scout assistant.
+        </p>
+        <button
+          type="button"
+          onClick={() => startCheckout("org")}
+          disabled={loadingScope === "org"}
+          className="mt-3 inline-flex items-center px-4 py-2 rounded bg-black text-white text-sm disabled:opacity-60"
+        >
+          {loadingScope === "org"
+            ? "Redirecting to Stripe..."
+            : "Upgrade Program to Elite"}
+        </button>
+      </section>
+
+      {/* Athlete Plan */}
+      <section className="border rounded-lg p-4 space-y-2">
+        <h2 className="text-xl font-semibold">Athlete Plan</h2>
+        <p className="text-sm text-gray-600">
+          Personal account for athletes: profile tools, visibility, and AI
+          guidance—even if your team hasn’t joined yet.
+        </p>
+        <button
+          type="button"
+          onClick={() => startCheckout("athlete")}
+          disabled={loadingScope === "athlete"}
+          className="mt-3 inline-flex items-center px-4 py-2 rounded bg-black text-white text-sm disabled:opacity-60"
+        >
+          {loadingScope === "athlete"
+            ? "Redirecting to Stripe..."
+            : "Upgrade Athlete to Elite"}
+        </button>
+      </section>
+    </main>
+  );
 }
+

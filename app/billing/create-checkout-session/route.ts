@@ -1,52 +1,94 @@
-// app/api/billing/create-checkout-session/route.ts
-import { NextResponse } from "next/server";
-import Stripe from "stripe";
+// app/billing/create-checkout-session/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+// Base app URL for Stripe redirect
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+// Stripe price IDs from env
+const ORG_ELITE_PRICE_ID = process.env.STRIPE_PRICE_COLLEGE_ELITE;
+const ATHLETE_ELITE_PRICE_ID = process.env.STRIPE_PRICE_HS_ATHLETE_ELITE;
 
-export async function POST(req: Request) {
+if (!ORG_ELITE_PRICE_ID) {
+  console.warn("STRIPE_PRICE_COLLEGE_ELITE is not set in env vars.");
+}
+if (!ATHLETE_ELITE_PRICE_ID) {
+  console.warn("STRIPE_PRICE_HS_ATHLETE_ELITE is not set in env vars.");
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const { scope, tier, orgId, athleteId } = await req.json();
+    // scope: "org" | "athlete"
+    // tier:  "basic" | "pro" | "elite" (optional label for your logic)
 
-    // You can pull this from your auth instead of the body if you prefer
-    const { userId } = body; // e.g. current coach's user id
-
-    if (!userId) {
-      return new NextResponse("Missing userId", { status: 400 });
+    if (scope !== "org" && scope !== "athlete") {
+      return NextResponse.json(
+        { error: "Invalid scope. Must be 'org' or 'athlete'." },
+        { status: 400 }
+      );
     }
 
-    // TODO: replace with your actual price ID for "elite"
-    const priceId = process.env.STRIPE_ELITE_PRICE_ID!;
-    if (!priceId) {
-      return new NextResponse("Missing STRIPE_ELITE_PRICE_ID", {
-        status: 500,
-      });
-    }
+    let priceId: string;
 
-    const origin =
-      process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    if (scope === "org") {
+      // Program / coach subscription
+      if (!orgId) {
+        return NextResponse.json(
+          { error: "Missing orgId for org-level subscription." },
+          { status: 400 }
+        );
+      }
+      if (!ORG_ELITE_PRICE_ID) {
+        throw new Error("STRIPE_PRICE_COLLEGE_ELITE is not configured.");
+      }
+      priceId = ORG_ELITE_PRICE_ID;
+    } else {
+      // scope === "athlete" → personal athlete subscription
+      if (!ATHLETE_ELITE_PRICE_ID) {
+        throw new Error("STRIPE_PRICE_HS_ATHLETE_ELITE is not configured.");
+      }
+      // Optional: enforce athleteId if you want
+      // if (!athleteId) {
+      //   return NextResponse.json(
+      //     { error: "Missing athleteId for athlete-level subscription." },
+      //     { status: 400 }
+      //   );
+      // }
+      priceId = ATHLETE_ELITE_PRICE_ID;
+    }
 
     const session = await stripe.checkout.sessions.create({
-      mode: "subscription", // or "payment" if one-time
+      mode: "subscription",
+      payment_method_types: ["card"],
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/billing/cancelled`,
+      success_url: `${APP_URL}/billing?status=success`,
+      cancel_url: `${APP_URL}/billing?status=cancelled`,
       metadata: {
-        userId, // 🔑 we read this in the webhook
+        scope,                 // "org" or "athlete"
+        tier: tier ?? "elite", // default
+        orgId: orgId ?? "",
+        athleteId: athleteId ?? "",
+        // userId: "" // you can add this later when auth exists
       },
     });
 
-    return NextResponse.json({ url: session.url });
-  } catch (err: any) {
-    console.error("❌ Error creating checkout session:", err);
-    return new NextResponse("Error creating checkout session", {
-      status: 500,
-    });
+    return NextResponse.json({ url: session.url }, { status: 200 });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : "Unknown error creating session";
+
+    console.error("Error creating checkout session:", message);
+
+    return NextResponse.json(
+      { error: message },
+      { status: 500 }
+    );
   }
 }
+

@@ -45,20 +45,30 @@ export async function POST(req: NextRequest) {
         break;
       }
       case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        console.log('✅ checkout.session.completed', {
-          id: session.id,
-          metadata: session.metadata,
-        });
+  const session = event.data.object as Stripe.Checkout.Session;
+  console.log('✅ checkout.session.completed', {
+    id: session.id,
+    metadata: session.metadata,
+  });
 
-        const userId = session.metadata?.userId;
-        if (userId) {
-          // TODO: real DB upgrade here
-          await db.user.update({ where: { id: userId }, data: { tier: 'elite' } });
-          console.log('✨ Upgrade user to elite:', userId);
-        }
-        break;
-      }
+  const userId = session.metadata?.userId;
+  console.log('userId from metadata:', userId);
+
+  if (userId) {
+    // 🔥 ACTUAL DB UPDATE GOES HERE
+    await db.user.update({
+      where: { id: userId },
+      data: { tier: 'elite' },
+    });
+
+    console.log('✨ Upgrade user to elite:', userId);
+  } else {
+    console.warn('⚠️ No userId in session.metadata');
+  }
+
+  break;
+}
+
       default: {
         console.log(`ℹ️ Unhandled event type: ${event.type}`);
       }

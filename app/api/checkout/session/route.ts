@@ -3,13 +3,15 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
-const ELITE_PRICE_ID = process.env.STRIPE_PRICE_COLLEGE_ELITE;
+const ORG_ELITE_PRICE_ID = process.env.STRIPE_PRICE_COLLEGE_ELITE;
+const ATHLETE_ELITE_PRICE_ID= process.env.STRIPE_PRICE_HS_ATHLETE_ELITE;
 
-if (!ELITE_PRICE_ID) {
+if (!ORG_ELITE_PRICE_ID) {
   console.warn("STRIPE_PRICE_COLLEGE_ELITE is not set in env vars.");
 }
 
 export async function POST(req: NextRequest) {
+  try{
   const user = await auth();
   if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
@@ -76,6 +78,7 @@ export async function POST(req: NextRequest) {
       { url: session.url },
       { status: 200 }
     );
+  
   } catch (err: any) {
     console.error("Error creating checkout session:", err);
     return NextResponse.json(

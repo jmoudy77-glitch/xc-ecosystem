@@ -1,29 +1,51 @@
 // app/billing/create-portal-session/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient();
+    // ⬇️ Destructure to get the actual Supabase client + accessToken
+    const { supabase, accessToken } = supabaseServer();
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // 1) Auth user
     const {
       data: { user: authUser },
-    } = await supabase.auth.getUser();
+      error: authError,
+    } = await supabase.auth.getUser(accessToken);
+
+    if (authError) {
+      console.error("Portal session auth error:", authError);
+      return NextResponse.json(
+        { error: "Auth error" },
+        { status: 500 },
+      );
+    }
 
     if (!authUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 2) App user record
-    const { data: appUser } = await supabase
+    const { data: appUser, error: userError } = await supabase
       .from("users")
       .select("id, subscription_tier, billing_status, stripe_customer_id")
       .eq("auth_id", authUser.id)
       .maybeSingle();
+
+    if (userError) {
+      console.error("Portal session users lookup error:", userError);
+      return NextResponse.json(
+        { error: "User lookup failed" },
+        { status: 500 },
+      );
+    }
 
     if (!appUser) {
       return NextResponse.json(
@@ -33,10 +55,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 3) Org memberships
-    const { data: memberships } = await supabase
+    const { data: memberships, error: membershipError } = await supabase
       .from("memberships")
       .select("organization_id, role")
       .eq("user_id", appUser.id);
+
+    if (membershipError) {
+      console.error("Portal session memberships lookup error:", membershipError);
+    }
 
     const isCoach = memberships && memberships.length > 0;
 
@@ -47,11 +73,19 @@ export async function POST(req: NextRequest) {
       // Coach → use org Stripe customer
       const primaryOrgId = memberships[0].organization_id;
 
-      const { data: org } = await supabase
+      const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("id, stripe_customer_id")
         .eq("id", primaryOrgId)
         .maybeSingle();
+
+      if (orgError) {
+        console.error("Portal session org lookup error:", orgError);
+        return NextResponse.json(
+          { error: "Org lookup failed" },
+          { status: 500 },
+        );
+      }
 
       if (!org || !org.stripe_customer_id) {
         return NextResponse.json(
@@ -75,7 +109,7 @@ export async function POST(req: NextRequest) {
 
     // 5) Create Billing Portal session
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: stripeCustomerId, // ✅ now guaranteed string
+      customer: stripeCustomerId, // ✅ guaranteed string
       return_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing`,
     });
 

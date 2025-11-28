@@ -46,12 +46,15 @@ export async function POST(req: NextRequest) {
       }
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        console.log('✅ checkout.session.completed', session.id);
+        console.log('✅ checkout.session.completed', {
+          id: session.id,
+          metadata: session.metadata,
+        });
 
         const userId = session.metadata?.userId;
         if (userId) {
           // TODO: real DB upgrade here
-          // await db.user.update({ where: { id: userId }, data: { tier: 'elite' } });
+          await db.user.update({ where: { id: userId }, data: { tier: 'elite' } });
           console.log('✨ Upgrade user to elite:', userId);
         }
         break;

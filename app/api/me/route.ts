@@ -68,43 +68,83 @@ export async function GET(req: NextRequest) {
     }
 
     // 3) Load app user row by auth_id
-    const {
-      data: userRow,
-      error: userError,
-    } = await supabase
-      .from("users")
-      .select(
+    let appUser: AppUserRow | null = null;
+
+    {
+      const {
+        data: userRow,
+        error: userError,
+      } = await supabase
+        .from("users")
+        .select(
+          `
+          id,
+          auth_id,
+          email,
+          name,
+          subscription_tier,
+          billing_status,
+          stripe_customer_id
         `
-        id,
-        auth_id,
-        email,
-        name,
-        subscription_tier,
-        billing_status,
-        stripe_customer_id
-      `
-      )
-      .eq("auth_id", user.id)
-      .maybeSingle();
+        )
+        .eq("auth_id", user.id)
+        .maybeSingle();
 
-    if (userError) {
-      console.error("[/api/me] users lookup error:", userError);
-      return NextResponse.json(
-        { error: "User lookup failed" },
-        { status: 500 }
-      );
+      if (userError) {
+        console.error("[/api/me] users lookup error:", userError);
+        return NextResponse.json(
+          { error: "User lookup failed" },
+          { status: 500 }
+        );
+      }
+
+      if (userRow) {
+        appUser = userRow as AppUserRow;
+      }
     }
 
-    if (!userRow) {
-      return NextResponse.json(
-        { error: "User record not found" },
-        { status: 404 }
+    // 4) If no app user row exists, create one on the fly
+    if (!appUser) {
+      console.log(
+        "[/api/me] No user row found, creating one for auth_id:",
+        user.id
       );
+
+      const {
+        data: inserted,
+        error: insertError,
+      } = await supabase
+        .from("users")
+        .insert({
+          auth_id: user.id,
+          email: user.email ?? null,
+          // leave subscription_tier, billing_status, stripe_* as defaults
+        })
+        .select(
+          `
+          id,
+          auth_id,
+          email,
+          name,
+          subscription_tier,
+          billing_status,
+          stripe_customer_id
+        `
+        )
+        .single();
+
+      if (insertError || !inserted) {
+        console.error("[/api/me] Failed to create user row:", insertError);
+        return NextResponse.json(
+          { error: "Failed to create user record" },
+          { status: 500 }
+        );
+      }
+
+      appUser = inserted as AppUserRow;
     }
 
-    const appUser = userRow as AppUserRow;
-
-    // 4) Memberships → derive coach vs athlete + primary org
+    // 5) Memberships → derive coach vs athlete + primary org
     const {
       data: memberships,
       error: membershipError,
@@ -121,7 +161,7 @@ export async function GET(req: NextRequest) {
     const isCoach = membershipList.length > 0;
     const primaryOrgId = isCoach ? membershipList[0].organization_id : null;
 
-    // 5) Load org row if there is a primary org
+    // 6) Load org row if there is a primary org
     let orgRow: OrgRow | null = null;
 
     if (primaryOrgId) {
@@ -141,7 +181,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 6) Compute role, billingScope, and effective tiers
+    // 7) Compute role, billingScope, and effective tiers
     const inferredRole: Role = isCoach ? "coach" : "athlete";
 
     let billingScope: BillingScope = "none";
@@ -159,7 +199,7 @@ export async function GET(req: NextRequest) {
     // Org-level tier
     const orgTier = orgRow?.subscription_tier ?? null;
 
-    // 7) Build response matching MeResponse (BillingPageClient.tsx)
+    // 8) Build response matching MeResponse (BillingPageClient.tsx)
     const payload = {
       user: {
         id: appUser.id,
@@ -200,7 +240,6 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
 
 
 

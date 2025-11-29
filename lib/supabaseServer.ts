@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-type SupabaseServerResult = {
+export type SupabaseServerResult = {
   supabase: SupabaseClient;
   accessToken: string | null;
 };
@@ -19,7 +19,7 @@ export async function supabaseServer(): Promise<SupabaseServerResult> {
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // ✅ In your setup, cookies() is async – we MUST await it
+  // In your Next version, cookies() is async → await it
   const cookieStore = await cookies();
   const accessTokenCookie = cookieStore.get("sb-access-token");
   const accessToken = accessTokenCookie?.value ?? null;

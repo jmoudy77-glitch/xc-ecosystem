@@ -29,17 +29,17 @@ interface AthleteRow {
 
 export async function GET() {
   try {
-    const { supabase, accessToken } = await supabaseServer(); // ✅
-
+    const { supabase, accessToken } = await supabaseServer();
 
     if (!accessToken) {
+      // No Supabase session cookie at all
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
       );
     }
 
-    // 1. Authenticated user (via JWT from cookie)
+    // 1) Auth user via JWT in cookie
     const {
       data: { user },
       error: authError,
@@ -60,7 +60,7 @@ export async function GET() {
       );
     }
 
-    // 2. App user row
+    // 2) Load your app user row
     const {
       data: userRow,
       error: userError,
@@ -77,6 +77,7 @@ export async function GET() {
         athlete_subscription_tier
       `
       )
+      // ⬇️ If your users table uses `auth_id` instead of `id`, change this line:
       .eq("id", user.id)
       .single();
 
@@ -90,7 +91,7 @@ export async function GET() {
 
     const appUser = userRow as AppUserRow;
 
-    // 3. Org row (optional)
+    // 3) Org row (optional)
     let org: OrgRow | null = null;
     if (appUser.org_id) {
       const { data, error } = await supabase
@@ -112,7 +113,7 @@ export async function GET() {
       }
     }
 
-    // 4. Athlete row (optional)
+    // 4) Athlete row (optional)
     let athlete: AthleteRow | null = null;
     if (appUser.athlete_id) {
       const { data, error } = await supabase
@@ -134,7 +135,7 @@ export async function GET() {
       }
     }
 
-    // 5. Billing scope + effective tiers
+    // 5) Billing scope + effective tiers
     let billingScope: BillingScope = "none";
 
     if (appUser.role === "coach" && org) {
@@ -193,5 +194,6 @@ export async function GET() {
     );
   }
 }
+
 
 

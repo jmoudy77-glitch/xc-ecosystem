@@ -67,121 +67,93 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 3) Load app user row by auth_id
+    // 3) Try to load app user row by auth_id (but don't insert if missing)
     let appUser: AppUserRow | null = null;
 
-    {
-      const {
-        data: userRow,
-        error: userError,
-      } = await supabase
-        .from("users")
-        .select(
-          `
-          id,
-          auth_id,
-          email,
-          name,
-          subscription_tier,
-          billing_status,
-          stripe_customer_id
-        `
-        )
-        .eq("auth_id", user.id)
-        .maybeSingle();
-
-      if (userError) {
-        console.error("[/api/me] users lookup error:", userError);
-        return NextResponse.json(
-          { error: "User lookup failed" },
-          { status: 500 }
-        );
-      }
-
-      if (userRow) {
-        appUser = userRow as AppUserRow;
-      }
-    }
-
-    // 4) If no app user row exists, create one on the fly
-    if (!appUser) {
-      console.log(
-        "[/api/me] No user row found, creating one for auth_id:",
-        user.id
-      );
-
-      const {
-        data: inserted,
-        error: insertError,
-      } = await supabase
-        .from("users")
-        .insert({
-          auth_id: user.id,
-          email: user.email ?? null,
-          // leave subscription_tier, billing_status, stripe_* as defaults
-        })
-        .select(
-          `
-          id,
-          auth_id,
-          email,
-          name,
-          subscription_tier,
-          billing_status,
-          stripe_customer_id
-        `
-        )
-        .single();
-
-      if (insertError || !inserted) {
-        console.error("[/api/me] Failed to create user row:", insertError);
-        return NextResponse.json(
-          { error: "Failed to create user record" },
-          { status: 500 }
-        );
-      }
-
-      appUser = inserted as AppUserRow;
-    }
-
-    // 5) Memberships → derive coach vs athlete + primary org
     const {
-      data: memberships,
-      error: membershipError,
+      data: userRow,
+      error: userError,
     } = await supabase
-      .from("memberships")
-      .select("organization_id, role")
-      .eq("user_id", appUser.id);
+      .from("users")
+      .select(
+        `
+        id,
+        auth_id,
+        email,
+        name,
+        subscription_tier,
+        billing_status,
+        stripe_customer_id
+      `
+      )
+      .eq("auth_id", user.id)
+      .maybeSingle();
 
-    if (membershipError) {
-      console.error("[/api/me] memberships lookup error:", membershipError);
+    if (userError) {
+      console.error("[/api/me] users lookup error:", userError);
+      // We'll just fall back to auth user info
     }
 
-    const membershipList = (memberships ?? []) as MembershipRow[];
-    const isCoach = membershipList.length > 0;
-    const primaryOrgId = isCoach ? membershipList[0].organization_id : null;
+    if (userRow) {
+      appUser = userRow as AppUserRow;
+    } else {
+      // No row in users table yet → synthesize a minimal appUser
+      appUser = {
+        id: user.id, // not actually users.id, but fine for front-end identity
+        auth_id: user.id,
+        email: user.email ?? null,
+        name: null,
+        subscription_tier: null,
+        billing_status: null,
+        stripe_customer_id: null,
+      };
+    }
 
-    // 6) Load org row if there is a primary org
+    // 4) If we have a real users.id from DB, load memberships/org.
+    // If this is a synthesized user (id === auth_id and no DB row), skip memberships/org.
+    let membershipList: MembershipRow[] = [];
     let orgRow: OrgRow | null = null;
+    let primaryOrgId: string | null = null;
 
-    if (primaryOrgId) {
+    const hasRealUserRow = !!userRow && !!(userRow as any).id;
+
+    if (hasRealUserRow) {
       const {
-        data: org,
-        error: orgError,
+        data: memberships,
+        error: membershipError,
       } = await supabase
-        .from("organizations")
-        .select("id, name, subscription_tier, billing_status")
-        .eq("id", primaryOrgId)
-        .maybeSingle();
+        .from("memberships")
+        .select("organization_id, role")
+        .eq("user_id", appUser.id);
 
-      if (orgError) {
-        console.error("[/api/me] organizations lookup error:", orgError);
-      } else if (org) {
-        orgRow = org as OrgRow;
+      if (membershipError) {
+        console.error("[/api/me] memberships lookup error:", membershipError);
+      }
+
+      membershipList = (memberships ?? []) as MembershipRow[];
+      primaryOrgId =
+        membershipList.length > 0 ? membershipList[0].organization_id : null;
+
+      if (primaryOrgId) {
+        const {
+          data: org,
+          error: orgError,
+        } = await supabase
+          .from("organizations")
+          .select("id, name, subscription_tier, billing_status")
+          .eq("id", primaryOrgId)
+          .maybeSingle();
+
+        if (orgError) {
+          console.error("[/api/me] organizations lookup error:", orgError);
+        } else if (org) {
+          orgRow = org as OrgRow;
+        }
       }
     }
 
-    // 7) Compute role, billingScope, and effective tiers
+    // 5) Compute role, billingScope, and effective tiers
+    const isCoach = membershipList.length > 0;
     const inferredRole: Role = isCoach ? "coach" : "athlete";
 
     let billingScope: BillingScope = "none";
@@ -199,7 +171,7 @@ export async function GET(req: NextRequest) {
     // Org-level tier
     const orgTier = orgRow?.subscription_tier ?? null;
 
-    // 8) Build response matching MeResponse (BillingPageClient.tsx)
+    // 6) Build response matching MeResponse (BillingPageClient.tsx)
     const payload = {
       user: {
         id: appUser.id,

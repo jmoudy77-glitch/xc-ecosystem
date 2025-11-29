@@ -115,7 +115,8 @@ export async function GET(req: NextRequest) {
     let orgRow: OrgRow | null = null;
     let primaryOrgId: string | null = null;
 
-    const hasRealUserRow = !!userRow && !!(userRow as any).id;
+    const hasRealUserRow = !!userRow && typeof userRow.id === "string";
+
 
     if (hasRealUserRow) {
       const {

@@ -9,7 +9,6 @@ interface AppUserRow {
   id: string;
   auth_id: string;
   email: string | null;
-  role: string | null;
   name: string | null;
   subscription_tier: string | null;
   billing_status: string | null;
@@ -79,7 +78,6 @@ export async function GET(req: NextRequest) {
         id,
         auth_id,
         email,
-        role,
         name,
         subscription_tier,
         billing_status,
@@ -161,7 +159,7 @@ export async function GET(req: NextRequest) {
     // Org-level tier
     const orgTier = orgRow?.subscription_tier ?? null;
 
-    // 7) Build response matching MeResponse
+    // 7) Build response matching MeResponse (BillingPageClient.tsx)
     const payload = {
       user: {
         id: appUser.id,

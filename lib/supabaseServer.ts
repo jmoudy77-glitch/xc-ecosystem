@@ -19,10 +19,31 @@ export async function supabaseServer(): Promise<SupabaseServerResult> {
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // In your Next version, cookies() is async → await it
+  // In your Next version, cookies() is async
   const cookieStore = await cookies();
-  const accessTokenCookie = cookieStore.get("sb-access-token");
-  const accessToken = accessTokenCookie?.value ?? null;
+
+  // Supabase v2 auth cookie looks like: sb-<project-ref>-auth-token
+  const allCookies = cookieStore.getAll();
+  const authCookie = allCookies.find((c) =>
+    c.name.startsWith("sb-") && c.name.endsWith("-auth-token")
+  );
+
+  let accessToken: string | null = null;
+
+  if (authCookie) {
+    try {
+      // Cookie value is JSON: { access_token, refresh_token, ... }
+      const parsed = JSON.parse(authCookie.value) as {
+        access_token?: string;
+      };
+
+      if (parsed.access_token) {
+        accessToken = parsed.access_token;
+      }
+    } catch (err) {
+      console.error("Failed to parse Supabase auth cookie:", err);
+    }
+  }
 
   return { supabase, accessToken };
 }

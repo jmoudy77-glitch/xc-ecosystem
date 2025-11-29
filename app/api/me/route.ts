@@ -68,12 +68,12 @@ export async function GET(req: NextRequest) {
     }
 
     // 3) Load your app user row
-    const {
-      data: userRow,
-      error: userError,
+   const {
+    data: userRow,
+    error: userError,
     } = await supabase
-      .from("users")
-      .select(
+    .from("users")
+    .select(
         `
         id,
         email,
@@ -82,11 +82,15 @@ export async function GET(req: NextRequest) {
         athlete_id,
         coach_subscription_tier,
         athlete_subscription_tier
-      `
-      )
-      // ⬇️ If your users table uses auth_id instead of id, change this line:
-      .eq("id", user.id)
-      .single();
+    `
+    )
+    .eq("auth_id", user.id) // ✅ match how create-portal-session does it
+    .single();
+
+    console.log("[/api/me] auth user id:", user.id);
+    console.log("[/api/me] userRow:", userRow);
+    console.log("[/api/me] userError:", userError);
+
 
     if (userError || !userRow) {
       console.error("[/api/me] users lookup error:", userError);

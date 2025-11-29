@@ -7,24 +7,20 @@ type BillingScope = "org" | "athlete" | "none";
 
 interface AppUserRow {
   id: string;
-  email: string;
-  role: Role;
-  org_id: string | null;
-  athlete_id: string | null;
-  coach_subscription_tier: string | null;
-  athlete_subscription_tier: string | null;
+  auth_id: string;
+  subscription_tier: string | null;
+  billing_status: string | null;
+  stripe_customer_id: string | null;
+}
+
+interface MembershipRow {
+  organization_id: string;
+  role: string | null;
 }
 
 interface OrgRow {
   id: string;
-  name: string;
-  subscription_tier: string | null;
-}
-
-interface AthleteRow {
-  id: string;
-  name: string;
-  subscription_tier: string | null;
+  name: string | null;
 }
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -67,132 +63,109 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 3) Load your app user row
-   const {
-    data: userRow,
-    error: userError,
+    // 3) Load app user row by auth_id (matches your create-portal-session)
+    const {
+      data: userRow,
+      error: userError,
     } = await supabase
-    .from("users")
-    .select(
+      .from("users")
+      .select(
         `
         id,
-        email,
-        role,
-        org_id,
-        athlete_id,
-        coach_subscription_tier,
-        athlete_subscription_tier
-    `
-    )
-    .eq("auth_id", user.id) // ✅ match how create-portal-session does it
-    .single();
+        auth_id,
+        subscription_tier,
+        billing_status,
+        stripe_customer_id
+      `
+      )
+      .eq("auth_id", user.id)
+      .maybeSingle();
 
-    console.log("[/api/me] auth user id:", user.id);
-    console.log("[/api/me] userRow:", userRow);
-    console.log("[/api/me] userError:", userError);
-
-
-    if (userError || !userRow) {
+    if (userError) {
       console.error("[/api/me] users lookup error:", userError);
       return NextResponse.json(
-        { error: "User record not found" },
+        { error: "User lookup failed" },
         { status: 500 }
+      );
+    }
+
+    if (!userRow) {
+      return NextResponse.json(
+        { error: "User record not found" },
+        { status: 404 }
       );
     }
 
     const appUser = userRow as AppUserRow;
 
-    // 4) Org row (optional)
-    let org: OrgRow | null = null;
-    if (appUser.org_id) {
-      const { data, error } = await supabase
+    // 4) Memberships → derive role + primary org
+    const {
+      data: memberships,
+      error: membershipError,
+    } = await supabase
+      .from("memberships")
+      .select("organization_id, role")
+      .eq("user_id", appUser.id);
+
+    if (membershipError) {
+      console.error("[/api/me] memberships lookup error:", membershipError);
+    }
+
+    const membershipList = (memberships ?? []) as MembershipRow[];
+    const isCoach = membershipList.length > 0;
+    const primaryOrgId = isCoach ? membershipList[0].organization_id : null;
+
+    // 5) Load org name if there is a primary org
+    let orgRow: OrgRow | null = null;
+
+    if (primaryOrgId) {
+      const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select(
-          `
-          id,
-          name,
-          subscription_tier
-        `
-        )
-        .eq("id", appUser.org_id)
-        .single();
+        .select("id, name")
+        .eq("id", primaryOrgId)
+        .maybeSingle();
 
-      if (error) {
-        console.error("[/api/me] organizations lookup error:", error);
-      } else if (data) {
-        org = data as OrgRow;
+      if (orgError) {
+        console.error("[/api/me] organizations lookup error:", orgError);
+      } else if (org) {
+        orgRow = org as OrgRow;
       }
     }
 
-    // 5) Athlete row (optional)
-    let athlete: AthleteRow | null = null;
-    if (appUser.athlete_id) {
-      const { data, error } = await supabase
-        .from("athletes")
-        .select(
-          `
-          id,
-          name,
-          subscription_tier
-        `
-        )
-        .eq("id", appUser.athlete_id)
-        .single();
+    // 6) Compute role, billingScope, and effective tier
+    const role: Role = isCoach ? "coach" : "athlete";
+    const billingScope: BillingScope = isCoach
+      ? "org"
+      : "athlete";
 
-      if (error) {
-        console.error("[/api/me] athletes lookup error:", error);
-      } else if (data) {
-        athlete = data as AthleteRow;
-      }
-    }
-
-    // 6) Billing scope + effective tiers
-    let billingScope: BillingScope = "none";
-
-    if (appUser.role === "coach" && org) {
-      billingScope = "org";
-    } else if (appUser.role === "athlete" && athlete) {
-      billingScope = "athlete";
-    }
-
-    const athleteTierFromRow = athlete?.subscription_tier ?? null;
-    const orgTierFromRow = org?.subscription_tier ?? null;
-
-    // HS ATHLETE BASIC = default free tier for athletes with no paid plan
-    const effectiveAthleteTier =
-      athleteTierFromRow ??
-      appUser.athlete_subscription_tier ??
-      (appUser.role === "athlete" ? "HS ATHLETE BASIC" : null);
-
-    const effectiveOrgTier =
-      orgTierFromRow ?? appUser.coach_subscription_tier ?? null;
+    const effectiveTier =
+      appUser.subscription_tier ??
+      (role === "athlete" ? "HS ATHLETE BASIC" : null);
 
     const payload = {
       user: {
         id: appUser.id,
-        email: appUser.email,
-        role: appUser.role,
-        orgId: appUser.org_id,
-        athleteId: appUser.athlete_id,
+        email: user.email ?? "",
+        role,
+        orgId: primaryOrgId,
+        athleteId: null as string | null,
       },
       billingScope,
-      org: org
+      org: orgRow && primaryOrgId
         ? {
-            id: org.id,
-            name: org.name,
-            subscriptionTier: effectiveOrgTier,
+            id: primaryOrgId,
+            name: orgRow.name ?? "Organization",
+            subscriptionTier: role === "coach" ? effectiveTier : null,
           }
         : null,
-      athlete: athlete
-        ? {
-            id: athlete.id,
-            name: athlete.name,
-            subscriptionTier: effectiveAthleteTier,
-          }
-        : null,
+      athlete: null as {
+        id: string;
+        name: string;
+        subscriptionTier: string | null;
+      } | null,
       tiers: {
-        athlete: effectiveAthleteTier,
-        org: effectiveOrgTier,
+        athlete: role === "athlete" ? effectiveTier : null,
+        org: role === "coach" ? effectiveTier : null,
       },
     };
 
@@ -205,7 +178,6 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
 
 
 

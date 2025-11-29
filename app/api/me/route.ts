@@ -1,6 +1,6 @@
 // app/api/me/route.ts
-import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 type Role = "coach" | "athlete";
 type BillingScope = "org" | "athlete" | "none";
@@ -27,23 +27,30 @@ interface AthleteRow {
   subscription_tier: string | null;
 }
 
-export async function GET() {
-  try {
-    const { supabase, accessToken } = await supabaseServer();
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    if (!accessToken) {
-      // No Supabase session cookie at all
+export async function GET(req: NextRequest) {
+  try {
+    // 1) Read token from Authorization header: "Bearer <token>"
+    const authHeader = req.headers.get("authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    if (!token) {
       return NextResponse.json(
-        { error: "Not authenticated" },
+        { error: "Not authenticated (no token)" },
         { status: 401 }
       );
     }
 
-    // 1) Auth user via JWT in cookie
+    // 2) Ask Supabase who this token belongs to
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(accessToken);
+    } = await supabase.auth.getUser(token);
 
     if (authError) {
       console.error("[/api/me] Auth error:", authError);
@@ -55,12 +62,12 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Not authenticated" },
+        { error: "Not authenticated (invalid token)" },
         { status: 401 }
       );
     }
 
-    // 2) Load your app user row
+    // 3) Load your app user row
     const {
       data: userRow,
       error: userError,
@@ -77,7 +84,7 @@ export async function GET() {
         athlete_subscription_tier
       `
       )
-      // ⬇️ If your users table uses `auth_id` instead of `id`, change this line:
+      // ⬇️ If your users table uses auth_id instead of id, change this line:
       .eq("id", user.id)
       .single();
 
@@ -91,7 +98,7 @@ export async function GET() {
 
     const appUser = userRow as AppUserRow;
 
-    // 3) Org row (optional)
+    // 4) Org row (optional)
     let org: OrgRow | null = null;
     if (appUser.org_id) {
       const { data, error } = await supabase
@@ -113,7 +120,7 @@ export async function GET() {
       }
     }
 
-    // 4) Athlete row (optional)
+    // 5) Athlete row (optional)
     let athlete: AthleteRow | null = null;
     if (appUser.athlete_id) {
       const { data, error } = await supabase
@@ -135,7 +142,7 @@ export async function GET() {
       }
     }
 
-    // 5) Billing scope + effective tiers
+    // 6) Billing scope + effective tiers
     let billingScope: BillingScope = "none";
 
     if (appUser.role === "coach" && org) {
@@ -194,6 +201,7 @@ export async function GET() {
     );
   }
 }
+
 
 
 

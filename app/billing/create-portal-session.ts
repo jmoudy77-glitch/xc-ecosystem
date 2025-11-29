@@ -8,7 +8,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 export async function POST(req: NextRequest) {
   try {
     // ⬇️ Destructure to get the actual Supabase client + accessToken
-    const { supabase, accessToken } = supabaseServer();
+    const { supabase, accessToken } = await supabaseServer(); // ✅
+
 
     if (!accessToken) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -29,7 +29,8 @@ interface AthleteRow {
 
 export async function GET() {
   try {
-    const { supabase, accessToken } = supabaseServer();
+    const { supabase, accessToken } = await supabaseServer(); // ✅
+
 
     if (!accessToken) {
       return NextResponse.json(

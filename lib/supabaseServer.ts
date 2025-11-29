@@ -7,12 +7,7 @@ type SupabaseServerResult = {
   accessToken: string | null;
 };
 
-// Minimal interface so TS knows cookies().get() exists and returns { value }
-interface CookieStore {
-  get(name: string): { value: string } | undefined;
-}
-
-export function supabaseServer(): SupabaseServerResult {
+export async function supabaseServer(): Promise<SupabaseServerResult> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -24,12 +19,13 @@ export function supabaseServer(): SupabaseServerResult {
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // cookies() returns a special object; we narrow it to something with .get()
-  const cookieStore = cookies() as unknown as CookieStore;
+  // ✅ In your setup, cookies() is async – we MUST await it
+  const cookieStore = await cookies();
   const accessTokenCookie = cookieStore.get("sb-access-token");
-  const accessToken = accessTokenCookie ? accessTokenCookie.value : null;
+  const accessToken = accessTokenCookie?.value ?? null;
 
   return { supabase, accessToken };
 }
+
 
 

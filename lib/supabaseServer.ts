@@ -1,34 +1,35 @@
 // lib/supabaseServer.ts
 import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-export function supabaseServer() {
-  const cookieStore = cookies();
+type SupabaseServerResult = {
+  supabase: SupabaseClient;
+  accessToken: string | null;
+};
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          try {
-            cookieStore.set({ name, value, ...options });
-          } catch (err) {
-            console.warn("Suppressing cookie set error in Next.js App Router:", err);
-          }
-        },
-        remove(name: string, options: any) {
-          try {
-            cookieStore.set({ name, value: "", ...options });
-          } catch (err) {
-            console.warn("Suppressing cookie delete error in Next.js App Router:", err);
-          }
-        }
-      }
-    }
-  );
+// Minimal interface so TS knows cookies().get() exists and returns { value }
+interface CookieStore {
+  get(name: string): { value: string } | undefined;
 }
+
+export function supabaseServer(): SupabaseServerResult {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY env vars"
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+  // cookies() returns a special object; we narrow it to something with .get()
+  const cookieStore = cookies() as unknown as CookieStore;
+  const accessTokenCookie = cookieStore.get("sb-access-token");
+  const accessToken = accessTokenCookie ? accessTokenCookie.value : null;
+
+  return { supabase, accessToken };
+}
+
 

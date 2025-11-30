@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
 
       if (
         insertAthleteError ||
-        !insertAthlete ||
+        !insertedAthlete ||
         insertedAthlete.length === 0
       ) {
         console.error(

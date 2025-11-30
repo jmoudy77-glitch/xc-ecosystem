@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   orgHasActiveSubscription,
   orgHasAiFeatures,
@@ -143,6 +144,14 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-5xl mx-auto py-8 px-4 space-y-6">
+        <div className="mb-6">
+          <Link
+            href="/athlete/profile"
+            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
+          >
+            View My Athlete Profile
+          </Link>
+        </div>
         {/* Billing summary card */}
         <section className="bg-white shadow rounded-md p-4 text-sm flex justify-between items-center">
           <div>

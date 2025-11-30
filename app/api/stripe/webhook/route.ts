@@ -2,233 +2,226 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import type { PlanCode } from "@/lib/billingPlans";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+/**
+ * Stripe webhook handler.
+ *
+ * Responsibilities:
+ * - Verify Stripe signature
+ * - Handle subscription lifecycle events
+ * - Upsert rows into:
+ *    - program_subscriptions (for scope = "program")
+ *    - athlete_subscriptions (for scope = "athlete")
+ *
+ * This route expects subscriptions to carry metadata:
+ *   - scope: "program" | "athlete"
+ *   - owner_id: program.id or users.id
+ *   - plan_code: PlanCode
+ *
+ * That metadata is attached by the Checkout Session via subscription_data.metadata
+ * in app/billing/create-checkout-session/route.ts.
+ */
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-06-20",
+});
 
-// ---- Plan + billing types ----
+const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 
-type BillingScope = "org" | "athlete";
+type BillingScope = "program" | "athlete";
 
-// These are your 9 concrete products, represented as internal codes
-export type PlanCode =
-  | "hs_athlete_basic"
-  | "hs_athlete_pro"
-  | "hs_athlete_elite"
-  | "hs_starter"
-  | "hs_pro"
-  | "hs_elite"
-  | "college_starter"
-  | "college_pro"
-  | "college_elite";
+function getSubscriptionMetadata(subscription: Stripe.Subscription) {
+  const metadata = subscription.metadata || {};
+  const scope = metadata.scope as BillingScope | undefined;
+  const ownerId = metadata.owner_id as string | undefined;
+  const planCode = metadata.plan_code as PlanCode | undefined;
 
-type BillingStatus = "active" | "past_due" | "canceled" | "trialing" | "none";
-
-// Optional helper if you want to check for “free”
-export function isFreePlan(plan: PlanCode | null): boolean {
-  return plan === "hs_athlete_basic";
+  return { scope, ownerId, planCode };
 }
 
-// Map Stripe subscription status → internal BillingStatus
-function mapStripeStatusToBillingStatus(
-  stripeStatus: Stripe.Subscription.Status
-): BillingStatus {
-  switch (stripeStatus) {
-    case "active":
-      return "active";
-    case "trialing":
-      return "trialing";
-    case "past_due":
-    case "unpaid":
-      return "past_due";
-    case "canceled":
-      return "canceled";
-    default:
-      return "none";
+async function upsertSubscriptionFromStripe(
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  const { scope, ownerId, planCode } = getSubscriptionMetadata(subscription);
+
+  if (!scope || !ownerId || !planCode) {
+    console.warn(
+      "[stripe:webhook] Missing metadata on subscription",
+      JSON.stringify({
+        subscriptionId: subscription.id,
+        scope,
+        ownerId,
+        planCode,
+      }),
+    );
+    return;
+  }
+
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id || null;
+
+  const status = subscription.status;
+  const currentPeriodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null;
+  const cancelAtPeriodEnd = subscription.cancel_at_period_end ?? false;
+
+  if (scope === "program") {
+    const { error } = await supabaseAdmin
+      .from("program_subscriptions")
+      .upsert(
+        {
+          program_id: ownerId,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscription.id,
+          plan_code: planCode,
+          status,
+          current_period_end: currentPeriodEnd,
+          cancel_at_period_end: cancelAtPeriodEnd,
+        },
+        {
+          onConflict: "program_id,stripe_subscription_id",
+        },
+      );
+
+    if (error) {
+      console.error(
+        "[stripe:webhook] Failed to upsert program subscription",
+        error,
+      );
+    }
+  } else if (scope === "athlete") {
+    const { error } = await supabaseAdmin
+      .from("athlete_subscriptions")
+      .upsert(
+        {
+          user_id: ownerId,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscription.id,
+          plan_code: planCode,
+          status,
+          current_period_end: currentPeriodEnd,
+          cancel_at_period_end: cancelAtPeriodEnd,
+        },
+        {
+          onConflict: "user_id,stripe_subscription_id",
+        },
+      );
+
+    if (error) {
+      console.error(
+        "[stripe:webhook] Failed to upsert athlete subscription",
+        error,
+      );
+    }
   }
 }
 
-// Use subscription.metadata.plan_code when present
-function getPlanFromSubscription(subscription: Stripe.Subscription): PlanCode {
-  const planCode = subscription.metadata?.plan_code as PlanCode | undefined;
+async function markSubscriptionCanceled(
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  const { scope, ownerId, planCode } = getSubscriptionMetadata(subscription);
 
-  if (planCode) return planCode;
+  if (!scope || !ownerId) {
+    console.warn(
+      "[stripe:webhook] Missing metadata on canceled subscription",
+      JSON.stringify({
+        subscriptionId: subscription.id,
+        scope,
+        ownerId,
+        planCode,
+      }),
+    );
+    return;
+  }
 
-  // Fallback if metadata is missing/invalid.
-  // You *could* inspect subscription.items[].price.product here if needed.
-  return "hs_athlete_basic";
+  if (scope === "program") {
+    const { error } = await supabaseAdmin
+      .from("program_subscriptions")
+      .update({
+        status: "canceled",
+        cancel_at_period_end: true,
+      })
+      .match({
+        program_id: ownerId,
+        stripe_subscription_id: subscription.id,
+      });
+
+    if (error) {
+      console.error(
+        "[stripe:webhook] Failed to mark program subscription canceled",
+        error,
+      );
+    }
+  } else if (scope === "athlete") {
+    const { error } = await supabaseAdmin
+      .from("athlete_subscriptions")
+      .update({
+        status: "canceled",
+        cancel_at_period_end: true,
+      })
+      .match({
+        user_id: ownerId,
+        stripe_subscription_id: subscription.id,
+      });
+
+    if (error) {
+      console.error(
+        "[stripe:webhook] Failed to mark athlete subscription canceled",
+        error,
+      );
+    }
+  }
 }
 
-// ---- Webhook handler ----
-
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text();
-  const signature = req.headers.get("stripe-signature");
+  const sig = req.headers.get("stripe-signature");
 
-  if (!signature) {
-    return NextResponse.json(
-      { error: "Missing Stripe signature" },
-      { status: 400 }
-    );
+  if (!sig) {
+    return NextResponse.json({ error: "Missing Stripe signature header" }, { status: 400 });
   }
 
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "Invalid Stripe signature";
-    console.error("Stripe webhook signature verification failed:", message);
-    return NextResponse.json({ error: message }, { status: 400 });
+    const rawBody = await req.text();
+    event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
+  } catch (err) {
+    console.error("[stripe:webhook] Signature verification failed", err);
+    return NextResponse.json(
+      { error: "Webhook signature verification failed" },
+      { status: 400 },
+    );
   }
 
   try {
     switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-
-        if (!session.subscription) break;
-
-        const subscription = await stripe.subscriptions.retrieve(
-          session.subscription as string
-        );
-
-        await upsertSubscriptionFromStripe(subscription);
-        break;
-      }
-
       case "customer.subscription.created":
-      case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
+      case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         await upsertSubscriptionFromStripe(subscription);
         break;
       }
-
-      default: {
-        // Ignore other events for now
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await markSubscriptionCanceled(subscription);
         break;
+      }
+      default: {
+        // For now, we ignore other events. You can log them if useful.
+        console.log("[stripe:webhook] Unhandled event type:", event.type);
       }
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
-  } catch (err: unknown) {
-    console.error("Error handling Stripe webhook", event.type, err);
+  } catch (err) {
+    console.error("[stripe:webhook] Handler error", err);
     return NextResponse.json(
-      { error: "Webhook handler failed" },
-      { status: 500 }
+      { error: "Webhook handler error" },
+      { status: 500 },
     );
   }
 }
-
-// ---- Core: Stripe Subscription → Supabase organizations/users ----
-
-async function upsertSubscriptionFromStripe(subscription: Stripe.Subscription) {
-  const customerId = subscription.customer as string;
-
-  // Metadata set in create-checkout-session (scope, owner_id, plan_code)
-  const meta = subscription.metadata ?? {};
-  const rawScope = meta.scope as string | undefined;
-  const ownerId = meta.owner_id as string | undefined;
-
-  const scope: BillingScope | null =
-    rawScope === "org"
-      ? "org"
-      : rawScope === "athlete"
-      ? "athlete"
-      : null;
-
-  if (!scope || !ownerId) {
-    console.warn(
-      "Subscription missing scope/owner_id metadata; skipping",
-      subscription.id,
-      meta
-    );
-    return;
-  }
-
-  const planCode = getPlanFromSubscription(subscription);
-  const status = mapStripeStatusToBillingStatus(subscription.status);
-
-  if (scope === "org") {
-    // Organization (coach/program) billing
-    const update = {
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      subscription_tier: planCode, // 👈 store concrete PlanCode string
-      billing_status: status,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabaseAdmin
-      .from("organizations")
-      .update(update)
-      .eq("id", ownerId);
-
-    if (error) {
-      console.error(
-        "Failed to update organization billing from Stripe subscription",
-        subscription.id,
-        error
-      );
-    }
-  } else {
-    // Athlete / personal billing (users table)
-    const update = {
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      subscription_tier: planCode, // 👈 store concrete PlanCode string
-      billing_status: status,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabaseAdmin
-      .from("users")
-      .update(update)
-      .eq("id", ownerId);
-
-    if (error) {
-      console.error(
-        "Failed to update user billing from Stripe subscription",
-        subscription.id,
-        error
-      );
-    }
-  }
-
-  // Optional: on cancel, reset to a "free" plan or clear tier
-  if (subscription.status === "canceled") {
-    if (scope === "org") {
-      const { error } = await supabaseAdmin
-        .from("organizations")
-        .update({
-          // For orgs, maybe you want "no paid plan" when canceled:
-          subscription_tier: null,
-        })
-        .eq("id", ownerId);
-
-      if (error) {
-        console.error("Failed to reset org tier after cancel", error);
-      }
-    } else {
-      const { error } = await supabaseAdmin
-        .from("users")
-        .update({
-          // For athletes, you might default back to HS Athlete Basic
-          subscription_tier: "hs_athlete_basic" as PlanCode,
-        })
-        .eq("id", ownerId);
-
-      if (error) {
-        console.error("Failed to reset user tier after cancel", error);
-      }
-    }
-  }
-}
-
-
-

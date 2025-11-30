@@ -1,219 +1,260 @@
 // app/api/me/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import type { PlanCode } from "@/lib/billingPlans";
 
-type Role = "coach" | "athlete";
-type BillingScope = "org" | "athlete" | "none";
+/**
+ * /api/me
+ *
+ * Returns the authenticated user's core profile and billing context.
+ *
+ * Responsibilities:
+ * - Ensure a row exists in the public.users table for the auth user
+ * - Load basic user info
+ * - Load any athlete-level subscription (athlete_subscriptions)
+ * - Optionally load program memberships and program-level subscriptions
+ *
+ * This route is intentionally conservative and focuses on returning
+ * enough data for the Billing UI and top-level "who am I?" context.
+ */
 
-interface AppUserRow {
-  id: string;
-  auth_id: string;
-  email: string | null;
-  name: string | null;
-  subscription_tier: string | null;
-  billing_status: string | null;
-  stripe_customer_id: string | null;
-}
+type RoleHint = "coach" | "athlete" | "both" | "unknown";
 
-interface MembershipRow {
-  organization_id: string;
-  role: string | null;
-}
+type BillingSummary = {
+  planCode: PlanCode | null;
+  status: string | null;
+  currentPeriodEnd: string | null;
+};
 
-interface OrgRow {
-  id: string;
-  name: string | null;
-  subscription_tier: string | null;
-  billing_status: string | null;
-}
+type ProgramBillingSummary = BillingSummary & {
+  programId: string;
+  programName: string | null;
+};
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    // 1) Read token from Authorization header: "Bearer <token>"
-    const authHeader = req.headers.get("authorization") ?? "";
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : null;
+    const { supabase } = await supabaseServer();
 
-    if (!token) {
-      return NextResponse.json(
-        { error: "Not authenticated (no token)" },
-        { status: 401 }
-      );
-    }
-
-    // 2) Ask Supabase who this token belongs to
+    // 1) Get auth user from Supabase
     const {
-      data: { user },
+      data: { user: authUser },
       error: authError,
-    } = await supabase.auth.getUser(token);
+    } = await supabase.auth.getUser();
 
     if (authError) {
-      console.error("[/api/me] Auth error:", authError);
+      console.error("[/api/me] Failed to load auth user:", authError);
       return NextResponse.json(
-        { error: "Auth error fetching user" },
-        { status: 500 }
+        { error: "Failed to load auth user" },
+        { status: 500 },
       );
     }
 
-    if (!user) {
+    if (!authUser) {
       return NextResponse.json(
-        { error: "Not authenticated (invalid token)" },
-        { status: 401 }
+        { error: "Not authenticated" },
+        { status: 401 },
       );
     }
 
-    // 3) Try to load app user row by auth_id (but don't insert if missing)
-    let appUser: AppUserRow | null = null;
+    const authId = authUser.id;
+
+    // 2) Ensure a row exists in public.users for this auth user.
+    // We use supabaseAdmin to bypass RLS on insert.
+    const { data: existingUsers, error: userSelectError } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("auth_id", authId)
+      .limit(1);
+
+    if (userSelectError) {
+      console.error("[/api/me] Failed to select user row:", userSelectError);
+      return NextResponse.json(
+        { error: "Failed to load user record" },
+        { status: 500 },
+      );
+    }
+
+    let appUser = existingUsers?.[0] ?? null;
+
+    if (!appUser) {
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from("users")
+        .insert({
+          auth_id: authId,
+          email: authUser.email,
+          name: authUser.user_metadata?.full_name ?? authUser.email,
+        })
+        .select("*")
+        .limit(1);
+
+      if (insertError || !inserted || inserted.length === 0) {
+        console.error("[/api/me] Failed to create user row:", insertError);
+        return NextResponse.json(
+          { error: "Failed to create user record" },
+          { status: 500 },
+        );
+      }
+
+      appUser = inserted[0];
+    }
+
+    const userId: string = appUser.id;
+
+    // 3) Determine a basic role hint from relationships (very simple heuristic for now).
+    let roleHint: RoleHint = "unknown";
+
+    // If this user has any athlete profile, they are at least an athlete.
+    const { data: athleteProfiles, error: athleteError } = await supabaseAdmin
+      .from("athletes")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1);
+
+    if (athleteError) {
+      console.error("[/api/me] Failed to lookup athlete profile:", athleteError);
+    }
+
+    const isAthlete = !!athleteProfiles && athleteProfiles.length > 0;
+
+    // If this user has any memberships (legacy org-based), we treat them as coach as well.
+    const { data: memberships, error: membershipsError } = await supabaseAdmin
+      .from("memberships")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1);
+
+    if (membershipsError) {
+      console.error("[/api/me] Failed to lookup memberships:", membershipsError);
+    }
+
+    const isCoach = !!memberships && memberships.length > 0;
+
+    if (isCoach && isAthlete) roleHint = "both";
+    else if (isCoach) roleHint = "coach";
+    else if (isAthlete) roleHint = "athlete";
+
+    // 4) Load athlete-level subscription (if any)
+    let athleteBilling: BillingSummary | null = null;
 
     const {
-      data: userRow,
-      error: userError,
-    } = await supabase
-      .from("users")
-      .select(
-        `
-        id,
-        auth_id,
-        email,
-        name,
-        subscription_tier,
-        billing_status,
-        stripe_customer_id
-      `
-      )
-      .eq("auth_id", user.id)
-      .maybeSingle();
+      data: athleteSubs,
+      error: athleteSubsError,
+    } = await supabaseAdmin
+      .from("athlete_subscriptions")
+      .select("plan_code, status, current_period_end")
+      .eq("user_id", userId)
+      .order("current_period_end", { ascending: false })
+      .limit(1);
 
-    if (userError) {
-      console.error("[/api/me] users lookup error:", userError);
-      // We'll just fall back to auth user info
-    }
+    if (athleteSubsError) {
+      console.error(
+        "[/api/me] Failed to load athlete_subscriptions:",
+        athleteSubsError,
+      );
+    } else if (athleteSubs && athleteSubs.length > 0) {
+      const sub = athleteSubs[0] as {
+        plan_code: PlanCode | null;
+        status: string | null;
+        current_period_end: string | null;
+      };
 
-    if (userRow) {
-      appUser = userRow as AppUserRow;
-    } else {
-      // No row in users table yet → synthesize a minimal appUser
-      appUser = {
-        id: user.id, // not actually users.id, but fine for front-end identity
-        auth_id: user.id,
-        email: user.email ?? null,
-        name: null,
-        subscription_tier: null,
-        billing_status: null,
-        stripe_customer_id: null,
+      athleteBilling = {
+        planCode: sub.plan_code ?? null,
+        status: sub.status ?? null,
+        currentPeriodEnd: sub.current_period_end,
       };
     }
 
-    // 4) If we have a real users.id from DB, load memberships/org.
-    // If this is a synthesized user (id === auth_id and no DB row), skip memberships/org.
-    let membershipList: MembershipRow[] = [];
-    let orgRow: OrgRow | null = null;
-    let primaryOrgId: string | null = null;
+    // 5) Load program memberships (for now we derive from legacy memberships + programs if present).
+    //    Once you introduce a dedicated user_programs table, this should query that instead.
+    const programBillings: ProgramBillingSummary[] = [];
 
-    const hasRealUserRow = !!userRow && typeof userRow.id === "string";
+    // Step 5a: get organizations the user belongs to (legacy)
+    const {
+      data: orgMemberships,
+      error: orgMembershipsError,
+    } = await supabaseAdmin
+      .from("memberships")
+      .select("organization_id")
+      .eq("user_id", userId);
 
+    if (orgMembershipsError) {
+      console.error(
+        "[/api/me] Failed to load org memberships:",
+        orgMembershipsError,
+      );
+    }
 
-    if (hasRealUserRow) {
-      const {
-        data: memberships,
-        error: membershipError,
-      } = await supabase
-        .from("memberships")
-        .select("organization_id, role")
-        .eq("user_id", appUser.id);
+    const organizationIds: string[] =
+      orgMemberships?.map((m: any) => m.organization_id).filter(Boolean) ?? [];
 
-      if (membershipError) {
-        console.error("[/api/me] memberships lookup error:", membershipError);
-      }
+    if (organizationIds.length > 0) {
+      // Step 5b: find any programs attached to these organizations (if programs table already wired)
+      const { data: programs, error: programsError } = await supabaseAdmin
+        .from("programs")
+        .select("id, name, school_id")
+        .in("school_id", organizationIds as string[]);
 
-      membershipList = (memberships ?? []) as MembershipRow[];
-      primaryOrgId =
-        membershipList.length > 0 ? membershipList[0].organization_id : null;
+      if (programsError) {
+        console.error("[/api/me] Failed to load programs:", programsError);
+      } else if (programs && programs.length > 0) {
+        const programIds = programs.map((p: any) => p.id);
 
-      if (primaryOrgId) {
-        const {
-          data: org,
-          error: orgError,
-        } = await supabase
-          .from("organizations")
-          .select("id, name, subscription_tier, billing_status")
-          .eq("id", primaryOrgId)
-          .maybeSingle();
+        const { data: programSubs, error: programSubsError } =
+          await supabaseAdmin
+            .from("program_subscriptions")
+            .select("program_id, plan_code, status, current_period_end")
+            .in("program_id", programIds as string[]);
 
-        if (orgError) {
-          console.error("[/api/me] organizations lookup error:", orgError);
-        } else if (org) {
-          orgRow = org as OrgRow;
+        if (programSubsError) {
+          console.error(
+            "[/api/me] Failed to load program_subscriptions:",
+            programSubsError,
+          );
+        } else if (programSubs && programSubs.length > 0) {
+          const programNameById = new Map<string, string | null>();
+          for (const p of programs as any[]) {
+            programNameById.set(p.id, p.name ?? null);
+          }
+
+          for (const row of programSubs as any[]) {
+            programBillings.push({
+              programId: row.program_id,
+              programName: programNameById.get(row.program_id) ?? null,
+              planCode: (row.plan_code as PlanCode) ?? null,
+              status: row.status ?? null,
+              currentPeriodEnd: row.current_period_end,
+            });
+          }
         }
       }
     }
 
-    // 5) Compute role, billingScope, and effective tiers
-    const isCoach = membershipList.length > 0;
-    const inferredRole: Role = isCoach ? "coach" : "athlete";
-
-    let billingScope: BillingScope = "none";
-    if (isCoach && orgRow) {
-      billingScope = "org";
-    } else if (!isCoach) {
-      billingScope = "athlete";
-    }
-
-    // User-level (athlete) tier
-    const athleteTier =
-      appUser.subscription_tier ??
-      (inferredRole === "athlete" ? "HS ATHLETE BASIC" : null);
-
-    // Org-level tier
-    const orgTier = orgRow?.subscription_tier ?? null;
-
-    // 6) Build response matching MeResponse (BillingPageClient.tsx)
-    const payload = {
+    // 6) Build response
+    const responsePayload = {
+      auth: {
+        id: authUser.id,
+        email: authUser.email,
+      },
       user: {
         id: appUser.id,
-        email: appUser.email ?? user.email ?? "",
-        role: inferredRole,
-        orgId: primaryOrgId,
-        athleteId: null as string | null,
+        email: appUser.email,
+        name: appUser.name,
       },
-      billingScope,
-      org:
-        orgRow && primaryOrgId
-          ? {
-              id: primaryOrgId,
-              name: orgRow.name ?? "Organization",
-              subscriptionTier: orgTier,
-            }
-          : null,
-      athlete:
-        inferredRole === "athlete"
-          ? {
-              id: appUser.id,
-              name: appUser.name ?? appUser.email ?? user.email ?? "Athlete",
-              subscriptionTier: athleteTier,
-            }
-          : null,
-      tiers: {
-        athlete: athleteTier,
-        org: orgTier,
+      roleHint,
+      billing: {
+        athlete: athleteBilling,
+        programs: programBillings,
       },
     };
 
-    return NextResponse.json(payload, { status: 200 });
+    return NextResponse.json(responsePayload, { status: 200 });
   } catch (err) {
-    console.error("[/api/me] Unhandled error:", err);
+    console.error("[/api/me] Unexpected error:", err);
     return NextResponse.json(
-      { error: "Unexpected server error in /api/me" },
-      { status: 500 }
+      { error: "Unexpected error loading account" },
+      { status: 500 },
     );
   }
 }
-
-
-
-

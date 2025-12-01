@@ -36,24 +36,29 @@ function getPlanCodeFromPriceId(priceId: string | null | undefined): PlanCode | 
   return null;
 }
 
-function getScopeAndOwnerFromSubscription(
-  sub: Stripe.Subscription,
-): { scope: BillingScope; ownerId: string; planCode: PlanCode | null } | null {
-  const metadata = sub.metadata || {};
-  const scope = metadata.scope as BillingScope | undefined;
-  const ownerId = metadata.ownerId as string | undefined;
-  let planCode = (metadata.planCode as PlanCode | undefined) || null;
+function getScopeAndOwnerFromSubscription(sub: Stripe.Subscription) {
+  const meta = sub.metadata || {};
+
+  // Accept both camelCase and snake_case for safety
+  const scope = (meta.scope as BillingScope | undefined) ?? undefined;
+  const ownerId =
+    ((meta as any).owner_id as string | undefined) ??
+    ((meta as any).ownerId as string | undefined);
+  const planCode =
+    ((meta as any).plan_code as PlanCode | undefined) ??
+    ((meta as any).planCode as PlanCode | undefined);
 
   if (!scope || !ownerId) {
-    console.warn("[stripe webhook] Missing scope/ownerId metadata on subscription:", sub.id);
+    console.error(
+      "Subscription missing scope/owner_id metadata; skipping",
+      sub.id,
+      {
+        ownerId: (meta as any).ownerId ?? (meta as any).owner_id,
+        scope: meta.scope,
+        planCode: (meta as any).planCode ?? (meta as any).plan_code,
+      },
+    );
     return null;
-  }
-
-  // Try to infer planCode from price if not present in metadata
-  if (!planCode) {
-    const item = sub.items.data[0];
-    const priceId = item?.price?.id;
-    planCode = getPlanCodeFromPriceId(priceId);
   }
 
   return { scope, ownerId, planCode };

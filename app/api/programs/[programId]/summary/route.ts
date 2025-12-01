@@ -6,32 +6,21 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
  * GET /api/programs/:programId/summary
  *
  * Returns a light-weight summary of a program for use in dashboards
- * and the program overview page.
- *
- * Shape:
- * {
- *   id,
- *   name,
- *   sport,
- *   gender,
- *   level,
- *   season,
- *   school: { id, name, city, state, country, level },
- *   subscription: { planCode, status, currentPeriodEnd } | null
- * }
+ * and the program overview / billing pages.
  */
 
-type RouteParams = {
-  params: {
-    programId: string;
-  };
-};
-
-export async function GET(_req: NextRequest, { params }: RouteParams) {
+export async function GET(req: NextRequest) {
   try {
-    const { programId } = params;
+    // Always parse programId from the URL path (ignore Next.js params to avoid edge issues)
+    const url = new URL(req.url);
+    const match = url.pathname.match(/\/api\/programs\/([^/]+)\/summary/);
+    const programId = match?.[1];
 
     if (!programId) {
+      console.error(
+        "[/api/programs/[programId]/summary] Could not extract programId from path:",
+        url.pathname,
+      );
       return NextResponse.json(
         { error: "Missing programId in route parameters" },
         { status: 400 },
@@ -39,9 +28,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     }
 
     // 1) Load the program
+    // Use select("*") so we don't error if some columns (level, season, etc.) aren't present yet.
     const { data: programs, error: programError } = await supabaseAdmin
       .from("programs")
-      .select("id, school_id, name, sport, gender, level, season")
+      .select("*")
       .eq("id", programId)
       .limit(1);
 
@@ -51,12 +41,12 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         programError,
       );
       return NextResponse.json(
-        { error: "Failed to load program" },
+        { error: "Failed to load program from database" },
         { status: 500 },
       );
     }
 
-    const program = programs?.[0];
+    const program = programs?.[0] as any;
 
     if (!program) {
       return NextResponse.json(
@@ -65,12 +55,12 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // 2) Load the school
+    // 2) Load the school (optional)
     let school: any = null;
     if (program.school_id) {
       const { data: schools, error: schoolError } = await supabaseAdmin
         .from("schools")
-        .select("id, name, city, state, country, level")
+        .select("*")
         .eq("id", program.school_id)
         .limit(1);
 
@@ -87,6 +77,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     // 3) Load the most recent subscription (if any)
     let subscription: any = null;
 
+    // If the table doesn't exist yet, this will error; we log and continue.
     const { data: subs, error: subsError } = await supabaseAdmin
       .from("program_subscriptions")
       .select("plan_code, status, current_period_end")
@@ -100,29 +91,29 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         subsError,
       );
     } else if (subs && subs.length > 0) {
-      const sub = subs[0];
+      const sub = subs[0] as any;
       subscription = {
-        planCode: sub.plan_code,
-        status: sub.status,
-        currentPeriodEnd: sub.current_period_end,
+        planCode: sub.plan_code ?? null,
+        status: sub.status ?? null,
+        currentPeriodEnd: sub.current_period_end ?? null,
       };
     }
 
     const payload = {
       id: program.id,
-      name: program.name,
-      sport: program.sport,
-      gender: program.gender,
-      level: program.level,
-      season: program.season,
+      name: program.name ?? null,
+      sport: program.sport ?? null,
+      gender: program.gender ?? null,
+      level: program.level ?? null,
+      season: program.season ?? null,
       school: school
         ? {
             id: school.id,
-            name: school.name,
-            city: school.city,
-            state: school.state,
-            country: school.country,
-            level: school.level,
+            name: school.name ?? null,
+            city: school.city ?? null,
+            state: school.state ?? null,
+            country: school.country ?? null,
+            level: school.level ?? null,
           }
         : null,
       subscription,

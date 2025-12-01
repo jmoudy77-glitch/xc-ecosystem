@@ -90,10 +90,10 @@ export async function POST(req: NextRequest) {
       ],
       success_url: `${baseUrl}${successPath}?checkout=success`,
       cancel_url: `${baseUrl}${cancelPath}?checkout=cancelled`,
-      metadata: {
-        scope,
-        ownerId,
-        planCode,
+        metadata: {
+        scope,              // "program"
+        ownerId,            // programId (or owner_id if you prefer snake_case)
+        planCode,           // hs_starter, college_elite, etc.
       },
       subscription_data: {
         metadata: {
@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
           ownerId,
           planCode,
         },
+     
       },
     });
 

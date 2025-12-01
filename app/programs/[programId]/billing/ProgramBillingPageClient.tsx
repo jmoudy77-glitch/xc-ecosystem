@@ -384,7 +384,7 @@ export default function ProgramBillingPageClient({ programId }: Props) {
 
                   <button
                     type="button"
-                    disabled={isBusy || isCurrent}
+                    disabled={!!(isBusy || isCurrent)}
                     onClick={() => startCheckout(plan.code)}
                     className={`mt-4 inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium ${
                       isCurrent

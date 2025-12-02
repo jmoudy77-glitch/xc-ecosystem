@@ -2,113 +2,64 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import type { PlanCode } from "@/lib/billingPlans";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-06-20",
+});
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+// Helper to upsert into the correct subscriptions table based on scope
+type BillingScope = "org" | "athlete";
 
-type BillingScope = "org" | "athlete" | "program";
+async function upsertSubscriptionRecord(args: {
+  scope: BillingScope;
+  ownerId: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  planCode: string | null;
+  status: string;
+  currentPeriodEnd: number | null; // unix seconds
+}) {
+  const {
+    scope,
+    ownerId,
+    stripeCustomerId,
+    stripeSubscriptionId,
+    planCode,
+    status,
+    currentPeriodEnd,
+  } = args;
 
-// Map planCode → Stripe price ID via env vars
-const PRICE_BY_PLAN: Record<PlanCode, string> = {
-  hs_athlete_basic: process.env.STRIPE_PRICE_HS_ATHLETE_BASIC || "",
-  hs_athlete_pro: process.env.STRIPE_PRICE_HS_ATHLETE_PRO || "",
-  hs_athlete_elite: process.env.STRIPE_PRICE_HS_ATHLETE_ELITE || "",
-  hs_starter: process.env.STRIPE_PRICE_HS_STARTER || "",
-  hs_pro: process.env.STRIPE_PRICE_HS_PRO || "",
-  hs_elite: process.env.STRIPE_PRICE_HS_ELITE || "",
-  college_starter: process.env.STRIPE_PRICE_COLLEGE_STARTER || "",
-  college_pro: process.env.STRIPE_PRICE_COLLEGE_PRO || "",
-  college_elite: process.env.STRIPE_PRICE_COLLEGE_ELITE || "",
-};
-
-function getPlanCodeFromPriceId(priceId: string | null | undefined): PlanCode | null {
-  if (!priceId) return null;
-  const entries = Object.entries(PRICE_BY_PLAN) as [PlanCode, string][];
-  for (const [code, envPriceId] of entries) {
-    if (envPriceId && envPriceId === priceId) {
-      return code;
-    }
-  }
-  return null;
-}
-
-function getScopeAndOwnerFromSubscription(sub: Stripe.Subscription) {
-  const meta = sub.metadata || {};
-
-  // Accept both camelCase and snake_case for safety
-  const scope = (meta.scope as BillingScope | undefined) ?? undefined;
-  const ownerId =
-    ((meta as any).owner_id as string | undefined) ??
-    ((meta as any).ownerId as string | undefined);
-  const planCode =
-    ((meta as any).plan_code as PlanCode | undefined) ??
-    ((meta as any).planCode as PlanCode | undefined);
-
-  if (!scope || !ownerId) {
-    console.error(
-      "Subscription missing scope/owner_id metadata; skipping",
-      sub.id,
-      {
-        ownerId: (meta as any).ownerId ?? (meta as any).owner_id,
-        scope: meta.scope,
-        planCode: (meta as any).planCode ?? (meta as any).plan_code,
-      },
-    );
-    return null;
-  }
-
-  return { scope, ownerId, planCode };
-}
-
-async function upsertSubscription(sub: Stripe.Subscription) {
-  const parsed = getScopeAndOwnerFromSubscription(sub);
-  if (!parsed) return;
-
-  const { scope, ownerId, planCode } = parsed;
-
-  // Determine table + owner column by scope
+  // IMPORTANT: We no longer use org_subscriptions.
+  // For org (program-level) billing we write to program_subscriptions using program_id.
   let tableName: string;
   let ownerColumn: string;
 
-  if (scope === "program") {
+  if (scope === "org") {
     tableName = "program_subscriptions";
     ownerColumn = "program_id";
-  } else if (scope === "athlete") {
-    tableName = "athlete_subscriptions";
-    ownerColumn = "user_id"; // adjust if your schema uses athlete_id instead
   } else {
-    tableName = "org_subscriptions";
-    ownerColumn = "org_id";
+    // keep athlete scope for completeness if/when you add athlete_subscriptions
+    tableName = "athlete_subscriptions";
+    ownerColumn = "athlete_id";
   }
 
-  const stripeCustomerId =
-    typeof sub.customer === "string" ? sub.customer : (sub.customer as Stripe.Customer | null)?.id ?? null;
-
-  // Use a loose type cast here to avoid TS complaints across Stripe versions
-  const rawCurrentPeriodEnd = (sub as any).current_period_end as number | null | undefined;
-  const currentPeriodEnd = rawCurrentPeriodEnd
-    ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
-    : null;
+  const currentPeriodEndIso =
+    currentPeriodEnd != null ? new Date(currentPeriodEnd * 1000).toISOString() : null;
 
   const payload: Record<string, any> = {
     [ownerColumn]: ownerId,
     stripe_customer_id: stripeCustomerId,
-    stripe_subscription_id: sub.id,
-    status: sub.status,
-    current_period_end: currentPeriodEnd,
+    stripe_subscription_id: stripeSubscriptionId,
+    plan_code: planCode,
+    status,
+    current_period_end: currentPeriodEndIso,
   };
-
-  if (planCode) {
-    payload.plan_code = planCode;
-  }
 
   const { error } = await supabaseAdmin
     .from(tableName)
-    .upsert(payload, { onConflict: "stripe_subscription_id" });
+    .upsert(payload, {
+      onConflict: ownerColumn, // requires unique constraint on program_id / athlete_id
+    });
 
   if (error) {
     console.error("[stripe webhook] Failed to upsert subscription:", {
@@ -117,61 +68,65 @@ async function upsertSubscription(sub: Stripe.Subscription) {
       ownerId,
       error,
     });
+    throw error;
   }
 }
 
-async function markSubscriptionCanceled(sub: Stripe.Subscription) {
-  const parsed = getScopeAndOwnerFromSubscription(sub);
-  if (!parsed) return;
-
-  const { scope } = parsed;
+async function markSubscriptionCanceled(args: {
+  scope: BillingScope;
+  ownerId: string;
+  stripeSubscriptionId: string;
+}) {
+  const { scope, ownerId, stripeSubscriptionId } = args;
 
   let tableName: string;
+  let ownerColumn: string;
 
-  if (scope === "program") {
+  if (scope === "org") {
     tableName = "program_subscriptions";
-  } else if (scope === "athlete") {
-    tableName = "athlete_subscriptions";
+    ownerColumn = "program_id";
   } else {
-    tableName = "org_subscriptions";
+    tableName = "athlete_subscriptions";
+    ownerColumn = "athlete_id";
   }
 
   const { error } = await supabaseAdmin
     .from(tableName)
-    .update({ status: "canceled" })
-    .eq("stripe_subscription_id", sub.id);
+    .update({
+      status: "canceled",
+    })
+    .eq(ownerColumn, ownerId)
+    .eq("stripe_subscription_id", stripeSubscriptionId);
 
   if (error) {
     console.error("[stripe webhook] Failed to mark subscription canceled:", {
       tableName,
-      subscriptionId: sub.id,
+      ownerColumn,
+      ownerId,
       error,
     });
+    throw error;
   }
 }
 
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!sig) {
-    return NextResponse.json(
-      { error: "Missing Stripe signature header" },
-      { status: 400 },
-    );
+  if (!sig || !webhookSecret) {
+    console.error("[stripe webhook] Missing signature or STRIPE_WEBHOOK_SECRET");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rawBody = await req.text();
-
   let event: Stripe.Event;
+
+  const rawBody = await req.text();
 
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
-    console.error("[stripe webhook] Signature verification failed:", err);
-    return NextResponse.json(
-      { error: `Webhook Error: ${err.message ?? "invalid signature"}` },
-      { status: 400 },
-    );
+    console.error("[stripe webhook] Error verifying signature:", err?.message || err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
   try {
@@ -179,25 +134,82 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        await upsertSubscription(subscription);
+
+        const metadata = subscription.metadata || {};
+        const scope = (metadata.scope as BillingScope | undefined) ?? "org";
+        const ownerId = metadata.owner_id;
+        const planCode = (metadata.plan_code as string | undefined) ?? null;
+
+        if (!ownerId) {
+          console.warn(
+            "[stripe webhook] Subscription event missing owner_id metadata; skipping",
+            {
+              subscriptionId: subscription.id,
+            },
+          );
+          break;
+        }
+
+        const stripeCustomerId =
+          (subscription.customer as string | null | undefined) ?? "";
+        if (!stripeCustomerId) {
+          console.warn(
+            "[stripe webhook] Subscription event missing customer; skipping",
+            {
+              subscriptionId: subscription.id,
+            },
+          );
+          break;
+        }
+
+        await upsertSubscriptionRecord({
+          scope,
+          ownerId,
+          stripeCustomerId,
+          stripeSubscriptionId: subscription.id,
+          planCode,
+          status: subscription.status,
+          currentPeriodEnd: subscription.current_period_end,
+        });
+
         break;
       }
+
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        await markSubscriptionCanceled(subscription);
+        const metadata = subscription.metadata || {};
+        const scope = (metadata.scope as BillingScope | undefined) ?? "org";
+        const ownerId = metadata.owner_id;
+
+        if (!ownerId) {
+          console.warn(
+            "[stripe webhook] Subscription deleted event missing owner_id; skipping",
+            {
+              subscriptionId: subscription.id,
+            },
+          );
+          break;
+        }
+
+        await markSubscriptionCanceled({
+          scope,
+          ownerId,
+          stripeSubscriptionId: subscription.id,
+        });
+
         break;
       }
-      default:
+
+      default: {
+        // For now, ignore other events
         // console.log("[stripe webhook] Unhandled event type:", event.type);
         break;
+      }
     }
 
-    return NextResponse.json({ received: true }, { status: 200 });
+    return NextResponse.json({ received: true });
   } catch (err: any) {
-    console.error("[stripe webhook] Handler error:", err);
-    return NextResponse.json(
-      { error: "Webhook handler failed" },
-      { status: 500 },
-    );
+    console.error("[stripe webhook] Handler error:", err?.message || err);
+    return NextResponse.json({ error: "Webhook handler error" }, { status: 500 });
   }
 }

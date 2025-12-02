@@ -3,18 +3,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-type Params = {
-  params: {
-    programId: string;
-    memberId: string;
-  };
-};
+// Helper: extract programId and memberId from URL path
+// Expected path: /api/programs/:programId/staff/:memberId
+function extractIdsFromUrl(req: NextRequest): {
+  programId?: string;
+  memberId?: string;
+} {
+  try {
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/").filter(Boolean);
+    // segments = ["api", "programs", "<programId>", "staff", "<memberId>"]
+    const programsIndex = segments.indexOf("programs");
+    const staffIndex = segments.indexOf("staff");
+
+    const programId =
+      programsIndex !== -1 && segments.length > programsIndex + 1
+        ? segments[programsIndex + 1]
+        : undefined;
+
+    const memberId =
+      staffIndex !== -1 && segments.length > staffIndex + 1
+        ? segments[staffIndex + 1]
+        : undefined;
+
+    return { programId, memberId };
+  } catch {
+    return { programId: undefined, memberId: undefined };
+  }
+}
 
 // Simple authorization helper: ensure the caller belongs to this program
 async function assertProgramMembership(
-  supabase: ReturnType<typeof supabaseServer>["supabase"],
+  req: NextRequest,
   programId: string,
 ) {
+  const { supabase } = supabaseServer(req);
+
   const {
     data: { user: authUser },
     error: authError,
@@ -81,8 +105,8 @@ async function assertProgramMembership(
 }
 
 // PATCH: update role for a staff member
-export async function PATCH(req: NextRequest, { params }: Params) {
-  const { programId, memberId } = params;
+export async function PATCH(req: NextRequest) {
+  const { programId, memberId } = extractIdsFromUrl(req);
 
   if (!programId || !memberId) {
     return NextResponse.json(
@@ -92,9 +116,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   try {
-    const { supabase } = supabaseServer(req);
-
-    const authCheck = await assertProgramMembership(supabase, programId);
+    const authCheck = await assertProgramMembership(req, programId);
     if (authCheck.error) {
       return NextResponse.json(
         { error: authCheck.error },
@@ -158,8 +180,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 // DELETE: remove a staff member from the program
-export async function DELETE(req: NextRequest, { params }: Params) {
-  const { programId, memberId } = params;
+export async function DELETE(req: NextRequest) {
+  const { programId, memberId } = extractIdsFromUrl(req);
 
   if (!programId || !memberId) {
     return NextResponse.json(
@@ -169,9 +191,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   }
 
   try {
-    const { supabase } = supabaseServer(req);
-
-    const authCheck = await assertProgramMembership(supabase, programId);
+    const authCheck = await assertProgramMembership(req, programId);
     if (authCheck.error) {
       return NextResponse.json(
         { error: authCheck.error },

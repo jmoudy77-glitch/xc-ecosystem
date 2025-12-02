@@ -1,4 +1,8 @@
-// app/programs/create/route.ts
+// app/api/programs/create/route.ts
+// Moved here from app/programs/create/route.ts to avoid route/page conflict.
+// This is a pure API endpoint used by coach onboarding and the Create Program page.
+
+
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
     // 1) Load user row
     const { data: userRow, error: userError } = await supabaseAdmin
       .from("users")
-      .select("id")
+      .select("id, role")
       .eq("auth_id", authId)
       .maybeSingle();
 
@@ -64,6 +68,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "No user record found for this account" },
         { status: 404 }
+      );
+    }
+
+    // Only coaches (and future admin-like roles) can create programs.
+    // Athletes should not be able to spin up new programs.
+    const userRole = (userRow as any).role as string | null;
+
+    if (userRole && userRole !== "coach" && userRole !== "admin") {
+      return NextResponse.json(
+        { error: "Only coaches can create programs" },
+        { status: 403 }
       );
     }
 
@@ -114,6 +129,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
+        programId: newProgram.id,
         program: newProgram,
       },
       { status: 200 }

@@ -255,6 +255,16 @@ export default function DashboardPage() {
                 subscriptions.
               </p>
             </div>
+            {roleHint !== "athlete" && (
+              <div>
+                <Link
+                  href="/programs/create"
+                  className="inline-flex items-center rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                >
+                  + New program
+                </Link>
+              </div>
+            )}
           </div>
 
           {programs.length === 0 ? (

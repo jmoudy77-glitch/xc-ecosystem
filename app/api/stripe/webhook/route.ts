@@ -3,9 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 // Helper to upsert into the correct subscriptions table based on scope
 type BillingScope = "org" | "athlete";
@@ -29,7 +27,6 @@ async function upsertSubscriptionRecord(args: {
     currentPeriodEnd,
   } = args;
 
-  // IMPORTANT: We no longer use org_subscriptions.
   // For org (program-level) billing we write to program_subscriptions using program_id.
   let tableName: string;
   let ownerColumn: string;
@@ -44,7 +41,9 @@ async function upsertSubscriptionRecord(args: {
   }
 
   const currentPeriodEndIso =
-    currentPeriodEnd != null ? new Date(currentPeriodEnd * 1000).toISOString() : null;
+    currentPeriodEnd != null
+      ? new Date(currentPeriodEnd * 1000).toISOString()
+      : null;
 
   const payload: Record<string, any> = {
     [ownerColumn]: ownerId,
@@ -114,7 +113,9 @@ export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!sig || !webhookSecret) {
-    console.error("[stripe webhook] Missing signature or STRIPE_WEBHOOK_SECRET");
+    console.error(
+      "[stripe webhook] Missing signature or STRIPE_WEBHOOK_SECRET",
+    );
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -125,7 +126,10 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
-    console.error("[stripe webhook] Error verifying signature:", err?.message || err);
+    console.error(
+      "[stripe webhook] Error verifying signature:",
+      err?.message || err,
+    );
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
@@ -169,7 +173,9 @@ export async function POST(req: NextRequest) {
           stripeSubscriptionId: subscription.id,
           planCode,
           status: subscription.status,
-          currentPeriodEnd: subscription.current_period_end,
+          // Stripe types in your version may not expose this field strongly,
+          // so treat it as dynamic to keep TS happy.
+          currentPeriodEnd: (subscription as any).current_period_end ?? null,
         });
 
         break;

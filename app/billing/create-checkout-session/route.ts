@@ -84,24 +84,27 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: priceId,
+          price: priceId,   // you already look this up from planCode
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}${successPath}?checkout=success`,
-      cancel_url: `${baseUrl}${cancelPath}?checkout=cancelled`,
-        metadata: {
-        scope,              // "program"
-        ownerId,            // programId (or owner_id if you prefer snake_case)
-        planCode,           // hs_starter, college_elite, etc.
-      },
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/cancel`,
+
+      // 🔴 NEW: this is what actually lands on Stripe.Subscription.metadata
       subscription_data: {
         metadata: {
-          scope,
-          ownerId,
-          planCode,
+          scope: body.scope,          // "org" for program-level
+          owner_id: body.ownerId,     // programId
+          plan_code: body.planCode,   // "college_elite" etc.
         },
-     
+      },
+
+      // Optional but nice to have: metadata on the Checkout Session itself
+      metadata: {
+        scope: body.scope,
+        owner_id: body.ownerId,
+        plan_code: body.planCode,
       },
     });
 

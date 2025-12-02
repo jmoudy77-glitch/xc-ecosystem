@@ -9,238 +9,276 @@ import type { PlanCode } from "@/lib/billingPlans";
  *
  * Returns the authenticated user's core profile and billing context.
  *
- * Responsibilities:
- * - Ensure a row exists in the public.users table for the auth user
- * - Load basic user info
- * - Load any athlete-level subscription (athlete_subscriptions)
- * - Optionally load program memberships and program-level subscriptions
- *
- * This route is intentionally conservative and focuses on returning
- * enough data for the Billing UI and top-level "who am I?" context.
+ * IMPORTANT:
+ * - The current DB schema does NOT have users.full_name, so we do NOT
+ *   select or insert that column here.
+ * - fullName is derived from Supabase Auth user_metadata instead.
  */
 
 type RoleHint = "coach" | "athlete" | "both" | "unknown";
 
-type BillingSummary = {
+type BillingStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "unknown";
+
+type AthleteBilling = {
+  subscriptionId: string | null;
   planCode: PlanCode | null;
-  status: string | null;
-  currentPeriodEnd: string | null;
+  status: BillingStatus;
+  currentPeriodEnd: string | null; // ISO
 };
 
-type ProgramBillingSummary = BillingSummary & {
+type ProgramBilling = {
   programId: string;
-  programName: string | null;
+  programName: string;
+  subscriptionId: string | null;
+  planCode: PlanCode | null;
+  status: BillingStatus;
+  currentPeriodEnd: string | null; // ISO
 };
 
-export async function GET(_req: NextRequest) {
-  try {
-    const { supabase } = await supabaseServer();
+type MeResponse = {
+  user: {
+    id: string;
+    email: string | null;
+    fullName: string | null;
+  };
+  roleHint: RoleHint;
+  billing: {
+    athlete: AthleteBilling | null;
+    programs: ProgramBilling[];
+  };
+};
 
-    // 1) Get auth user from Supabase
+function normalizeStatus(status: string | null): BillingStatus {
+  if (!status) return "unknown";
+  const s = status.toLowerCase();
+  if (s === "active") return "active";
+  if (s === "trialing") return "trialing";
+  if (s === "past_due") return "past_due";
+  if (s === "canceled") return "canceled";
+  if (s === "incomplete") return "incomplete";
+  return "unknown";
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { supabase } = supabaseServer(req);
+
+    // 1) Get the authenticated user from Supabase Auth
     const {
       data: { user: authUser },
       error: authError,
     } = await supabase.auth.getUser();
 
+    // AuthSessionMissingError just means no session; that's not a 500.
     if (authError) {
-      console.error("[/api/me] Failed to load auth user:", authError);
-      return NextResponse.json(
-        { error: "Failed to load auth user" },
-        { status: 500 },
-      );
+      console.warn("[/api/me] auth.getUser error:", authError.message);
     }
 
     if (!authUser) {
       return NextResponse.json(
         { error: "Not authenticated" },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
     const authId = authUser.id;
 
-    // 2) Ensure a row exists in public.users for this auth user.
-    // We use supabaseAdmin to bypass RLS on insert.
-    const { data: existingUsers, error: userSelectError } = await supabaseAdmin
-      .from("users")
-      .select("*")
-      .eq("auth_id", authId)
-      .limit(1);
+    // Derive full name from auth metadata (since users.full_name is not in DB)
+    const derivedFullName =
+      authUser.user_metadata?.full_name ??
+      authUser.user_metadata?.name ??
+      null;
+
+    // 2) Ensure a row exists in public.users for this auth_id
+    // NOTE: We DO NOT reference users.full_name here.
+    const { data: existingUserRow, error: userSelectError } =
+      await supabaseAdmin
+        .from("users")
+        .select("id, auth_id, email")
+        .eq("auth_id", authId)
+        .maybeSingle();
 
     if (userSelectError) {
-      console.error("[/api/me] Failed to select user row:", userSelectError);
+      console.error("[/api/me] users select error:", userSelectError);
       return NextResponse.json(
         { error: "Failed to load user record" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
-    let appUser = existingUsers?.[0] ?? null;
+    let userRow = existingUserRow;
 
-    if (!appUser) {
-      const { data: inserted, error: insertError } = await supabaseAdmin
+    if (!userRow) {
+      const {
+        data: insertedUser,
+        error: userInsertError,
+      } = await supabaseAdmin
         .from("users")
         .insert({
           auth_id: authId,
-          email: authUser.email,
-          name: authUser.user_metadata?.full_name ?? authUser.email,
+          email: authUser.email ?? null,
+          // full_name intentionally omitted; column not present in DB yet
         })
-        .select("*")
-        .limit(1);
+        .select("id, auth_id, email")
+        .single();
 
-      if (insertError || !inserted || inserted.length === 0) {
-        console.error("[/api/me] Failed to create user row:", insertError);
+      if (userInsertError) {
+        console.error("[/api/me] Failed to create user row:", userInsertError);
         return NextResponse.json(
           { error: "Failed to create user record" },
-          { status: 500 },
+          { status: 500 }
         );
       }
 
-      appUser = inserted[0];
+      userRow = insertedUser;
     }
 
-    const userId: string = appUser.id;
+    const userId = userRow.id as string;
 
-    // 3) Determine a basic role hint from relationships (very simple heuristic for now).
-    let roleHint: RoleHint = "unknown";
+    // 3) Load athlete-level subscription (if any)
+    let athleteBilling: AthleteBilling | null = null;
 
-    // If this user has any athlete profile, they are at least an athlete.
-    const { data: athleteProfiles, error: athleteError } = await supabaseAdmin
-      .from("athletes")
-      .select("id")
-      .eq("user_id", userId)
-      .limit(1);
+    const { data: athleteSubscriptionRows, error: athleteSubError } =
+      await supabaseAdmin
+        .from("athlete_subscriptions")
+        .select(
+          "id, status, current_period_end, plan_code, stripe_subscription_id"
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1);
 
-    if (athleteError) {
-      console.error("[/api/me] Failed to lookup athlete profile:", athleteError);
-    }
-
-    const isAthlete = !!athleteProfiles && athleteProfiles.length > 0;
-
-    // If this user has any memberships (legacy org-based), we treat them as coach as well.
-    const { data: memberships, error: membershipsError } = await supabaseAdmin
-      .from("memberships")
-      .select("id")
-      .eq("user_id", userId)
-      .limit(1);
-
-    if (membershipsError) {
-      console.error("[/api/me] Failed to lookup memberships:", membershipsError);
-    }
-
-    const isCoach = !!memberships && memberships.length > 0;
-
-    if (isCoach && isAthlete) roleHint = "both";
-    else if (isCoach) roleHint = "coach";
-    else if (isAthlete) roleHint = "athlete";
-
-    // 4) Load athlete-level subscription (if any)
-    let athleteBilling: BillingSummary | null = null;
-
-    const {
-      data: athleteSubs,
-      error: athleteSubsError,
-    } = await supabaseAdmin
-      .from("athlete_subscriptions")
-      .select("plan_code, status, current_period_end")
-      .eq("user_id", userId)
-      .order("current_period_end", { ascending: false })
-      .limit(1);
-
-    if (athleteSubsError) {
+    if (athleteSubError) {
       console.error(
-        "[/api/me] Failed to load athlete_subscriptions:",
-        athleteSubsError,
+        "[/api/me] athlete_subscriptions select error:",
+        athleteSubError
       );
-    } else if (athleteSubs && athleteSubs.length > 0) {
-      const sub = athleteSubs[0] as {
-        plan_code: PlanCode | null;
-        status: string | null;
-        current_period_end: string | null;
-      };
+    }
 
+    if (athleteSubscriptionRows && athleteSubscriptionRows.length > 0) {
+      const row = athleteSubscriptionRows[0];
       athleteBilling = {
-        planCode: sub.plan_code ?? null,
-        status: sub.status ?? null,
-        currentPeriodEnd: sub.current_period_end,
+        subscriptionId: row.stripe_subscription_id ?? row.id ?? null,
+        planCode: (row.plan_code as PlanCode | null) ?? null,
+        status: normalizeStatus(row.status),
+        currentPeriodEnd: row.current_period_end
+          ? new Date(row.current_period_end).toISOString()
+          : null,
       };
     }
 
-    // 5) Load program memberships (for now we derive from legacy memberships + programs if present).
-    //    Once you introduce a dedicated user_programs table, this should query that instead.
-    const programBillings: ProgramBillingSummary[] = [];
-
-    // Step 5a: get organizations the user belongs to (legacy)
-    const {
-      data: orgMemberships,
-      error: orgMembershipsError,
-    } = await supabaseAdmin
-      .from("memberships")
-      .select("organization_id")
+    // 4) Load program memberships + program-level subscriptions
+    const { data: memberships, error: membershipError } = await supabaseAdmin
+      .from("program_members")
+      .select(
+        `
+        id,
+        program_id,
+        role,
+        programs!inner (
+          id,
+          name
+        )
+      `
+      )
       .eq("user_id", userId);
 
-    if (orgMembershipsError) {
+    if (membershipError) {
       console.error(
-        "[/api/me] Failed to load org memberships:",
-        orgMembershipsError,
+        "[/api/me] program_members select error:",
+        membershipError
       );
     }
 
-    const organizationIds: string[] =
-      orgMemberships?.map((m: any) => m.organization_id).filter(Boolean) ?? [];
+    const programs: { id: string; name: string }[] =
+      memberships?.map((m: any) => ({
+        id: m.program_id,
+        name: m.programs?.name ?? "Unnamed Program",
+      })) ?? [];
 
-    if (organizationIds.length > 0) {
-      // Step 5b: find any programs attached to these organizations (if programs table already wired)
-      const { data: programs, error: programsError } = await supabaseAdmin
-        .from("programs")
-        .select("id, name, school_id")
-        .in("school_id", organizationIds as string[]);
+    const programIds = programs.map((p) => p.id);
+    let programBillings: ProgramBilling[] = [];
 
-      if (programsError) {
-        console.error("[/api/me] Failed to load programs:", programsError);
-      } else if (programs && programs.length > 0) {
-        const programIds = programs.map((p: any) => p.id);
+    if (programIds.length > 0) {
+      const { data: programSubRows, error: programSubError } =
+        await supabaseAdmin
+          .from("program_subscriptions")
+          .select(
+            `
+            id,
+            status,
+            current_period_end,
+            plan_code,
+            stripe_subscription_id,
+            program_id
+          `
+          )
+          .in("program_id", programIds);
 
-        const { data: programSubs, error: programSubsError } =
-          await supabaseAdmin
-            .from("program_subscriptions")
-            .select("program_id, plan_code, status, current_period_end")
-            .in("program_id", programIds as string[]);
-
-        if (programSubsError) {
-          console.error(
-            "[/api/me] Failed to load program_subscriptions:",
-            programSubsError,
-          );
-        } else if (programSubs && programSubs.length > 0) {
-          const programNameById = new Map<string, string | null>();
-          for (const p of programs as any[]) {
-            programNameById.set(p.id, p.name ?? null);
-          }
-
-          for (const row of programSubs as any[]) {
-            programBillings.push({
-              programId: row.program_id,
-              programName: programNameById.get(row.program_id) ?? null,
-              planCode: (row.plan_code as PlanCode) ?? null,
-              status: row.status ?? null,
-              currentPeriodEnd: row.current_period_end,
-            });
-          }
-        }
+      if (programSubError) {
+        console.error(
+          "[/api/me] program_subscriptions select error:",
+          programSubError
+        );
       }
+
+      const subsByProgram: Record<string, any[]> = {};
+      (programSubRows ?? []).forEach((row) => {
+        if (!subsByProgram[row.program_id]) {
+          subsByProgram[row.program_id] = [];
+        }
+        subsByProgram[row.program_id].push(row);
+      });
+
+      programBillings = programs.map((program) => {
+        const subs = subsByProgram[program.id] ?? [];
+        let latestSub: any | null = null;
+
+        if (subs.length > 0) {
+          latestSub = subs[0];
+        }
+
+        return {
+          programId: program.id,
+          programName: program.name,
+          subscriptionId: latestSub
+            ? latestSub.stripe_subscription_id ?? latestSub.id
+            : null,
+          planCode: latestSub?.plan_code ?? null,
+          status: normalizeStatus(latestSub?.status ?? null),
+          currentPeriodEnd: latestSub?.current_period_end
+            ? new Date(latestSub.current_period_end).toISOString()
+            : null,
+        };
+      });
     }
 
-    // 6) Build response
-    const responsePayload = {
-      auth: {
-        id: authUser.id,
-        email: authUser.email,
-      },
+    // 5) Determine role hint
+    let roleHint: RoleHint = "unknown";
+
+    const hasAthleteSub =
+      athleteBilling && athleteBilling.status !== "canceled";
+    const hasProgramMemberships = programs.length > 0;
+
+    if (hasAthleteSub && hasProgramMemberships) {
+      roleHint = "both";
+    } else if (hasAthleteSub) {
+      roleHint = "athlete";
+    } else if (hasProgramMemberships) {
+      roleHint = "coach";
+    }
+
+    const responsePayload: MeResponse = {
       user: {
-        id: appUser.id,
-        email: appUser.email,
-        name: appUser.name,
+        id: userRow.id,
+        email: userRow.email,
+        fullName: derivedFullName,
       },
       roleHint,
       billing: {
@@ -254,7 +292,7 @@ export async function GET(_req: NextRequest) {
     console.error("[/api/me] Unexpected error:", err);
     return NextResponse.json(
       { error: "Unexpected error loading account" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

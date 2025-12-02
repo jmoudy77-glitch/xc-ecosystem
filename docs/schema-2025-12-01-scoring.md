@@ -1,0 +1,204 @@
+# XC-Ecosystem — Updated Database Schema
+### Updated: 2025-12-01
+
+This schema reflects all updates made during the Stripe billing integration, metadata normalization, and subscription sync stabilization.
+
+---
+
+# 1. users Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| auth_id | uuid | Supabase auth reference |
+| email | text | unique |
+| full_name | text | nullable |
+| role | text | 'coach' or 'athlete' |
+| created_at | timestamptz | default now() |
+
+---
+
+# 2. schools Table
+
+Stores real-world schools for HS or colleges. Also acts as the root "institution" identity that programs (sports) belong to.
+
+| Column         | Type      | Notes                                      |
+|----------------|-----------|--------------------------------------------|
+| id             | uuid      | PK                                         |
+| name           | text      | required                                   |
+| city           | text      | nullable                                   |
+| state          | text      | nullable                                   |
+| country        | text      | nullable                                   |
+| level          | text      | 'hs' or 'college'                          |
+| primary_color  | text      | nullable; branding (e.g. '#800000')       |
+| secondary_color| text      | nullable; branding                         |
+| logo_url       | text      | nullable; school logo                      |
+| domain         | text      | nullable; official email/web domain       |
+| identity_json  | jsonb     | nullable; recruiting/identity metadata     |
+| created_at     | timestamptz | default now()                           |
+
+---
+
+# 3. programs Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| school_id | uuid | FK → schools |
+| name | text | e.g. “Men’s Track & Field” |
+| sport | text | |
+| gender | text | |
+| level | text | hs or college |
+| season | text | indoor/outdoor/etc |
+| created_at | timestamptz | |
+
+---
+
+# 4. program_subscriptions Table
+
+**Updated to include UNIQUE constraint on `stripe_subscription_id`**
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| program_id | uuid | FK → programs |
+| stripe_customer_id | text | |
+| stripe_subscription_id | text | **UNIQUE** required |
+| plan_code | text | code representing plan |
+| status | text | active / canceled / trialing |
+| current_period_end | timestamptz | |
+| created_at | timestamptz | default now() |
+
+### Constraint
+```sql
+ALTER TABLE public.program_subscriptions
+ADD CONSTRAINT program_subscriptions_stripe_subscription_id_key
+UNIQUE (stripe_subscription_id);
+```
+
+---
+
+# 5. athletes Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| user_id | uuid | FK → users |
+| school_id | uuid | FK → schools (HS) |
+| grad_year | int | |
+| primary_event | text | |
+| created_at | timestamptz | now() |
+
+---
+
+# 6. athlete_prs Table
+
+Event-specific PR values.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| athlete_id | uuid | FK → athletes |
+| event | text | |
+| result | numeric | |
+| wind | numeric | nullable |
+| created_at | timestamptz | |
+
+---
+
+# 7. athlete_subscriptions Table (Future)
+
+To be added when athlete billing is enabled.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| athlete_id | uuid | FK → athletes |
+| stripe_subscription_id | text | unique |
+| stripe_customer_id | text | |
+| plan_code | text | |
+| status | text | |
+| current_period_end | timestamptz | |
+| created_at | timestamptz | now() |
+
+---
+
+# 8. recruit_board_items Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| program_id | uuid | FK |
+| athlete_id | uuid | FK |
+| status | text | evaluating / priority / offer |
+| notes | text | |
+| created_at | timestamptz | |
+
+---
+
+# 9. Summary
+
+This schema now fully supports:
+- School → Program → Subscription hierarchy  
+- Proper subscription upsert behavior  
+- Metadata-driven billing  
+- Future athlete subscription expansion  
+- Clean routing for dynamic program billing pages  
+
+This is the authoritative schema snapshot for 2025‑12‑01.
+
+---
+
+# 10. Scoring & Fit Tables (New)
+
+These tables support holistic 0–100 recruiting scores, both globally and per-program, while allowing each program to define its own weighting profile.
+
+## 10.1 athlete_scores Table
+
+Stores global, program-agnostic component scores for each athlete.
+
+| Column            | Type        | Notes                                                        |
+|-------------------|-------------|--------------------------------------------------------------|
+| id                | uuid        | PK                                                           |
+| athlete_id        | uuid        | FK → athletes.id                                             |
+| academic_score    | integer     | 0–100; academics-only composite                             |
+| performance_score | integer     | 0–100; athletic performance composite                       |
+| availability_score| integer     | 0–100; attendance / reliability composite                   |
+| conduct_score     | integer     | 0–100; reprimands / character composite                     |
+| global_overall    | integer     | 0–100; system-default weighted overall                       |
+| breakdown_json    | jsonb       | optional raw components / debug info                         |
+| created_at        | timestamptz | default now()                                                |
+| updated_at        | timestamptz | default now()                                                |
+
+## 10.2 program_scoring_profiles Table
+
+Defines how a given program (sport at a school) weights the component scores when computing its own overall fit number.
+
+| Column         | Type        | Notes                                                          |
+|----------------|-------------|----------------------------------------------------------------|
+| id             | uuid        | PK                                                             |
+| program_id     | uuid        | FK → programs.id                                               |
+| label          | text        | e.g. 'Default', 'High-Academic', 'Performance-First'          |
+| weights_json   | jsonb       | e.g. {"academic":0.4,"performance":0.35,"availability":0.15,"conduct":0.1} |
+| is_default     | boolean     | whether this is the active default profile for the program     |
+| created_at     | timestamptz | default now()                                                  |
+| updated_at     | timestamptz | default now()                                                  |
+
+## 10.3 program_athlete_scores Table
+
+Stores the final 0–100 overall score for an athlete with respect to a specific program, plus an optional "fit" score and breakdown.
+
+| Column              | Type        | Notes                                                      |
+|---------------------|-------------|------------------------------------------------------------|
+| id                  | uuid        | PK                                                         |
+| program_id          | uuid        | FK → programs.id                                           |
+| athlete_id          | uuid        | FK → athletes.id                                           |
+| scoring_profile_id  | uuid        | nullable FK → program_scoring_profiles.id                  |
+| overall_for_program | integer     | 0–100; main program-specific recruiting score             |
+| fit_score_for_program | integer   | nullable 0–100; optional high-level fit score             |
+| breakdown_json      | jsonb       | optional per-component breakdown for this program          |
+| created_at          | timestamptz | default now()                                              |
+| updated_at          | timestamptz | default now()                                              |
+
+This extension keeps the core School → Program → Athlete relationships intact while adding a flexible scoring layer that can evolve as more performance, academic, and behavioral data is integrated.
+

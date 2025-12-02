@@ -3,74 +3,76 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-/**
- * /api/athlete/me
- *
- * Returns the authenticated user's athlete profile, if one exists.
- *
- * Uses:
- *  - auth user from Supabase
- *  - users table (auth_id -> users.id)
- *  - athletes table (user_id -> athlete profile)
- *
- * It also parses the event_group field into structured fields when possible:
- *   "Sprints | 100m | 10.82" -> eventGroup, primaryEvent, primaryEventMark
- */
+type AthleteProfileResponse = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  gradYear: number | null;
+  eventGroup: string | null;
+  hsName: string | null;
+  hsCity: string | null;
+  hsState: string | null;
+  hsCountry: string | null;
+  hsCoachName: string | null;
+  hsCoachEmail: string | null;
+  hsCoachPhone: string | null;
+};
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const { supabase } = await supabaseServer();
+    const { supabase } = supabaseServer(req);
 
     const {
       data: { user: authUser },
       error: authError,
     } = await supabase.auth.getUser();
 
+    // Again, this will often be AuthSessionMissingError when not logged in
     if (authError) {
-      console.error("[/api/athlete/me] auth error:", authError);
-      return NextResponse.json(
-        { error: "Failed to load auth user" },
-        { status: 500 },
+      console.warn(
+        "[/api/athlete/me] auth.getUser error:",
+        authError.message
       );
     }
 
     if (!authUser) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
     }
 
     const authId = authUser.id;
 
-    // 1) Find the app user row
-    const { data: users, error: userError } = await supabaseAdmin
+    // Load user row
+    const { data: userRow, error: userError } = await supabaseAdmin
       .from("users")
       .select("id")
       .eq("auth_id", authId)
-      .limit(1);
+      .maybeSingle();
 
     if (userError) {
       console.error("[/api/athlete/me] users select error:", userError);
       return NextResponse.json(
         { error: "Failed to load user record" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
-    const appUser = users?.[0];
-
-    if (!appUser) {
+    if (!userRow) {
       return NextResponse.json(
         { error: "No user record found for this account" },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
-    const userId = appUser.id;
+    const userId = userRow.id as string;
 
-    // 2) Find the athlete profile row for this user
+    // Load athlete row for this user
     const { data: athletes, error: athleteError } = await supabaseAdmin
       .from("athletes")
       .select(
-        "id, first_name, last_name, grad_year, event_group, hs_school_name, hs_city, hs_state, hs_country, hs_coach_name, hs_coach_email, hs_coach_phone",
+        "id, first_name, last_name, grad_year, event_group, hs_school_name, hs_city, hs_state, hs_country, hs_coach_name, hs_coach_email, hs_coach_phone"
       )
       .eq("user_id", userId)
       .limit(1);
@@ -79,52 +81,24 @@ export async function GET(_req: NextRequest) {
       console.error("[/api/athlete/me] athletes select error:", athleteError);
       return NextResponse.json(
         { error: "Failed to load athlete profile" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
-    const athlete = athletes?.[0];
-
-    if (!athlete) {
-      return NextResponse.json(
-        { error: "No athlete profile found for this user" },
-        { status: 404 },
-      );
+    if (!athletes || athletes.length === 0) {
+      // No athlete profile yet; 200 with null is fine for your onboarding UI
+      return NextResponse.json(null, { status: 200 });
     }
 
-    // 3) Parse the event_group field into structured pieces if it follows
-    //    the "group | event | mark" convention we used in onboarding.
-    let eventGroup: string | null = null;
-    let primaryEvent: string | null = null;
-    let primaryEventMark: string | null = null;
+    const athlete = athletes[0];
 
-    if (athlete.event_group) {
-      const parts = (athlete.event_group as string)
-        .split("|")
-        .map((p) => p.trim())
-        .filter(Boolean);
-
-      if (parts.length === 1) {
-        eventGroup = parts[0];
-      } else if (parts.length === 2) {
-        eventGroup = parts[0];
-        primaryEvent = parts[1];
-      } else if (parts.length >= 3) {
-        eventGroup = parts[0];
-        primaryEvent = parts[1];
-        primaryEventMark = parts[2];
-      }
-    }
-
-    const payload = {
+    const payload: AthleteProfileResponse = {
       id: athlete.id,
       firstName: athlete.first_name,
       lastName: athlete.last_name,
       gradYear: athlete.grad_year,
-      eventGroup,
-      primaryEvent,
-      primaryEventMark,
-      hsSchoolName: athlete.hs_school_name,
+      eventGroup: athlete.event_group,
+      hsName: athlete.hs_school_name,
       hsCity: athlete.hs_city,
       hsState: athlete.hs_state,
       hsCountry: athlete.hs_country,
@@ -135,9 +109,10 @@ export async function GET(_req: NextRequest) {
 
     return NextResponse.json(payload, { status: 200 });
   } catch (err) {
-    console.error("[/api/athlete/me] unexpected error:", err);
-    const message =
-      err instanceof Error ? err.message : "Failed to load athlete profile";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[/api/athlete/me] Unexpected error:", err);
+    return NextResponse.json(
+      { error: "Unexpected error loading athlete profile" },
+      { status: 500 }
+    );
   }
 }

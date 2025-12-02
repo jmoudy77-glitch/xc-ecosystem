@@ -1,34 +1,19 @@
-// app/api/programs/create/route.ts
+// app/programs/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-/**
- * Creates a new program (team) under a school.
- *
- * Expects JSON body:
- * {
- *   schoolId: string;
- *   name: string;        // e.g. "Men's Track & Field"
- *   sport: string;       // e.g. "Track & Field"
- *   gender?: string;     // e.g. "Men", "Women", "Coed"
- *   level?: string;      // e.g. "college", "hs"
- *   season?: string;     // e.g. "Outdoor", "Indoor", "XC"
- * }
- */
-
 type CreateProgramBody = {
-  schoolId: string;
   name: string;
-  sport: string;
-  gender?: string;
-  level?: string;
-  season?: string;
+  schoolName: string;
+  division: string | null;
+  conference: string | null;
 };
 
 export async function POST(req: NextRequest) {
   try {
-    const { supabase } = await supabaseServer();
+    // ✅ FIX: pass req, no await
+    const { supabase } = supabaseServer(req);
 
     const {
       data: { user: authUser },
@@ -36,85 +21,108 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError) {
-      console.error("[/api/programs/create] Auth error:", authError);
+      console.error("[/programs/create] Auth error:", authError);
       return NextResponse.json(
         { error: "Failed to verify authentication" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
     if (!authUser) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
     }
 
+    const authId = authUser.id;
     const body = (await req.json()) as CreateProgramBody;
 
-    if (!body.schoolId || !body.name || !body.sport) {
+    if (!body.name || !body.schoolName) {
       return NextResponse.json(
-        { error: "Missing required program fields" },
-        { status: 400 },
+        { error: "Missing required fields" },
+        { status: 400 }
       );
     }
 
-    // Optionally verify the school exists
-    const { data: schools, error: schoolError } = await supabaseAdmin
-      .from("schools")
+    // 1) Load user row
+    const { data: userRow, error: userError } = await supabaseAdmin
+      .from("users")
       .select("id")
-      .eq("id", body.schoolId)
-      .limit(1);
+      .eq("auth_id", authId)
+      .maybeSingle();
 
-    if (schoolError) {
-      console.error("[/api/programs/create] School lookup error:", schoolError);
+    if (userError) {
+      console.error("[/programs/create] users select error:", userError);
       return NextResponse.json(
-        { error: "Failed to verify school" },
-        { status: 500 },
+        { error: "Failed to load user record" },
+        { status: 500 }
       );
     }
 
-    if (!schools || schools.length === 0) {
+    if (!userRow) {
       return NextResponse.json(
-        { error: "School not found for provided schoolId" },
-        { status: 404 },
+        { error: "No user record found for this account" },
+        { status: 404 }
       );
     }
 
-    const { data: insertedPrograms, error: insertError } = await supabaseAdmin
+    const userId = userRow.id as string;
+
+    // 2) Create program
+    const { data: newProgram, error: programError } = await supabaseAdmin
       .from("programs")
       .insert({
-        school_id: body.schoolId,
-        name: body.name.trim(),
-        sport: body.sport.trim(),
-        gender: body.gender?.trim() || null,
-        level: body.level?.trim() || null,
-        season: body.season?.trim() || null,
+        name: body.name,
+        school_name: body.schoolName,
+        division: body.division,
+        conference: body.conference,
       })
-      .select("id")
-      .limit(1);
+      .select("id, name, school_name, division, conference")
+      .single();
 
-    if (insertError || !insertedPrograms || insertedPrograms.length === 0) {
+    if (programError) {
       console.error(
-        "[/api/programs/create] Failed to create program:",
-        insertError,
+        "[/programs/create] programs insert error:",
+        programError
       );
       return NextResponse.json(
         { error: "Failed to create program" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
-    const programId = insertedPrograms[0].id as string;
+    // 3) Create membership row (default: head_coach)
+    const { error: memberError } = await supabaseAdmin
+      .from("program_members")
+      .insert({
+        program_id: newProgram.id,
+        user_id: userId,
+        role: "head_coach",
+      });
+
+    if (memberError) {
+      console.error(
+        "[/programs/create] program_members insert error:",
+        memberError
+      );
+      return NextResponse.json(
+        { error: "Failed to attach user to program" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {
-        ok: true,
-        programId,
+        program: newProgram,
       },
-      { status: 200 },
+      { status: 200 }
     );
   } catch (err) {
-    console.error("[/api/programs/create] Unexpected error:", err);
-    const message =
-      err instanceof Error ? err.message : "Failed to create program";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[/programs/create] Unexpected error:", err);
+    return NextResponse.json(
+      { error: "Unexpected error creating program" },
+      { status: 500 }
+    );
   }
 }

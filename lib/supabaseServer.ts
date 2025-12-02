@@ -1,52 +1,37 @@
 // lib/supabaseServer.ts
-import { cookies } from "next/headers";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+//
+// Server-side Supabase client for Next.js App Router using @supabase/ssr.
+// Binds to the incoming NextRequest so Supabase can read/write auth cookies.
 
-export type SupabaseServerResult = {
-  supabase: SupabaseClient;
-  accessToken: string | null;
-};
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-export async function supabaseServer(): Promise<SupabaseServerResult> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY env vars"
-    );
+export function supabaseServer(req: NextRequest) {
+  if (!req) {
+    throw new Error("supabaseServer(req) was called without a NextRequest.");
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // Mutable response that Supabase can write auth cookies into
+  const res = NextResponse.next();
 
-  // In your Next version, cookies() is async
-  const cookieStore = await cookies();
-
-  // Supabase v2 auth cookie looks like: sb-<project-ref>-auth-token
-  const allCookies = cookieStore.getAll();
-  const authCookie = allCookies.find((c) =>
-    c.name.startsWith("sb-") && c.name.endsWith("-auth-token")
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        // ✅ Explicitly typed parameters so TS is happy
+        get(name: string) {
+          return req.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          res.cookies.set(name, value, options);
+        },
+        remove(name: string, options: any) {
+          res.cookies.set(name, "", { ...options, maxAge: 0 });
+        },
+      },
+    }
   );
 
-  let accessToken: string | null = null;
-
-  if (authCookie) {
-    try {
-      // Cookie value is JSON: { access_token, refresh_token, ... }
-      const parsed = JSON.parse(authCookie.value) as {
-        access_token?: string;
-      };
-
-      if (parsed.access_token) {
-        accessToken = parsed.access_token;
-      }
-    } catch (err) {
-      console.error("Failed to parse Supabase auth cookie:", err);
-    }
-  }
-
-  return { supabase, accessToken };
+  return { supabase, res };
 }
-
-
-

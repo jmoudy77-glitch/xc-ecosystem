@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 // Helper: ensure the current auth user belongs to this program.
-// Mirrors /api/programs/[programId]/teams and /staff.
+// Mirrors /api/programs/[programId]/teams and correctly resolves auth user -> users.id.
 async function assertProgramMembership(req: NextRequest, programId: string) {
   const { supabase } = supabaseServer(req);
 
@@ -33,12 +33,41 @@ async function assertProgramMembership(req: NextRequest, programId: string) {
     };
   }
 
+  // Resolve internal users.id from auth_id
+  const { data: userRow, error: userError } = await supabaseAdmin
+    .from("users")
+    .select("id")
+    .eq("auth_id", authUser.id)
+    .maybeSingle();
+
+  if (userError) {
+    console.error(
+      "[/api/programs/[programId]/teams/[teamId]/seasons] users lookup error:",
+      userError,
+    );
+    return {
+      ok: false as const,
+      status: 500 as const,
+      error: "Failed to resolve user record",
+    };
+  }
+
+  if (!userRow) {
+    return {
+      ok: false as const,
+      status: 403 as const,
+      error: "No user record found for this account",
+    };
+  }
+
+  const userId = userRow.id as string;
+
   // Check membership in program_members
   const { data: memberRow, error: memberError } = await supabaseAdmin
     .from("program_members")
     .select("id, role")
     .eq("program_id", programId)
-    .eq("user_id", authUser.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (memberError) {

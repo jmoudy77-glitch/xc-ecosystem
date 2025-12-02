@@ -4,7 +4,8 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 // Helper: ensure the current auth user belongs to this program.
-// This mirrors the pattern used in /api/programs/[programId]/staff.
+// This mirrors the pattern used in /api/programs/[programId]/staff but
+// correctly resolves auth user -> users.id -> program_members.user_id.
 async function assertProgramMembership(req: NextRequest, programId: string) {
   const { supabase } = supabaseServer(req);
 
@@ -30,18 +31,47 @@ async function assertProgramMembership(req: NextRequest, programId: string) {
     };
   }
 
+  // Resolve internal users.id from auth_id
+  const { data: userRow, error: userError } = await supabaseAdmin
+    .from("users")
+    .select("id")
+    .eq("auth_id", authUser.id)
+    .maybeSingle();
+
+  if (userError) {
+    console.error(
+      "[/api/programs/[programId]/teams] users lookup error:",
+      userError,
+    );
+    return {
+      ok: false as const,
+      status: 500 as const,
+      error: "Failed to resolve user record",
+    };
+  }
+
+  if (!userRow) {
+    return {
+      ok: false as const,
+      status: 403 as const,
+      error: "No user record found for this account",
+    };
+  }
+
+  const userId = userRow.id as string;
+
   // Check membership in program_members
   const { data: memberRow, error: memberError } = await supabaseAdmin
     .from("program_members")
     .select("id, role")
     .eq("program_id", programId)
-    .eq("user_id", authUser.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (memberError) {
     console.error(
       "[/api/programs/[programId]/teams] program_members lookup error:",
-      memberError
+      memberError,
     );
     return {
       ok: false as const,
@@ -81,20 +111,23 @@ export async function GET(req: NextRequest) {
   if (!programId) {
     return NextResponse.json(
       { error: "Missing programId in path" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   const authCheck = await assertProgramMembership(req, programId);
   if (!authCheck.ok) {
-    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
+    return NextResponse.json(
+      { error: authCheck.error },
+      { status: authCheck.status },
+    );
   }
 
   try {
     const { data: teams, error } = await supabaseAdmin
       .from("teams")
       .select(
-        "id, program_id, name, code, sport, gender, level, season, is_primary, created_at"
+        "id, program_id, name, code, sport, gender, level, season, is_primary, created_at",
       )
       .eq("program_id", programId)
       .order("created_at", { ascending: true });
@@ -102,11 +135,11 @@ export async function GET(req: NextRequest) {
     if (error) {
       console.error(
         "[/api/programs/[programId]/teams] teams select error:",
-        error
+        error,
       );
       return NextResponse.json(
         { error: "Failed to load teams" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -115,16 +148,16 @@ export async function GET(req: NextRequest) {
         programId,
         teams: teams ?? [],
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error(
       "[/api/programs/[programId]/teams] Unexpected GET error:",
-      err
+      err,
     );
     return NextResponse.json(
       { error: "Unexpected error loading teams" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -157,13 +190,16 @@ export async function POST(req: NextRequest) {
   if (!programId) {
     return NextResponse.json(
       { error: "Missing programId in path" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   const authCheck = await assertProgramMembership(req, programId);
   if (!authCheck.ok) {
-    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
+    return NextResponse.json(
+      { error: authCheck.error },
+      { status: authCheck.status },
+    );
   }
 
   let body: CreateTeamBody;
@@ -172,7 +208,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -181,7 +217,7 @@ export async function POST(req: NextRequest) {
   if (!name) {
     return NextResponse.json(
       { error: "Team name is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -199,18 +235,18 @@ export async function POST(req: NextRequest) {
         is_primary: body.isPrimary ?? false,
       })
       .select(
-        "id, program_id, name, code, sport, gender, level, season, is_primary, created_at"
+        "id, program_id, name, code, sport, gender, level, season, is_primary, created_at",
       )
       .single();
 
     if (error) {
       console.error(
         "[/api/programs/[programId]/teams] teams insert error:",
-        error
+        error,
       );
       return NextResponse.json(
         { error: "Failed to create team" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -219,16 +255,16 @@ export async function POST(req: NextRequest) {
         programId,
         team: newTeam,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error(
       "[/api/programs/[programId]/teams] Unexpected POST error:",
-      err
+      err,
     );
     return NextResponse.json(
       { error: "Unexpected error creating team" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

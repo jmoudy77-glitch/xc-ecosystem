@@ -20,70 +20,61 @@ type AthleteBillingSummary = {
   currentPeriodEnd: string | null;
 };
 
-type MeOkResponse = {
+type MeResponse = {
   user: {
     id: string;
     email: string | null;
     fullName: string | null;
-  } | null;
-  roleHint?: string | null;
-  billing?: {
-    athlete?: AthleteBillingSummary | null;
-    programs?: ProgramBillingSummary[];
+  };
+  roleHint: string | null; // "coach" | "athlete" | "both" | "unknown"
+  billing: {
+    athlete: AthleteBillingSummary | null;
+    programs: ProgramBillingSummary[];
   };
 };
 
-type MeErrorResponse = {
-  error: string;
-};
-
-type MeResponse = MeOkResponse | MeErrorResponse;
+function formatRoleLabel(roleHint: string | null): string {
+  if (!roleHint) return "Account";
+  if (roleHint === "coach") return "Head coach";
+  if (roleHint === "athlete") return "Athlete";
+  if (roleHint === "both") return "Head coach + athlete";
+  return roleHint;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
+
+  const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [me, setMe] = useState<MeResponse | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
     async function load() {
+      setLoading(true);
+      setErrorMsg(null);
+
       try {
-        setLoading(true);
-        setErrorMsg(null);
-
-        const res = await fetch("/api/me", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        const body = (await res.json().catch(() => ({}))) as MeResponse;
+        const res = await fetch("/api/me", { cache: "no-store" });
+        const body = (await res.json().catch(() => ({}))) as any;
 
         if (!mounted) return;
-
-        if (res.status === 401) {
-          // Not authenticated -> send to login
-          router.replace("/login");
-          return;
-        }
 
         if (!res.ok || ("error" in body && body.error)) {
           const message =
             "error" in body && body.error
-              ? body.error
+              ? String(body.error)
               : `Failed to load account (${res.status})`;
           setErrorMsg(message);
           setLoading(false);
           return;
         }
 
-        setMe(body);
+        setMe(body as MeResponse);
         setLoading(false);
       } catch (err) {
-        console.error("[Dashboard] Failed to load /api/me:", err);
+        console.error("[Dashboard] Failed to load /api/me", err);
         if (!mounted) return;
         setErrorMsg("Unexpected error loading dashboard.");
         setLoading(false);
@@ -98,47 +89,55 @@ export default function DashboardPage() {
   }, [router]);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
-    router.replace("/login");
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("[Dashboard] logout error", err);
+    } finally {
+      router.replace("/login");
+    }
   }
 
-  const user =
-    me && "user" in me && me.user
-      ? me.user
-      : { id: "", email: null as string | null, fullName: null as string | null };
-
-  const programs: ProgramBillingSummary[] =
-    me && "billing" in me && me.billing?.programs
-      ? me.billing.programs ?? []
-      : [];
-
+  const roleHint = me?.roleHint ?? "unknown";
+  const roleLabel = formatRoleLabel(me?.roleHint ?? null);
+  const programs: ProgramBillingSummary[] = me?.billing?.programs ?? [];
   const athleteBilling: AthleteBillingSummary | null =
-    me && "billing" in me ? me.billing?.athlete ?? null : null;
-
-  const roleHint =
-    me && "roleHint" in me ? (me as MeOkResponse).roleHint ?? null : null;
+    me?.billing?.athlete ?? null;
+  const email = me?.user.email ?? null;
+  const fullName = me?.user.fullName ?? null;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <p className="text-sm text-slate-400">Loading dashboard...</p>
+      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
+        <p className="text-sm text-slate-300">Loading dashboard…</p>
       </div>
     );
   }
 
   if (errorMsg) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="max-w-md w-full rounded-xl border border-red-500/40 bg-red-950/60 px-4 py-3 text-sm text-red-100">
-          <p className="font-semibold mb-1">Failed to load dashboard</p>
-          <p className="mb-3 text-xs text-red-200">{errorMsg}</p>
-          <button
-            type="button"
-            onClick={() => router.refresh()}
-            className="rounded-full bg-red-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-400"
-          >
-            Retry
-          </button>
+      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-xl border border-red-500/40 bg-red-950/40 p-5">
+          <p className="text-sm font-semibold text-red-100">
+            Problem loading your dashboard
+          </p>
+          <p className="mt-2 text-xs text-red-200">{errorMsg}</p>
+          <div className="mt-4 flex justify-between items-center">
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="rounded-full bg-red-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-400"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-[11px] text-red-100/80 hover:underline"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -164,17 +163,15 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-xs font-semibold text-slate-50">
-                {user.fullName || user.email || "Coach"}
+              <p className="text-xs font-medium text-slate-100">
+                {fullName || email || "Account"}
               </p>
-              {roleHint && (
-                <p className="text-[11px] text-slate-400">{roleHint}</p>
-              )}
+              <p className="text-[11px] text-slate-400">{roleLabel}</p>
             </div>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-full border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-100 hover:border-slate-400"
+              className="text-[11px] text-slate-300 hover:text-slate-50"
             >
               Log out
             </button>
@@ -191,23 +188,24 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Account
             </p>
-            <p className="mt-1 text-sm font-semibold text-slate-50">
-              {user.fullName || user.email || "Your account"}
+            <p className="mt-1 text-[11px] text-slate-500">
+              Overview of your XC Ecosystem account.
             </p>
-            {user.email && (
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                {user.email}
+
+            <div className="mt-3 space-y-2 text-xs">
+              <p className="text-slate-200">
+                Email:{" "}
+                <span className="font-mono text-[11px] text-slate-100">
+                  {email ?? "unknown"}
+                </span>
               </p>
-            )}
-            <p className="mt-3 text-[11px] text-slate-500">
-              This dashboard pulls from your{" "}
-              <span className="font-mono text-[11px] text-slate-300">
-                /api/me
-              </span>
-              , which consolidates user, program, and billing context. As you
-              add more features (rosters, boards, AI scoring), this page can
-              evolve into a full coach home screen.
-            </p>
+              <p className="text-slate-200">
+                Role:{" "}
+                <span className="font-mono text-[11px] text-slate-100">
+                  {roleLabel} ({roleHint})
+                </span>
+              </p>
+            </div>
           </div>
 
           {/* Athlete subscription card */}
@@ -215,22 +213,27 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Athlete subscription
             </p>
-            {athleteBilling && athleteBilling.planCode ? (
-              <div className="mt-2 space-y-1 text-xs text-slate-100">
-                <p className="font-semibold">
+            <p className="mt-1 text-[11px] text-slate-500">
+              Billing for your personal athlete tools (separate from program
+              billing).
+            </p>
+
+            {athleteBilling ? (
+              <div className="mt-3 space-y-1 text-xs">
+                <p className="text-slate-200">
                   Plan:{" "}
-                  <span className="font-mono">
-                    {athleteBilling.planCode}
+                  <span className="font-mono text-[11px] text-slate-100">
+                    {athleteBilling.planCode ?? "unknown"}
                   </span>
                 </p>
-                <p className="text-slate-300">
+                <p className="text-slate-200">
                   Status: {athleteBilling.status ?? "unknown"}
                 </p>
                 {athleteBilling.currentPeriodEnd && (
-                  <p className="text-slate-300">
+                  <p className="text-slate-200">
                     Renews:{" "}
                     {new Date(
-                      athleteBilling.currentPeriodEnd,
+                      athleteBilling.currentPeriodEnd
                     ).toLocaleDateString()}
                   </p>
                 )}
@@ -268,9 +271,17 @@ export default function DashboardPage() {
           </div>
 
           {programs.length === 0 ? (
-            <p className="mt-3 text-[11px] text-slate-500">
-              No programs found for this account yet.
-            </p>
+            <div className="mt-3 space-y-2 text-[11px] text-slate-500">
+              <p>No programs found for this account yet.</p>
+              {roleHint !== "athlete" && (
+                <Link
+                  href="/programs/create"
+                  className="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-950 hover:bg-white"
+                >
+                  Create your first program
+                </Link>
+              )}
+            </div>
           ) : (
             <div className="mt-4 space-y-2">
               {programs.map((p) => (
@@ -296,7 +307,8 @@ export default function DashboardPage() {
                       · Status: {p.status ?? "unknown"}
                       {p.currentPeriodEnd && (
                         <>
-                          {" "}· Renews{" "}
+                          {" "}
+                          · Renews{" "}
                           {new Date(p.currentPeriodEnd).toLocaleDateString()}
                         </>
                       )}
@@ -305,15 +317,21 @@ export default function DashboardPage() {
                   <div className="flex flex-wrap gap-2">
                     <Link
                       href={`/programs/${p.programId}`}
-                      className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                      className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
                     >
                       Overview
                     </Link>
                     <Link
                       href={`/programs/${p.programId}/staff`}
-                      className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                      className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
                     >
-                      Team
+                      Staff
+                    </Link>
+                    <Link
+                      href={`/programs/${p.programId}/teams`}
+                      className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                    >
+                      Teams
                     </Link>
                     <Link
                       href={`/programs/${p.programId}/billing`}

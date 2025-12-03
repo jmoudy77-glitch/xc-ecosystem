@@ -137,9 +137,6 @@ type RosterRow = {
   depth_order: number | null;
   notes: string | null;
   created_at: string | null;
-  // joined fields
-  athlete_name?: string | null;
-  athlete_grad_year?: number | null;
 };
 
 type CreateRosterBody = {
@@ -241,11 +238,7 @@ export async function GET(req: NextRequest) {
         status,
         depth_order,
         notes,
-        created_at,
-        athletes:athlete_id (
-          full_name,
-          grad_year
-        )
+        created_at
       `,
       )
       .eq("program_id", programId)
@@ -276,8 +269,6 @@ export async function GET(req: NextRequest) {
         depth_order: row.depth_order,
         notes: row.notes,
         created_at: row.created_at,
-        athlete_name: row.athletes?.full_name ?? null,
-        athlete_grad_year: row.athletes?.grad_year ?? null,
       })) ?? [];
 
     return NextResponse.json(
@@ -402,11 +393,7 @@ export async function POST(req: NextRequest) {
         status,
         depth_order,
         notes,
-        created_at,
-        athletes:athlete_id (
-          full_name,
-          grad_year
-        )
+        created_at
       `,
       )
       .single();
@@ -446,8 +433,6 @@ export async function POST(req: NextRequest) {
       depth_order: inserted.depth_order,
       notes: inserted.notes,
       created_at: inserted.created_at,
-      athlete_name: inserted.athletes?.full_name ?? null,
-      athlete_grad_year: inserted.athletes?.grad_year ?? null,
     };
 
     return NextResponse.json(

@@ -64,7 +64,7 @@ function normalizeStatus(status: string | null): BillingStatus {
 }
 
 export default async function DashboardPage() {
-  const supabase = supabaseServerComponent();
+  const supabase = await supabaseServerComponent();
 
   // 1) Auth user
   const {

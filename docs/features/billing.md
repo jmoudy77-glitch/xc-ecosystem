@@ -1,0 +1,3 @@
+# Billing
+
+Stripe scopes, plan codes, subscription logic...

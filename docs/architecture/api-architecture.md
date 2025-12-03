@@ -1,0 +1,3 @@
+# API Architecture
+
+Routes, patterns, auth...

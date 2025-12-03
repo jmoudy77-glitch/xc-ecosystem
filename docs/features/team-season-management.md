@@ -1,0 +1,3 @@
+# Team & Season Management
+
+Teams, seasons, academic year logic...

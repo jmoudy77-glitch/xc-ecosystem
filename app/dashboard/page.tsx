@@ -1,22 +1,33 @@
 // app/dashboard/page.tsx
-"use client";
+// Server Component dashboard using supabaseServerComponent + supabaseAdmin
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { redirect } from "next/navigation";
+import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import type { PlanCode } from "@/lib/billingPlans";
+
+type RoleHint = "coach" | "athlete" | "both" | "unknown";
+
+type BillingStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "unknown";
 
 type ProgramBillingSummary = {
   programId: string;
   programName: string | null;
-  planCode: string | null;
-  status: string | null;
+  planCode: PlanCode | null;
+  status: BillingStatus;
   currentPeriodEnd: string | null;
 };
 
 type AthleteBillingSummary = {
-  planCode: string | null;
-  status: string | null;
+  planCode: PlanCode | null;
+  status: BillingStatus;
   currentPeriodEnd: string | null;
 };
 
@@ -26,14 +37,14 @@ type MeResponse = {
     email: string | null;
     fullName: string | null;
   };
-  roleHint: string | null; // "coach" | "athlete" | "both" | "unknown"
+  roleHint: RoleHint;
   billing: {
     athlete: AthleteBillingSummary | null;
     programs: ProgramBillingSummary[];
   };
 };
 
-function formatRoleLabel(roleHint: string | null): string {
+function formatRoleLabel(roleHint: RoleHint | null): string {
   if (!roleHint) return "Account";
   if (roleHint === "coach") return "Head coach";
   if (roleHint === "athlete") return "Athlete";
@@ -41,108 +52,222 @@ function formatRoleLabel(roleHint: string | null): string {
   return roleHint;
 }
 
-export default function DashboardPage() {
-  const router = useRouter();
+function normalizeStatus(status: string | null): BillingStatus {
+  if (!status) return "unknown";
+  const s = status.toLowerCase();
+  if (s === "active") return "active";
+  if (s === "trialing") return "trialing";
+  if (s === "past_due") return "past_due";
+  if (s === "canceled") return "canceled";
+  if (s === "incomplete") return "incomplete";
+  return "unknown";
+}
 
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+export default async function DashboardPage() {
+  const supabase = supabaseServerComponent();
 
-  useEffect(() => {
-    let mounted = true;
+  // 1) Auth user
+  const {
+    data: { user: authUser },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-    async function load() {
-      setLoading(true);
-      setErrorMsg(null);
+  if (authError) {
+    console.warn("[Dashboard] auth.getUser error:", authError.message);
+  }
 
-      try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        const body = (await res.json().catch(() => ({}))) as any;
+  if (!authUser) {
+    redirect("/login");
+  }
 
-        if (!mounted) return;
+  const authId = authUser.id;
 
-        if (!res.ok || ("error" in body && body.error)) {
-          const message =
-            "error" in body && body.error
-              ? String(body.error)
-              : `Failed to load account (${res.status})`;
-          setErrorMsg(message);
-          setLoading(false);
-          return;
-        }
+  const derivedFullName =
+    (authUser.user_metadata as any)?.full_name ??
+    (authUser.user_metadata as any)?.name ??
+    null;
 
-        setMe(body as MeResponse);
-        setLoading(false);
-      } catch (err) {
-        console.error("[Dashboard] Failed to load /api/me", err);
-        if (!mounted) return;
-        setErrorMsg("Unexpected error loading dashboard.");
-        setLoading(false);
-      }
+  // 2) Ensure user row
+  const { data: existingUserRow, error: userSelectError } =
+    await supabaseAdmin
+      .from("users")
+      .select("id, auth_id, email")
+      .eq("auth_id", authId)
+      .maybeSingle();
+
+  if (userSelectError) {
+    console.error("[Dashboard] users select error:", userSelectError);
+    throw new Error("Failed to load user record");
+  }
+
+  let userRow = existingUserRow;
+
+  if (!userRow) {
+    const {
+      data: insertedUser,
+      error: userInsertError,
+    } = await supabaseAdmin
+      .from("users")
+      .insert({
+        auth_id: authId,
+        email: authUser.email ?? null,
+      })
+      .select("id, auth_id, email")
+      .single();
+
+    if (userInsertError) {
+      console.error("[Dashboard] Failed to create user row:", userInsertError);
+      throw new Error("Failed to create user record");
     }
 
-    void load();
+    userRow = insertedUser;
+  }
 
-    return () => {
-      mounted = false;
+  const userId = userRow.id as string;
+
+  // 3) Athlete-level subscription
+  let athleteBilling: AthleteBillingSummary | null = null;
+
+  const { data: athleteSubscriptionRows, error: athleteSubError } =
+    await supabaseAdmin
+      .from("athlete_subscriptions")
+      .select(
+        "id, status, current_period_end, plan_code, stripe_subscription_id"
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+  if (athleteSubError) {
+    console.error(
+      "[Dashboard] athlete_subscriptions select error:",
+      athleteSubError
+    );
+  }
+
+  if (athleteSubscriptionRows && athleteSubscriptionRows.length > 0) {
+    const row = athleteSubscriptionRows[0];
+    athleteBilling = {
+      planCode: (row.plan_code as PlanCode | null) ?? null,
+      status: normalizeStatus(row.status),
+      currentPeriodEnd: row.current_period_end
+        ? new Date(row.current_period_end).toISOString()
+        : null,
     };
-  }, [router]);
+  }
 
-  async function handleLogout() {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error("[Dashboard] logout error", err);
-    } finally {
-      router.replace("/login");
+  // 4) Program memberships + program-level subscriptions
+  const { data: memberships, error: membershipError } = await supabaseAdmin
+    .from("program_members")
+    .select(
+      `
+      id,
+      program_id,
+      role,
+      programs!inner (
+        id,
+        name
+      )
+    `
+    )
+    .eq("user_id", userId);
+
+  if (membershipError) {
+    console.error("[Dashboard] program_members select error:", membershipError);
+  }
+
+  const programsBasic: { id: string; name: string | null }[] =
+    memberships?.map((m: any) => ({
+      id: m.program_id,
+      name: m.programs?.name ?? "Unnamed Program",
+    })) ?? [];
+
+  const programIds = programsBasic.map((p) => p.id);
+
+  let programBillings: ProgramBillingSummary[] = [];
+
+  if (programIds.length > 0) {
+    const { data: programSubRows, error: programSubError } =
+      await supabaseAdmin
+        .from("program_subscriptions")
+        .select(
+          `
+          id,
+          status,
+          current_period_end,
+          plan_code,
+          stripe_subscription_id,
+          program_id
+        `
+        )
+        .in("program_id", programIds);
+
+    if (programSubError) {
+      console.error(
+        "[Dashboard] program_subscriptions select error:",
+        programSubError
+      );
     }
+
+    const subsByProgram: Record<string, any[]> = {};
+    (programSubRows ?? []).forEach((row) => {
+      if (!subsByProgram[row.program_id]) {
+        subsByProgram[row.program_id] = [];
+      }
+      subsByProgram[row.program_id].push(row);
+    });
+
+    programBillings = programsBasic.map((program) => {
+      const subs = subsByProgram[program.id] ?? [];
+      const latestSub = subs[0] ?? null;
+
+      return {
+        programId: program.id,
+        programName: program.name,
+        planCode: (latestSub?.plan_code as PlanCode | null) ?? null,
+        status: normalizeStatus(latestSub?.status ?? null),
+        currentPeriodEnd: latestSub?.current_period_end
+          ? new Date(latestSub.current_period_end).toISOString()
+          : null,
+      };
+    });
   }
 
-  const roleHint = me?.roleHint ?? "unknown";
-  const roleLabel = formatRoleLabel(me?.roleHint ?? null);
-  const programs: ProgramBillingSummary[] = me?.billing?.programs ?? [];
-  const athleteBilling: AthleteBillingSummary | null =
-    me?.billing?.athlete ?? null;
-  const email = me?.user.email ?? null;
-  const fullName = me?.user.fullName ?? null;
+  // 5) Role hint
+  let roleHint: RoleHint = "unknown";
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p className="text-sm text-slate-300">Loading dashboard…</p>
-      </div>
-    );
+  const hasAthleteSub =
+    athleteBilling && athleteBilling.status !== "canceled";
+  const hasProgramMemberships = programsBasic.length > 0;
+
+  if (hasAthleteSub && hasProgramMemberships) {
+    roleHint = "both";
+  } else if (hasAthleteSub) {
+    roleHint = "athlete";
+  } else if (hasProgramMemberships) {
+    roleHint = "coach";
   }
 
-  if (errorMsg) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-xl border border-red-500/40 bg-red-950/40 p-5">
-          <p className="text-sm font-semibold text-red-100">
-            Problem loading your dashboard
-          </p>
-          <p className="mt-2 text-xs text-red-200">{errorMsg}</p>
-          <div className="mt-4 flex justify-between items-center">
-            <button
-              type="button"
-              onClick={() => router.refresh()}
-              className="rounded-full bg-red-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-400"
-            >
-              Retry
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="text-[11px] text-red-100/80 hover:underline"
-            >
-              Log out
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const me: MeResponse = {
+    user: {
+      id: userRow.id,
+      email: userRow.email,
+      fullName: derivedFullName,
+    },
+    roleHint,
+    billing: {
+      athlete: athleteBilling,
+      programs: programBillings,
+    },
+  };
 
+  const programs = me.billing.programs;
+  const athlete = me.billing.athlete;
+  const email = me.user.email;
+  const fullName = me.user.fullName;
+  const roleLabel = formatRoleLabel(me.roleHint);
+
+  // Server component render (no loading/error states needed here)
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       {/* Top nav header */}
@@ -168,13 +293,13 @@ export default function DashboardPage() {
               </p>
               <p className="text-[11px] text-slate-400">{roleLabel}</p>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
+            {/* TODO: Wire logout to a server route or auth UI */}
+            <Link
+              href="/logout"
               className="text-[11px] text-slate-300 hover:text-slate-50"
             >
               Log out
-            </button>
+            </Link>
           </div>
         </div>
       </header>
@@ -202,7 +327,7 @@ export default function DashboardPage() {
               <p className="text-slate-200">
                 Role:{" "}
                 <span className="font-mono text-[11px] text-slate-100">
-                  {roleLabel} ({roleHint})
+                  {roleLabel} ({me.roleHint})
                 </span>
               </p>
             </div>
@@ -218,23 +343,21 @@ export default function DashboardPage() {
               billing).
             </p>
 
-            {athleteBilling ? (
+            {athlete ? (
               <div className="mt-3 space-y-1 text-xs">
                 <p className="text-slate-200">
                   Plan:{" "}
                   <span className="font-mono text-[11px] text-slate-100">
-                    {athleteBilling.planCode ?? "unknown"}
+                    {athlete.planCode ?? "unknown"}
                   </span>
                 </p>
                 <p className="text-slate-200">
-                  Status: {athleteBilling.status ?? "unknown"}
+                  Status: {athlete.status ?? "unknown"}
                 </p>
-                {athleteBilling.currentPeriodEnd && (
+                {athlete.currentPeriodEnd && (
                   <p className="text-slate-200">
                     Renews:{" "}
-                    {new Date(
-                      athleteBilling.currentPeriodEnd
-                    ).toLocaleDateString()}
+                    {new Date(athlete.currentPeriodEnd).toLocaleDateString()}
                   </p>
                 )}
               </div>
@@ -258,7 +381,7 @@ export default function DashboardPage() {
                 subscriptions.
               </p>
             </div>
-            {roleHint !== "athlete" && (
+            {me.roleHint !== "athlete" && (
               <div>
                 <Link
                   href="/programs/create"
@@ -273,7 +396,7 @@ export default function DashboardPage() {
           {programs.length === 0 ? (
             <div className="mt-3 space-y-2 text-[11px] text-slate-500">
               <p>No programs found for this account yet.</p>
-              {roleHint !== "athlete" && (
+              {me.roleHint !== "athlete" && (
                 <Link
                   href="/programs/create"
                   className="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-950 hover:bg-white"
@@ -309,7 +432,9 @@ export default function DashboardPage() {
                         <>
                           {" "}
                           · Renews{" "}
-                          {new Date(p.currentPeriodEnd).toLocaleDateString()}
+                          {new Date(
+                            p.currentPeriodEnd
+                          ).toLocaleDateString()}
                         </>
                       )}
                     </p>

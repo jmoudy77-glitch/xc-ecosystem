@@ -14,7 +14,7 @@ type PageProps = {
 export default async function ProgramInquiriesPage({ params }: PageProps) {
   const programId = params.programId;
 
-  const supabase = supabaseServerComponent();
+  const supabase = await supabaseServerComponent();
 
   // 1) Auth user
   const {

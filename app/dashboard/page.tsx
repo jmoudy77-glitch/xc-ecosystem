@@ -293,7 +293,17 @@ export default async function DashboardPage() {
               </p>
               <p className="text-[11px] text-slate-400">{roleLabel}</p>
             </div>
-            {/* TODO: Wire logout to a server route or auth UI */}
+
+            {/* New: athlete billing link */}
+            {(roleHint === "athlete" || roleHint === "both") && (
+              <Link
+                href="/billing"
+                className="text-[11px] text-slate-300 hover:text-slate-50"
+              >
+                Personal billing
+              </Link>
+            )}
+
             <Link
               href="/logout"
               className="text-[11px] text-slate-300 hover:text-slate-50"

@@ -8,9 +8,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 type BillingScope = "org" | "athlete";
 
 type CheckoutBody = {
-  scope: BillingScope;
-  ownerId: string;      // orgId, userId, or programId
-  planCode: PlanCode;   // one of the defined plan codes
+  scope: BillingScope;      // "org" for program, "athlete" for personal
+  ownerId: string;          // programId for org, userId for athlete
+  planCode: PlanCode;       // one of the plan codes from billingPlans.ts
 };
 
 // Map planCode → Stripe price ID via env vars
@@ -29,52 +29,46 @@ const PRICE_BY_PLAN: Record<PlanCode, string> = {
 function getBaseUrl(req: NextRequest): string {
   const headerOrigin = req.headers.get("origin");
   if (headerOrigin) return headerOrigin;
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  return "http://localhost:3000";
+
+  const url = new URL(req.url);
+  return `${url.protocol}//${url.host}`;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as CheckoutBody;
-    const { scope, ownerId, planCode } = body;
+    const body = (await req.json().catch(() => ({}))) as Partial<CheckoutBody>;
+
+    const scope = body.scope;
+    const ownerId = body.ownerId;
+    const planCode = body.planCode;
 
     if (!scope || !ownerId || !planCode) {
       return NextResponse.json(
-        { error: "Missing required fields: scope, ownerId, planCode" },
-        { status: 400 },
-      );
-    }
-
-    if (!["org", "athlete", "program"].includes(scope)) {
-      return NextResponse.json(
-        { error: "Invalid scope value" },
+        { error: "Missing scope, ownerId, or planCode" },
         { status: 400 },
       );
     }
 
     const priceId = PRICE_BY_PLAN[planCode];
     if (!priceId) {
-      console.error("[create-checkout] No Stripe price ID for planCode:", planCode);
       return NextResponse.json(
-        { error: "Stripe price ID not configured for this plan" },
-        { status: 500 },
+        { error: `No Stripe price configured for planCode=${planCode}` },
+        { status: 400 },
       );
     }
 
     const baseUrl = getBaseUrl(req);
 
+    // 👇 Where Stripe sends the user after checkout
     let successPath = "/billing";
     let cancelPath = "/billing";
 
     if (scope === "org") {
+      // Program-level billing
       successPath = `/programs/${ownerId}/billing`;
       cancelPath = `/programs/${ownerId}/billing`;
     } else if (scope === "athlete") {
-      // In the future you could route to an athlete-specific billing page
-      successPath = "/billing";
-      cancelPath = "/billing";
-    } else if (scope === "org") {
-      // In the future you could route to an org-level billing page
+      // Personal athlete billing
       successPath = "/billing";
       cancelPath = "/billing";
     }
@@ -84,32 +78,29 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: priceId,   // you already look this up from planCode
+          price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/cancel`,
+      success_url: `${baseUrl}${successPath}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${cancelPath}?cancelled=1`,
 
-      // 🔴 NEW: this is what actually lands on Stripe.Subscription.metadata
+      // We attach metadata so the webhook knows who/what this subscription is for
+      metadata: {
+        scope,
+        owner_id: ownerId,
+        plan_code: planCode,
+      },
       subscription_data: {
         metadata: {
-          scope: body.scope,          // "org" for program-level
-          owner_id: body.ownerId,     // programId
-          plan_code: body.planCode,   // "college_elite" etc.
+          scope,
+          owner_id: ownerId,
+          plan_code: planCode,
         },
-      },
-
-      // Optional but nice to have: metadata on the Checkout Session itself
-      metadata: {
-        scope: body.scope,
-        owner_id: body.ownerId,
-        plan_code: body.planCode,
       },
     });
 
     if (!session.url) {
-      console.error("[create-checkout] No URL returned from Stripe:", session.id);
       return NextResponse.json(
         { error: "No checkout URL returned from Stripe" },
         { status: 500 },
@@ -118,7 +109,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (err: unknown) {
-    console.error("Error creating checkout session:", err);
+    console.error("[create-checkout-session] Error:", err);
     const message =
       err instanceof Error ? err.message : "Failed to create checkout session";
     return NextResponse.json({ error: message }, { status: 500 });

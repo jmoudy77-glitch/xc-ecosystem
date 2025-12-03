@@ -8,56 +8,48 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 type BillingScope = "org" | "athlete";
 
 type PortalBody = {
-  scope: BillingScope;
-  ownerId: string; // orgId, userId, or programId
+  scope: BillingScope;  // "org" for program, "athlete" for personal
+  ownerId: string;      // programId for org, userId for athlete
 };
 
 function getBaseUrl(req: NextRequest): string {
   const headerOrigin = req.headers.get("origin");
   if (headerOrigin) return headerOrigin;
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  return "http://localhost:3000";
+
+  const url = new URL(req.url);
+  return `${url.protocol}//${url.host}`;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as PortalBody;
-    const { scope, ownerId } = body;
+    const body = (await req.json().catch(() => ({}))) as Partial<PortalBody>;
+    const scope = body.scope;
+    const ownerId = body.ownerId;
 
     if (!scope || !ownerId) {
       return NextResponse.json(
-        { error: "Missing required fields: scope, ownerId" },
+        { error: "Missing scope or ownerId" },
         { status: 400 },
       );
     }
 
-    if (!["org", "athlete", "program"].includes(scope)) {
-      return NextResponse.json(
-        { error: "Invalid scope value" },
-        { status: 400 },
-      );
-    }
-
-    // Determine subscription table + owner column by scope
+    // Look up the Stripe customer from our DB
     let tableName: string;
     let ownerColumn: string;
 
     if (scope === "org") {
       tableName = "program_subscriptions";
       ownerColumn = "program_id";
-    } else if (scope === "athlete") {
-      tableName = "athlete_subscriptions";
-      ownerColumn = "user_id"; // adjust if your schema uses athlete_id instead
     } else {
-      tableName = "org_subscriptions";
-      ownerColumn = "org_id";
+      tableName = "athlete_subscriptions";
+      ownerColumn = "user_id";
     }
 
     const { data, error } = await supabaseAdmin
       .from(tableName)
-      .select("stripe_customer_id, status, current_period_end")
+      .select("stripe_customer_id, status")
       .eq(ownerColumn, ownerId)
-      .order("current_period_end", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(1);
 
     if (error) {
@@ -72,7 +64,6 @@ export async function POST(req: NextRequest) {
       | {
           stripe_customer_id: string | null;
           status: string | null;
-          current_period_end: string | null;
         }
       | undefined;
 
@@ -84,16 +75,15 @@ export async function POST(req: NextRequest) {
     }
 
     const stripeCustomerId = row.stripe_customer_id;
-
     const baseUrl = getBaseUrl(req);
+
+    // 👇 Where Stripe sends the user after closing the billing portal
     let returnPath = "/billing";
 
     if (scope === "org") {
       returnPath = `/programs/${ownerId}/billing`;
     } else if (scope === "athlete") {
-      returnPath = "/billing"; // or something like `/athlete/billing`
-    } else if (scope === "org") {
-      returnPath = "/billing"; // or something like `/org/billing`
+      returnPath = "/billing";
     }
 
     const portalSession = await stripe.billingPortal.sessions.create({
@@ -103,7 +93,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: portalSession.url }, { status: 200 });
   } catch (err: unknown) {
-    console.error("Portal session error:", err);
+    console.error("[create-portal-session] Error:", err);
     const message =
       err instanceof Error ? err.message : "Failed to create portal session";
     return NextResponse.json({ error: message }, { status: 500 });

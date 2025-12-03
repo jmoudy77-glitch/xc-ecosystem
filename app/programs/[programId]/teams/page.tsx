@@ -2,7 +2,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Team = {
   id: string;
@@ -17,12 +18,7 @@ type Team = {
   created_at: string | null;
 };
 
-type TeamsResponse = {
-  programId: string;
-  teams: Team[];
-};
-
-type TeamSeason = {
+type Season = {
   id: string;
   team_id: string;
   program_id: string;
@@ -34,45 +30,54 @@ type TeamSeason = {
   created_at: string | null;
 };
 
-type TeamSeasonsResponse = {
+type TeamsResponse = {
+  programId: string;
+  teams: Team[];
+  error?: string;
+};
+
+type SeasonsResponse = {
   programId: string;
   teamId: string;
-  seasons: TeamSeason[];
+  seasons: Season[];
+  error?: string;
 };
 
 export default function ProgramTeamsPage() {
   const params = useParams();
+  const router = useRouter();
   const programId = params?.programId as string | undefined;
 
-  const [data, setData] = useState<TeamsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [teamsData, setTeamsData] = useState<TeamsResponse | null>(null);
+  const [loadingTeams, setLoadingTeams] = useState(true);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [sport, setSport] = useState("");
-  const [gender, setGender] = useState("");
-  const [level, setLevel] = useState("");
-  const [season, setSeason] = useState("");
-  const [isPrimary, setIsPrimary] = useState(false);
-  const [creating, setCreating] = useState(false);
-
-  // Seasons state
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [seasons, setSeasons] = useState<TeamSeason[]>([]);
-  const [seasonsLoading, setSeasonsLoading] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [seasonsData, setSeasonsData] = useState<SeasonsResponse | null>(null);
+  const [loadingSeasons, setLoadingSeasons] = useState(false);
   const [seasonsError, setSeasonsError] = useState<string | null>(null);
 
+  // Create team form state
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [sport, setSport] = useState("Track & Field");
+  const [gender, setGender] = useState("Coed");
+  const [level, setLevel] = useState("Varsity");
+  const [season, setSeason] = useState("");
+  const [isPrimary, setIsPrimary] = useState(false);
+  const [creatingTeam, setCreatingTeam] = useState(false);
+
+  // Create season form state (for selected team)
   const [academicYear, setAcademicYear] = useState("");
   const [yearStart, setYearStart] = useState("");
   const [yearEnd, setYearEnd] = useState("");
-  const [seasonLabel, setSeasonLabel] = useState("");
-  const [isCurrent, setIsCurrent] = useState(false);
+  const [seasonLabel, setSeasonLabel] = useState("Cross Country");
+  const [isCurrentSeason, setIsCurrentSeason] = useState(true);
   const [creatingSeason, setCreatingSeason] = useState(false);
 
   async function loadTeams(currentProgramId: string) {
-    setLoading(true);
-    setErrorMsg(null);
+    setLoadingTeams(true);
+    setTeamsError(null);
 
     try {
       const res = await fetch(`/api/programs/${currentProgramId}/teams`);
@@ -81,53 +86,57 @@ export default function ProgramTeamsPage() {
       };
 
       if (!res.ok) {
-        setErrorMsg(body.error || `Failed to load teams (HTTP ${res.status})`);
-        setData(null);
+        setTeamsError(
+          body.error || `Failed to load teams (HTTP ${res.status})`,
+        );
+        setTeamsData(null);
         return;
       }
 
-      setData({
+      setTeamsData({
         programId: body.programId,
         teams: body.teams || [],
       });
     } catch (err: any) {
       console.error("[ProgramTeamsPage] loadTeams error:", err);
-      setErrorMsg(err?.message || "Unexpected error loading teams");
-      setData(null);
+      setTeamsError(err?.message || "Unexpected error loading teams");
+      setTeamsData(null);
     } finally {
-      setLoading(false);
+      setLoadingTeams(false);
     }
   }
 
-  async function loadSeasons(currentProgramId: string, team: Team) {
-    setSelectedTeam(team);
-    setSeasons([]);
+  async function loadSeasons(currentProgramId: string, teamId: string) {
+    setLoadingSeasons(true);
     setSeasonsError(null);
-    setSeasonsLoading(true);
 
     try {
       const res = await fetch(
-        `/api/programs/${currentProgramId}/teams/${team.id}/seasons`,
+        `/api/programs/${currentProgramId}/teams/${teamId}/seasons`,
       );
-      const body = (await res
-        .json()
-        .catch(() => ({}))) as TeamSeasonsResponse & { error?: string };
+      const body = (await res.json().catch(() => ({}))) as SeasonsResponse & {
+        error?: string;
+      };
 
       if (!res.ok) {
         setSeasonsError(
           body.error || `Failed to load seasons (HTTP ${res.status})`,
         );
-        setSeasons([]);
+        setSeasonsData(null);
         return;
       }
 
-      setSeasons(body.seasons || []);
+      setSeasonsData({
+        programId: body.programId,
+        teamId: body.teamId,
+        seasons: body.seasons || [],
+      });
     } catch (err: any) {
       console.error("[ProgramTeamsPage] loadSeasons error:", err);
       setSeasonsError(err?.message || "Unexpected error loading seasons");
-      setSeasons([]);
+      setSeasonsData(null);
     } finally {
-      setSeasonsLoading(false);
+      setLoadingSeasons(false);
     }
   }
 
@@ -140,8 +149,8 @@ export default function ProgramTeamsPage() {
     e.preventDefault();
     if (!programId) return;
 
-    setCreating(true);
-    setErrorMsg(null);
+    setCreatingTeam(true);
+    setTeamsError(null);
 
     try {
       const payload = {
@@ -160,36 +169,36 @@ export default function ProgramTeamsPage() {
         body: JSON.stringify(payload),
       });
 
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-      };
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
-        setErrorMsg(body.error || `Failed to create team (HTTP ${res.status})`);
+        setTeamsError(
+          body.error || `Failed to create team (HTTP ${res.status})`,
+        );
         return;
       }
 
-      // Reset form and reload
+      // Reset form
       setName("");
       setCode("");
-      setSport("");
-      setGender("");
-      setLevel("");
+      setSport("Track & Field");
+      setGender("Coed");
+      setLevel("Varsity");
       setSeason("");
       setIsPrimary(false);
 
       await loadTeams(programId);
     } catch (err: any) {
-      console.error("[ProgramTeamsPage] create team error:", err);
-      setErrorMsg(err?.message || "Unexpected error creating team");
+      console.error("[ProgramTeamsPage] createTeam error:", err);
+      setTeamsError(err?.message || "Unexpected error creating team");
     } finally {
-      setCreating(false);
+      setCreatingTeam(false);
     }
   }
 
   async function handleCreateSeason(e: FormEvent) {
     e.preventDefault();
-    if (!programId || !selectedTeam) return;
+    if (!programId || !selectedTeamId) return;
 
     setCreatingSeason(true);
     setSeasonsError(null);
@@ -197,14 +206,14 @@ export default function ProgramTeamsPage() {
     try {
       const payload = {
         academicYear: academicYear.trim(),
-        yearStart: Number(yearStart),
-        yearEnd: yearEnd ? Number(yearEnd) : null,
+        yearStart: yearStart ? Number(yearStart) : undefined,
+        yearEnd: yearEnd ? Number(yearEnd) : undefined,
         seasonLabel: seasonLabel.trim(),
-        isCurrent,
+        isCurrent: isCurrentSeason,
       };
 
       const res = await fetch(
-        `/api/programs/${programId}/teams/${selectedTeam.id}/seasons`,
+        `/api/programs/${programId}/teams/${selectedTeamId}/seasons`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -221,109 +230,137 @@ export default function ProgramTeamsPage() {
         return;
       }
 
-      // Reset form & reload seasons
+      // Reset form
       setAcademicYear("");
       setYearStart("");
       setYearEnd("");
-      setSeasonLabel("");
-      setIsCurrent(false);
+      setSeasonLabel("Cross Country");
+      setIsCurrentSeason(true);
 
-      await loadSeasons(programId, selectedTeam);
+      await loadSeasons(programId, selectedTeamId);
     } catch (err: any) {
-      console.error("[ProgramTeamsPage] create season error:", err);
+      console.error("[ProgramTeamsPage] createSeason error:", err);
       setSeasonsError(err?.message || "Unexpected error creating season");
     } finally {
       setCreatingSeason(false);
     }
   }
 
-  if (!programId) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-sm text-slate-600">Missing programId in route.</p>
-      </div>
-    );
-  }
+  const teams = teamsData?.teams ?? [];
 
+  const selectedTeam =
+    selectedTeamId && teams.length
+      ? teams.find((t) => t.id === selectedTeamId) ?? null
+      : null;
+
+  // Dark-shell layout similar to dashboard
   return (
-    <div className="min-h-screen bg-slate-50">
-      <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">
-              Program teams
-            </p>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              Teams &amp; divisions
-            </h1>
-            <p className="mt-1 text-xs text-slate-500">
-              Create and manage teams within this program. Use this to separate
-              Cross Country vs Track &amp; Field, varsity vs JV, or seasonal
-              squads.
-            </p>
-            <p className="mt-1 text-[11px] text-slate-400">
-              Program ID:{" "}
-              <span className="font-mono text-[11px] text-slate-500">
-                {data?.programId ?? programId}
-              </span>
-            </p>
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-xs font-semibold text-slate-950">
+              XC
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-50">
+                XC Ecosystem
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Teams &amp; divisions for your program
+              </p>
+            </div>
           </div>
-        </header>
+          <div className="flex flex-col items-end">
+            {programId && (
+              <p className="font-mono text-[11px] text-slate-400">
+                Program: {programId}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="mt-1 rounded-full border border-slate-600 px-3 py-1 text-[11px] text-slate-100 hover:border-slate-400"
+            >
+              Back to dashboard
+            </button>
+          </div>
+        </div>
+      </header>
 
-        {errorMsg && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {errorMsg}
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
+        {teamsError && (
+          <div className="rounded-xl border border-red-500/40 bg-red-950/60 px-3 py-2 text-xs text-red-100">
+            {teamsError}
           </div>
         )}
 
-        {/* Create team form */}
-        <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-800">
-            Add a team or division
+        {/* Create team */}
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-4">
+          <h2 className="text-sm font-semibold text-slate-50">
+            Create a team or division
           </h2>
-          <form onSubmit={handleCreateTeam} className="space-y-3">
-            <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-700">
-                Team name<span className="text-red-500">*</span>
-              </label>
-              <input
-                required
-                className="border rounded px-3 py-2 text-sm w-full"
-                placeholder="e.g. Men's Cross Country"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+          <p className="text-[11px] text-slate-400">
+            Think &quot;Men&apos;s Cross Country&quot;, &quot;Women&apos;s Outdoor&quot;,
+            or &quot;JV Track&quot;.
+          </p>
+
+          <form onSubmit={handleCreateTeam} className="space-y-3 text-xs">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-slate-200">
+                  Team name<span className="text-red-400">*</span>
+                </label>
+                <input
+                  required
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500"
+                  placeholder="e.g. Men&apos;s Cross Country"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-slate-200">
+                  Short code
+                </label>
+                <input
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500"
+                  placeholder="Optional code, e.g. M-XC"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-700">
+                <label className="block text-[11px] font-medium text-slate-200">
                   Sport
                 </label>
                 <input
-                  className="border rounded px-3 py-2 text-sm w-full"
-                  placeholder="e.g. XC, T&F"
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500"
+                  placeholder="e.g. Cross Country, Track &amp; Field"
                   value={sport}
                   onChange={(e) => setSport(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-700">
+                <label className="block text-[11px] font-medium text-slate-200">
                   Gender
                 </label>
                 <input
-                  className="border rounded px-3 py-2 text-sm w-full"
-                  placeholder="e.g. Men's, Women's, Coed"
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500"
+                  placeholder="e.g. Men, Women, Coed"
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-700">
+                <label className="block text-[11px] font-medium text-slate-200">
                   Level
                 </label>
                 <input
-                  className="border rounded px-3 py-2 text-sm w-full"
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500"
                   placeholder="e.g. Varsity, JV"
                   value={level}
                   onChange={(e) => setLevel(e.target.value)}
@@ -331,40 +368,29 @@ export default function ProgramTeamsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-700">
-                  Season
+                <label className="block text-[11px] font-medium text-slate-200">
+                  Default season label
                 </label>
                 <input
-                  className="border rounded px-3 py-2 text-sm w-full"
-                  placeholder="e.g. Cross Country, Indoor, Outdoor"
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500"
+                  placeholder="Optional, e.g. Cross Country"
                   value={season}
                   onChange={(e) => setSeason(e.target.value)}
                 />
               </div>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-700">
-                  Short code
-                </label>
-                <input
-                  className="border rounded px-3 py-2 text-sm w-full"
-                  placeholder="Optional code, e.g. M-XC"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2 pt-5">
+              <div className="flex items-center gap-2 pt-5 md:col-span-2">
                 <input
                   id="isPrimary"
                   type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-slate-500 bg-slate-900 text-slate-50"
                   checked={isPrimary}
                   onChange={(e) => setIsPrimary(e.target.checked)}
                 />
                 <label
                   htmlFor="isPrimary"
-                  className="text-xs text-slate-700 select-none"
+                  className="text-[11px] text-slate-200 select-none"
                 >
                   Mark as primary team for this program
                 </label>
@@ -374,80 +400,83 @@ export default function ProgramTeamsPage() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={creating}
-                className="bg-blue-600 text-white px-4 py-2 rounded shadow text-sm font-medium disabled:opacity-60"
+                disabled={creatingTeam}
+                className="rounded-full bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow disabled:opacity-60 hover:bg-blue-400"
               >
-                {creating ? "Creating…" : "Create team"}
+                {creatingTeam ? "Creating…" : "Create team"}
               </button>
             </div>
           </form>
         </section>
 
         {/* Teams list */}
-        <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2 mb-1">
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">
+              <h2 className="text-sm font-semibold text-slate-50">
                 Teams in this program
               </h2>
-              <p className="text-[11px] text-slate-500">
-                Use teams to mirror how your school splits cross country and
-                track.
+              <p className="text-[11px] text-slate-400">
+                {loadingTeams
+                  ? "Loading teams…"
+                  : teams.length === 0
+                  ? "No teams created yet."
+                  : `This program has ${teams.length} team${
+                      teams.length === 1 ? "" : "s"
+                    }.`}
               </p>
             </div>
           </div>
 
-          {loading ? (
-            <p className="text-xs text-slate-500">Loading teams…</p>
-          ) : !data || data.teams.length === 0 ? (
-            <p className="text-xs text-slate-500">
-              No teams found yet. Create your first team above.
+          {loadingTeams ? (
+            <p className="text-xs text-slate-400">Loading…</p>
+          ) : teams.length === 0 ? (
+            <p className="text-xs text-slate-400">
+              Use the form above to create your first team.
             </p>
           ) : (
-            <div className="mt-1 space-y-2">
-              {data.teams.map((team) => (
+            <div className="mt-2 space-y-2">
+              {teams.map((team) => (
                 <div
                   key={team.id}
-                  className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 md:flex-row md:items-center md:justify-between"
+                  className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
-                    <p className="font-semibold text-slate-900">
-                      {team.name}
+                    <p className="font-medium text-slate-50">
+                      {team.name}{" "}
                       {team.is_primary && (
-                        <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                        <span className="ml-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
                           Primary
                         </span>
                       )}
                     </p>
-                    <p className="text-[11px] text-slate-500">
-                      {[team.sport, team.gender, team.level, team.season]
+                    <p className="text-[11px] text-slate-400">
+                      {[
+                        team.sport,
+                        team.gender,
+                        team.level,
+                        team.code ? `(${team.code})` : null,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
-                    {team.code && (
-                      <p className="text-[11px] text-slate-500">
-                        Code:{" "}
-                        <span className="font-mono text-[11px]">
-                          {team.code}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-col items-start gap-1 md:mt-0 md:items-end">
-                    <span className="text-[11px] text-slate-400">
-                      Created at:{" "}
-                      <span className="font-mono">
-                        {team.created_at
-                          ? new Date(team.created_at).toLocaleDateString()
-                          : "—"}
+                    <p className="text-[11px] text-slate-500">
+                      Team ID:{" "}
+                      <span className="font-mono text-[11px]">
+                        {team.id}
                       </span>
-                    </span>
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        programId && loadSeasons(programId, team)
-                      }
-                      className="mt-1 inline-flex items-center rounded-full border border-slate-400 px-3 py-1 text-[11px] font-medium text-slate-700 hover:border-slate-500"
+                      onClick={() => {
+                        setSelectedTeamId(team.id);
+                        if (programId) {
+                          void loadSeasons(programId, team.id);
+                        }
+                      }}
+                      className="rounded-full border border-slate-600 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
                     >
                       Manage seasons
                     </button>
@@ -458,164 +487,172 @@ export default function ProgramTeamsPage() {
           )}
         </section>
 
-        {/* Seasons management panel */}
+        {/* Seasons panel for selected team */}
         {selectedTeam && (
-          <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-            <div className="flex items-center justify-between gap-2">
+          <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-800">
+                <h2 className="text-sm font-semibold text-slate-50">
                   Seasons for {selectedTeam.name}
                 </h2>
-                <p className="text-[11px] text-slate-500">
-                  Define academic years and seasons for this team, like
-                  &quot;2024-25 Cross Country&quot;.
+                <p className="text-[11px] text-slate-400">
+                  Define academic years and seasonal slices for this team, then manage rosters.
                 </p>
               </div>
               <button
                 type="button"
-                className="text-[11px] text-slate-500 hover:underline"
                 onClick={() => {
-                  setSelectedTeam(null);
-                  setSeasons([]);
+                  setSelectedTeamId(null);
+                  setSeasonsData(null);
                   setSeasonsError(null);
                 }}
+                className="text-[11px] text-slate-400 hover:text-slate-200"
               >
                 Close
               </button>
             </div>
 
             {seasonsError && (
-              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <div className="rounded border border-red-500/40 bg-red-950/60 px-3 py-2 text-xs text-red-100">
                 {seasonsError}
               </div>
             )}
 
-            <form
-              onSubmit={handleCreateSeason}
-              className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-slate-700">
-                    Academic year<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    required
-                    className="border rounded px-3 py-2 text-sm w-full"
-                    placeholder="e.g. 2024-25"
-                    value={academicYear}
-                    onChange={(e) => setAcademicYear(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-slate-700">
-                    Year start<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    className="border rounded px-3 py-2 text-sm w-full"
-                    placeholder="e.g. 2024"
-                    value={yearStart}
-                    onChange={(e) => setYearStart(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-slate-700">
-                    Year end
-                  </label>
-                  <input
-                    type="number"
-                    className="border rounded px-3 py-2 text-sm w-full"
-                    placeholder="e.g. 2025"
-                    value={yearEnd}
-                    onChange={(e) => setYearEnd(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-slate-700">
-                    Season label<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    required
-                    className="border rounded px-3 py-2 text-sm w-full"
-                    placeholder="e.g. Cross Country"
-                    value={seasonLabel}
-                    onChange={(e) => setSeasonLabel(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  id="isCurrentSeason"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300"
-                  checked={isCurrent}
-                  onChange={(e) => setIsCurrent(e.target.checked)}
-                />
-                <label
-                  htmlFor="isCurrentSeason"
-                  className="text-xs text-slate-700 select-none"
-                >
-                  Mark as current season for this team
-                </label>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={creatingSeason}
-                  className="bg-blue-600 text-white px-4 py-2 rounded shadow text-sm font-medium disabled:opacity-60"
-                >
-                  {creatingSeason ? "Creating…" : "Create season"}
-                </button>
-              </div>
-            </form>
-
-            <div className="space-y-2">
-              <h3 className="text-xs font-semibold text-slate-700">
-                Existing seasons
+            {/* Create season */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3 space-y-3">
+              <h3 className="text-xs font-semibold text-slate-50">
+                Add season for this team
               </h3>
-              {seasonsLoading ? (
-                <p className="text-xs text-slate-500">
-                  Loading seasons for this team…
-                </p>
-              ) : seasons.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  No seasons defined yet. Create one above.
+              <form
+                onSubmit={handleCreateSeason}
+                className="space-y-3 text-xs"
+              >
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium text-slate-200">
+                      Academic year
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-50 placeholder:text-slate-500"
+                      placeholder="e.g. 2024-25"
+                      value={academicYear}
+                      onChange={(e) => setAcademicYear(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium text-slate-200">
+                      Year start
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-50 placeholder:text-slate-500"
+                      placeholder="e.g. 2024"
+                      value={yearStart}
+                      onChange={(e) => setYearStart(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium text-slate-200">
+                      Year end
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-50 placeholder:text-slate-500"
+                      placeholder="Optional, e.g. 2025"
+                      value={yearEnd}
+                      onChange={(e) => setYearEnd(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium text-slate-200">
+                      Season label
+                    </label>
+                    <input
+                      className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-50 placeholder:text-slate-500"
+                      placeholder="e.g. Cross Country, Indoor, Outdoor"
+                      value={seasonLabel}
+                      onChange={(e) => setSeasonLabel(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="isCurrentSeason"
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border-slate-500 bg-slate-900 text-slate-50"
+                    checked={isCurrentSeason}
+                    onChange={(e) => setIsCurrentSeason(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="isCurrentSeason"
+                    className="text-[11px] text-slate-200 select-none"
+                  >
+                    Mark as current season
+                  </label>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={creatingSeason}
+                    className="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-medium text-slate-900 shadow disabled:opacity-60"
+                  >
+                    {creatingSeason ? "Adding…" : "Add season"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Seasons list */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-slate-50">
+                  Existing seasons
+                </h3>
+                {loadingSeasons && (
+                  <p className="text-[11px] text-slate-400">Loading…</p>
+                )}
+              </div>
+
+              {loadingSeasons ? (
+                <p className="text-[11px] text-slate-400">Loading seasons…</p>
+              ) : !seasonsData || seasonsData.seasons.length === 0 ? (
+                <p className="text-[11px] text-slate-400">
+                  No seasons defined yet for this team.
                 </p>
               ) : (
                 <div className="space-y-1">
-                  {seasons.map((s) => (
+                  {seasonsData.seasons.map((seasonRow) => (
                     <div
-                      key={s.id}
-                      className="flex items-center justify-between rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      key={seasonRow.id}
+                      className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-[11px] sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
-                        <p className="font-medium text-slate-800">
-                          {s.academic_year} — {s.season_label}
-                          {s.is_current && (
-                            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                        <p className="font-medium text-slate-50">
+                          {seasonRow.academic_year} – {seasonRow.season_label}{" "}
+                          {seasonRow.is_current && (
+                            <span className="ml-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-300">
                               Current
                             </span>
                           )}
                         </p>
+                        <p className="text-[11px] text-slate-400">
+                          Years: {seasonRow.year_start}
+                          {seasonRow.year_end
+                            ? `–${seasonRow.year_end}`
+                            : ""}
+                        </p>
                         <p className="text-[11px] text-slate-500">
-                          Years:{" "}
-                          <span className="font-mono">
-                            {s.year_start}
-                            {s.year_end ? `–${s.year_end}` : ""}
+                          Season ID:{" "}
+                          <span className="font-mono text-[11px]">
+                            {seasonRow.id}
                           </span>
                         </p>
                       </div>
-                      <div className="text-[11px] text-slate-400">
-                        Created:{" "}
-                        <span className="font-mono">
-                          {s.created_at
-                            ? new Date(s.created_at).toLocaleDateString()
-                            : "—"}
-                        </span>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/programs/${seasonRow.program_id}/teams/${seasonRow.team_id}/seasons/${seasonRow.id}/roster`}
+                          className="rounded-full border border-slate-600 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                        >
+                          Manage roster
+                        </Link>
                       </div>
                     </div>
                   ))}

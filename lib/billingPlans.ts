@@ -1,4 +1,46 @@
 // lib/billingPlans.ts
+
+export function mapPlanToTier(planCode: PlanCode | string): 
+  | "free"
+  | "starter"
+  | "pro"
+  | "elite"
+  | "unknown" 
+{
+  const code = String(planCode).toLowerCase();
+
+  if (
+    code === "hs_athlete_basic" ||
+    code === "hs_starter" ||
+    code === "college_starter"
+  ) {
+    return "starter";
+  }
+
+  if (
+    code === "hs_athlete_pro" ||
+    code === "hs_pro" ||
+    code === "college_pro"
+  ) {
+    return "pro";
+  }
+
+  if (
+    code === "hs_athlete_elite" ||
+    code === "hs_elite" ||
+    code === "college_elite"
+  ) {
+    return "elite";
+  }
+
+  // No subscription or free-tier logic
+  if (code === "free" || code === "none" || code === "" || code === "null") {
+    return "free";
+  }
+
+  return "unknown";
+}
+
 export type PlanCode =
   | "hs_athlete_basic"
   | "hs_athlete_pro"

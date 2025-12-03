@@ -6,6 +6,12 @@ import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { PlanCode } from "@/lib/billingPlans";
+import {
+  canUseProgramRecruiting,
+  canUseProgramAI,
+  hasPaidProgramPlan,
+  ProgramBillingLite,
+} from "@/lib/accessControl";
 
 type RoleHint = "coach" | "athlete" | "both" | "unknown";
 
@@ -417,66 +423,78 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {programs.map((p) => (
-                <div
-                  key={p.programId}
-                  className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3 text-xs text-slate-100 md:flex-row md:items-center md:justify-between"
-                >
-                  <div>
-                    <p className="font-semibold text-slate-50">
-                      {p.programName || "Unnamed program"}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Program ID:{" "}
-                      <span className="font-mono text-[11px] text-slate-300">
-                        {p.programId}
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Plan:{" "}
-                      <span className="font-mono text-[11px] text-slate-300">
-                        {p.planCode ?? "none"}
-                      </span>{" "}
-                      · Status: {p.status ?? "unknown"}
-                      {p.currentPeriodEnd && (
-                        <>
-                          {" "}
-                          · Renews{" "}
-                          {new Date(
-                            p.currentPeriodEnd
-                          ).toLocaleDateString()}
-                        </>
-                      )}
-                    </p>
+              {programs.map((p) => {
+                const billingInfo: ProgramBillingLite = {
+                  planCode: p.planCode,
+                  status: p.status,
+                };
+
+                const hasPaid = hasPaidProgramPlan(billingInfo);
+                const canRecruit = canUseProgramRecruiting(billingInfo);
+                const canUseAi = canUseProgramAI(billingInfo);
+
+                return (
+                  <div
+                    key={p.programId}
+                    className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3 text-xs text-slate-100 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-50">
+                        {p.programName || "Unnamed program"}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Program ID:{" "}
+                        <span className="font-mono text-[11px] text-slate-300">
+                          {p.programId}
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Plan:{" "}
+                        <span className="font-mono text-[11px] text-slate-300">
+                          {p.planCode ?? "none"}
+                        </span>{" "}
+                        · Status: {p.status ?? "unknown"}
+                        {p.currentPeriodEnd && (
+                          <>
+                            {" "}
+                            · Renews{" "}
+                            {new Date(p.currentPeriodEnd).toLocaleDateString()}
+                          </>
+                        )}
+                        {hasPaid && " · Paid"}
+                        {canRecruit && " · Recruiting enabled"}
+                        {canUseAi && " · AI enabled"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/programs/${p.programId}`}
+                        className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                      >
+                        Overview
+                      </Link>
+                      <Link
+                        href={`/programs/${p.programId}/staff`}
+                        className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                      >
+                        Staff
+                      </Link>
+                      <Link
+                        href={`/programs/${p.programId}/teams`}
+                        className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
+                      >
+                        Teams
+                      </Link>
+                      <Link
+                        href={`/programs/${p.programId}/billing`}
+                        className="rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-950 hover:bg-white"
+                      >
+                        Manage billing
+                      </Link>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/programs/${p.programId}`}
-                      className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
-                    >
-                      Overview
-                    </Link>
-                    <Link
-                      href={`/programs/${p.programId}/staff`}
-                      className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
-                    >
-                      Staff
-                    </Link>
-                    <Link
-                      href={`/programs/${p.programId}/teams`}
-                      className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
-                    >
-                      Teams
-                    </Link>
-                    <Link
-                      href={`/programs/${p.programId}/billing`}
-                      className="rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-950 hover:bg-white"
-                    >
-                      Manage billing
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

@@ -163,7 +163,7 @@ export default function ProgramBillingPageClient({ programId }: Props) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          scope: "program",
+          scope: "org",
           ownerId: programId,
           planCode,
         }),
@@ -210,7 +210,7 @@ export default function ProgramBillingPageClient({ programId }: Props) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          scope: "program",
+          scope: "org",
           ownerId: programId,
         }),
       });

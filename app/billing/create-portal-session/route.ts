@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-type BillingScope = "org" | "athlete" | "program";
+type BillingScope = "org" | "athlete";
 
 type PortalBody = {
   scope: BillingScope;
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     let tableName: string;
     let ownerColumn: string;
 
-    if (scope === "program") {
+    if (scope === "org") {
       tableName = "program_subscriptions";
       ownerColumn = "program_id";
     } else if (scope === "athlete") {
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     const baseUrl = getBaseUrl(req);
     let returnPath = "/billing";
 
-    if (scope === "program") {
+    if (scope === "org") {
       returnPath = `/programs/${ownerId}/billing`;
     } else if (scope === "athlete") {
       returnPath = "/billing"; // or something like `/athlete/billing`

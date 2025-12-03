@@ -3,62 +3,78 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
-// Helper to upsert into the correct subscriptions table based on scope
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+if (!webhookSecret) {
+  throw new Error("STRIPE_WEBHOOK_SECRET is not set");
+}
+
 type BillingScope = "org" | "athlete";
 
-async function upsertSubscriptionRecord(args: {
+function normalizeStatus(status: string | null | undefined): string {
+  if (!status) return "unknown";
+  const s = status.toLowerCase();
+  if (["active", "trialing", "past_due", "canceled", "incomplete"].includes(s)) {
+    return s;
+  }
+  return "unknown";
+}
+
+async function upsertFromSubscription(args: {
   scope: BillingScope;
   ownerId: string;
-  stripeCustomerId: string;
-  stripeSubscriptionId: string;
-  planCode: string | null;
-  status: string;
-  currentPeriodEnd: number | null; // unix seconds
+  subscription: Stripe.Subscription;
 }) {
-  const {
-    scope,
-    ownerId,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    planCode,
-    status,
-    currentPeriodEnd,
-  } = args;
+  const { scope, ownerId, subscription } = args;
 
-  // For org (program-level) billing we write to program_subscriptions using program_id.
+  const stripeCustomerId =
+    (subscription.customer as string | null) ??
+    (typeof subscription.customer === "object" && subscription.customer
+      ? (subscription.customer as any).id
+      : null);
+
+  const stripeSubscriptionId = subscription.id;
+  const planCode = (subscription.metadata?.plan_code as string | undefined) ?? null;
+  const status = normalizeStatus(subscription.status);
+
+  const currentPeriodEndUnix = (subscription as any).current_period_end as
+    | number
+    | null
+    | undefined;
+
+  const currentPeriodEnd = currentPeriodEndUnix
+    ? new Date(currentPeriodEndUnix * 1000).toISOString()
+    : null;
+
   let tableName: string;
   let ownerColumn: string;
 
   if (scope === "org") {
+    // Program-level subscription
     tableName = "program_subscriptions";
     ownerColumn = "program_id";
   } else {
-    // keep athlete scope for completeness if/when you add athlete_subscriptions
+    // Athlete-level subscription
     tableName = "athlete_subscriptions";
-    ownerColumn = "athlete_id";
+    ownerColumn = "user_id";
   }
-
-  const currentPeriodEndIso =
-    currentPeriodEnd != null
-      ? new Date(currentPeriodEnd * 1000).toISOString()
-      : null;
-
-  const payload: Record<string, any> = {
-    [ownerColumn]: ownerId,
-    stripe_customer_id: stripeCustomerId,
-    stripe_subscription_id: stripeSubscriptionId,
-    plan_code: planCode,
-    status,
-    current_period_end: currentPeriodEndIso,
-  };
 
   const { error } = await supabaseAdmin
     .from(tableName)
-    .upsert(payload, {
-      onConflict: ownerColumn, // requires unique constraint on program_id / athlete_id
-    });
+    .upsert(
+      {
+        [ownerColumn]: ownerId,
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: stripeSubscriptionId,
+        plan_code: planCode,
+        status,
+        current_period_end: currentPeriodEnd,
+      },
+      {
+        onConflict: ownerColumn,
+      },
+    );
 
   if (error) {
     console.error("[stripe webhook] Failed to upsert subscription:", {
@@ -71,7 +87,7 @@ async function upsertSubscriptionRecord(args: {
   }
 }
 
-async function markSubscriptionCanceled(args: {
+async function markCanceled(args: {
   scope: BillingScope;
   ownerId: string;
   stripeSubscriptionId: string;
@@ -86,7 +102,7 @@ async function markSubscriptionCanceled(args: {
     ownerColumn = "program_id";
   } else {
     tableName = "athlete_subscriptions";
-    ownerColumn = "athlete_id";
+    ownerColumn = "user_id";
   }
 
   const { error } = await supabaseAdmin
@@ -102,6 +118,7 @@ async function markSubscriptionCanceled(args: {
       tableName,
       ownerColumn,
       ownerId,
+      stripeSubscriptionId,
       error,
     });
     throw error;
@@ -110,105 +127,104 @@ async function markSubscriptionCanceled(args: {
 
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!sig || !webhookSecret) {
-    console.error(
-      "[stripe webhook] Missing signature or STRIPE_WEBHOOK_SECRET",
-    );
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!sig) {
+    console.error("[stripe webhook] Missing stripe-signature header");
+    return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
   let event: Stripe.Event;
 
-  const rawBody = await req.text();
-
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    const rawBody = await req.text();
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret!);
   } catch (err: any) {
-    console.error(
-      "[stripe webhook] Error verifying signature:",
-      err?.message || err,
-    );
+    console.error("[stripe webhook] Signature verification failed:", err?.message || err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
   try {
     switch (event.type) {
-      case "customer.subscription.created":
-      case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
 
-        const metadata = subscription.metadata || {};
-        const scope = (metadata.scope as BillingScope | undefined) ?? "org";
-        const ownerId = metadata.owner_id;
-        const planCode = (metadata.plan_code as string | undefined) ?? null;
+        const metadata = (session.metadata || {}) as Record<string, string>;
+        const scope = metadata.scope as BillingScope | undefined;
+        const ownerId = metadata.owner_id as string | undefined;
+        const planCode = metadata.plan_code as string | undefined;
 
-        if (!ownerId) {
-          console.warn(
-            "[stripe webhook] Subscription event missing owner_id metadata; skipping",
-            {
-              subscriptionId: subscription.id,
-            },
-          );
+        const subscriptionId = session.subscription as string | null;
+        if (!scope || !ownerId || !subscriptionId) {
+          console.warn("[stripe webhook] Missing metadata on checkout.session.completed", {
+            scope,
+            ownerId,
+            subscriptionId,
+          });
           break;
         }
 
-        const stripeCustomerId =
-          (subscription.customer as string | null | undefined) ?? "";
-        if (!stripeCustomerId) {
-          console.warn(
-            "[stripe webhook] Subscription event missing customer; skipping",
-            {
-              subscriptionId: subscription.id,
-            },
-          );
-          break;
-        }
-
-        await upsertSubscriptionRecord({
-          scope,
-          ownerId,
-          stripeCustomerId,
-          stripeSubscriptionId: subscription.id,
-          planCode,
-          status: subscription.status,
-          // Stripe types in your version may not expose this field strongly,
-          // so treat it as dynamic to keep TS happy.
-          currentPeriodEnd: (subscription as any).current_period_end ?? null,
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+          expand: ["customer"],
         });
 
+        // Ensure plan_code is set on the subscription for later events
+        const existingPlanCode = subscription.metadata?.plan_code;
+        if (!existingPlanCode && planCode) {
+          await stripe.subscriptions.update(subscription.id, {
+            metadata: {
+              ...subscription.metadata,
+              plan_code: planCode,
+              scope,
+              owner_id: ownerId,
+            },
+          });
+          subscription.metadata.plan_code = planCode;
+        }
+
+        await upsertFromSubscription({ scope, ownerId, subscription });
+        break;
+      }
+
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        const metadata = (subscription.metadata || {}) as Record<string, string>;
+        const scope = metadata.scope as BillingScope | undefined;
+        const ownerId = metadata.owner_id as string | undefined;
+
+        if (!scope || !ownerId) {
+          console.warn("[stripe webhook] subscription.updated missing scope/owner_id metadata", {
+            subscriptionId: subscription.id,
+          });
+          break;
+        }
+
+        await upsertFromSubscription({ scope, ownerId, subscription });
         break;
       }
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        const metadata = subscription.metadata || {};
-        const scope = (metadata.scope as BillingScope | undefined) ?? "org";
-        const ownerId = metadata.owner_id;
+        const metadata = (subscription.metadata || {}) as Record<string, string>;
+        const scope = metadata.scope as BillingScope | undefined;
+        const ownerId = metadata.owner_id as string | undefined;
 
-        if (!ownerId) {
-          console.warn(
-            "[stripe webhook] Subscription deleted event missing owner_id; skipping",
-            {
-              subscriptionId: subscription.id,
-            },
-          );
+        if (!scope || !ownerId) {
+          console.warn("[stripe webhook] subscription.deleted missing scope/owner_id metadata", {
+            subscriptionId: subscription.id,
+          });
           break;
         }
 
-        await markSubscriptionCanceled({
+        await markCanceled({
           scope,
           ownerId,
           stripeSubscriptionId: subscription.id,
         });
-
         break;
       }
 
       default: {
-        // For now, ignore other events
-        // console.log("[stripe webhook] Unhandled event type:", event.type);
+        // Ignore everything else for now
         break;
       }
     }

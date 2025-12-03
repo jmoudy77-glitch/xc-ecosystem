@@ -5,7 +5,7 @@ import type { PlanCode } from "@/lib/billingPlans";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-type BillingScope = "org" | "athlete" | "program";
+type BillingScope = "org" | "athlete";
 
 type CheckoutBody = {
   scope: BillingScope;
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     let successPath = "/billing";
     let cancelPath = "/billing";
 
-    if (scope === "program") {
+    if (scope === "org") {
       successPath = `/programs/${ownerId}/billing`;
       cancelPath = `/programs/${ownerId}/billing`;
     } else if (scope === "athlete") {

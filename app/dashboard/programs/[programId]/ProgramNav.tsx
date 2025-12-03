@@ -11,23 +11,23 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   {
     label: "Overview",
-    href: (programId) => `/programs/${programId}`,
+    href: (programId) => `/dashboard/programs/${programId}`,
   },
   {
     label: "Staff",
-    href: (programId) => `/programs/${programId}/staff`,
+    href: (programId) => `/dashboard/programs/${programId}/staff`,
   },
   {
     label: "Teams & Divisions",
-    href: (programId) => `/programs/${programId}/teams-and-divisions`,
+    href: (programId) => `/dashboard/programs/${programId}/teams-and-divisions`,
   },
   {
     label: "Inquiries",
-    href: (programId) => `/programs/${programId}/inquiries`,
+    href: (programId) => `/dashboard/programs/${programId}/inquiries`,
   },
   {
     label: "Recruiting Board",
-    href: (programId) => `/programs/${programId}/recruiting`,
+    href: (programId) => `/dashboard/programs/${programId}/recruiting`,
   },
 ];
 
@@ -39,12 +39,13 @@ export function ProgramNav() {
   if (!programId) return null;
 
   return (
-    <nav className="mb-4 flex flex-wrap gap-1 rounded-md border border-border bg-background/60 p-1 text-sm">
+    <nav className="mb-4 flex flex-wrap gap-1 rounded-x3 border border-slate-800 bg-slate-900/60 p-2 text-sm">
       {NAV_ITEMS.map((item) => {
         const href = item.href(programId);
         const isActive =
           pathname === href ||
-          (href !== `/programs/${programId}` && pathname.startsWith(href));
+          (href !== `/dashboard/programs/${programId}` &&
+            pathname.startsWith(href));
 
         return (
           <Link

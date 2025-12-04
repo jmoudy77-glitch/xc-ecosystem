@@ -208,6 +208,25 @@ export default async function ProgramStaffPage({ params }: PageProps) {
       <main className="mx-auto max-w-6xl px-4 py-6">
         <div className="flex items-center justify-between gap-2">
           <div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <Link
+                href={`/programs/${programId}`}
+                className="hover:text-slate-200"
+              >
+                Program overview
+              </Link>
+              <span>›</span>
+              <span>Staff &amp; roles</span>
+            </div>
+            <h1 className="mt-1 text-base font-semibold text-slate-100">
+              Staff &amp; roles
+            </h1>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Manage who is on staff for this program and what level of access each
+              person has.
+            </p>
+          </div>
+          <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Staff roster
             </p>

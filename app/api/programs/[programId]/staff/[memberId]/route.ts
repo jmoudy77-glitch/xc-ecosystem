@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { isManagerRole } from "@/lib/staffRoles";
 
 // Helper: extract programId and memberId from URL path
 // Expected path: /api/programs/:programId/staff/:memberId
@@ -14,42 +15,28 @@ function extractIdsFromUrl(req: NextRequest): {
     const segments = url.pathname.split("/").filter(Boolean);
     // segments = ["api", "programs", "<programId>", "staff", "<memberId>"]
     const programsIndex = segments.indexOf("programs");
+    if (programsIndex === -1) return {};
+
+    const programId = segments[programsIndex + 1];
     const staffIndex = segments.indexOf("staff");
-
-    const programId =
-      programsIndex !== -1 && segments.length > programsIndex + 1
-        ? segments[programsIndex + 1]
-        : undefined;
-
-    const memberId =
-      staffIndex !== -1 && segments.length > staffIndex + 1
-        ? segments[staffIndex + 1]
-        : undefined;
+    const memberId = staffIndex !== -1 ? segments[staffIndex + 1] : undefined;
 
     return { programId, memberId };
   } catch {
-    return { programId: undefined, memberId: undefined };
+    return {};
   }
 }
 
-// At the top of the file:
-const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
-
-type ManagerRoleCode = (typeof MANAGER_ROLES)[number];
-
-function isManagerRole(role: string | null | undefined): boolean {
-  if (!role) return false;
-  return MANAGER_ROLES.includes(role.toLowerCase() as ManagerRoleCode);
-}
-
-// Simple authorization helper: ensure the caller belongs to this program
+// Helper: ensure the current auth user belongs to this program,
+// and optionally ensure they have a "manager" role (head_coach, director, admin).
 async function assertProgramMembership(
   req: NextRequest,
   programId: string,
   opts?: { requireManager?: boolean },
-) {
+): Promise<{ error: string | null; status: number }> {
   const { supabase } = supabaseServer(req);
 
+  // 1) Auth user from Supabase
   const {
     data: { user: authUser },
     error: authError,
@@ -60,13 +47,14 @@ async function assertProgramMembership(
       "[/api/programs/[programId]/staff/[memberId]] auth error:",
       authError,
     );
-    return { error: "Not authenticated", status: 401 as const };
+    return { error: "Not authenticated", status: 401 };
   }
 
   if (!authUser) {
-    return { error: "Not authenticated", status: 401 as const };
+    return { error: "Not authenticated", status: 401 };
   }
 
+  // 2) Resolve auth user -> app-level users.id
   const { data: userRow, error: userError } = await supabaseAdmin
     .from("users")
     .select("id")
@@ -78,15 +66,16 @@ async function assertProgramMembership(
       "[/api/programs/[programId]/staff/[memberId]] users select error:",
       userError,
     );
-    return { error: "Failed to load user", status: 500 as const };
+    return { error: "Failed to load user", status: 500 };
   }
 
   if (!userRow) {
-    return { error: "No user record for this account", status: 404 as const };
+    return { error: "No user record for this account", status: 404 };
   }
 
   const currentUserId = userRow.id as string;
 
+  // 3) Confirm membership in this program and get acting role
   const { data: membership, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select("id, role")
@@ -101,14 +90,14 @@ async function assertProgramMembership(
     );
     return {
       error: "Failed to verify program membership",
-      status: 500 as const,
+      status: 500,
     };
   }
 
   if (!membership) {
     return {
       error: "You do not have access to this program",
-      status: 403 as const,
+      status: 403,
     };
   }
 
@@ -117,16 +106,15 @@ async function assertProgramMembership(
   if (opts?.requireManager && !isManagerRole(actingRole)) {
     return {
       error: "You do not have permission to manage staff in this program",
-      status: 403 as const,
+      status: 403,
     };
   }
 
-  // Success
-  return { error: null, status: 200 as const };
+  return { error: null, status: 200 };
 }
 
-// PATCH: update role for a staff member
-// PATCH: update role for a staff member
+// PATCH: update a staff member's role within this program.
+// Only program managers (head_coach, director, admin) can do this.
 export async function PATCH(req: NextRequest) {
   const { programId, memberId } = extractIdsFromUrl(req);
 
@@ -141,6 +129,7 @@ export async function PATCH(req: NextRequest) {
     const authCheck = await assertProgramMembership(req, programId, {
       requireManager: true,
     });
+
     if (authCheck.error) {
       return NextResponse.json(
         { error: authCheck.error },
@@ -158,12 +147,13 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    // NOTE: memberId here should be the users.id for the staff member.
     const { data, error } = await supabaseAdmin
       .from("program_members")
       .update({ role })
       .eq("program_id", programId)
-      .eq("user_id", memberId) // memberId = public.users.id for the staff
-      .select("id, role, user_id, created_at")
+      .eq("user_id", memberId)
+      .select("id, user_id, role, created_at")
       .maybeSingle();
 
     if (error) {
@@ -203,8 +193,8 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE: remove a staff member from the program
-// DELETE: remove a staff member from the program
+// DELETE: remove a staff member from this program.
+// Only program managers can perform this.
 export async function DELETE(req: NextRequest) {
   const { programId, memberId } = extractIdsFromUrl(req);
 
@@ -219,6 +209,7 @@ export async function DELETE(req: NextRequest) {
     const authCheck = await assertProgramMembership(req, programId, {
       requireManager: true,
     });
+
     if (authCheck.error) {
       return NextResponse.json(
         { error: authCheck.error },

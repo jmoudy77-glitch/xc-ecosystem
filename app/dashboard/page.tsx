@@ -473,6 +473,7 @@ export default async function DashboardPage() {
                       >
                         Overview
                       </Link>
+                      {/* 👉 This is your main entry to roles & permissions */}
                       <Link
                         href={`/programs/${p.programId}/staff`}
                         className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"

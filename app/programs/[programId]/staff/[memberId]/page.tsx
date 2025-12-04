@@ -305,6 +305,32 @@ export default async function StaffProfilePage(props: PageProps) {
 
       {/* Main content */}
       <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6">
+        {/* Breadcrumb */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+            <Link
+              href={`/programs/${programId}`}
+              className="hover:text-slate-200"
+            >
+              Program overview
+            </Link>
+            <span>›</span>
+            <Link
+              href={`/programs/${programId}/staff`}
+              className="hover:text-slate-200"
+            >
+              Staff &amp; roles
+            </Link>
+            <span>›</span>
+            <span>{displayName}</span>
+          </div>
+          <h1 className="mt-1 text-base font-semibold text-slate-100">
+            {displayName}
+          </h1>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Manage this coach&apos;s profile, avatar, and role in your program.
+          </p>
+        </div>
         <section className="grid gap-4 md:grid-cols-3">
           {/* Left: photo controls + meta */}
           <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 md:col-span-1">
@@ -374,10 +400,9 @@ export default async function StaffProfilePage(props: PageProps) {
                 canEdit={isManager}
               />
 
-              <p className="mt-3 text-[11px] text-slate-500">
-                Future: assign this staff member to specific teams, event groups, or
-                responsibilities (distance, sprints, throws, etc.), and control what
-                parts of the recruiting and practice modules they can access.
+              <p className="mt-4 text-[11px] text-slate-500">
+                In the future, this will include assigning event groups (distance,
+                sprints, throws), practice responsibilities, and access permissions.
               </p>
             </div>
 

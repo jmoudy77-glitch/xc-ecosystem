@@ -348,6 +348,7 @@ export default async function ProgramOverviewPage({ params }: PageProps) {
               >
                 ← Back to dashboard
               </Link>
+              {/* 👉 Direct entry to staff & permissions */}
               <Link
                 href={`/programs/${program.id}/staff`}
                 className="inline-flex items-center rounded-full border border-slate-600 px-3 py-1.5 font-medium text-slate-100 hover:border-slate-400"

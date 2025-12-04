@@ -4,161 +4,161 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-const AVATAR_BUCKET = "staff-avatars"; // make sure this bucket exists in Supabase
+const BUCKET = "staff-avatars";
 
-// Roles allowed to edit other staff members' photos
-const MANAGER_ROLES = ["head_coach", "director", "admin"];
+type RouteParams = {
+  programId: string;
+  memberId: string; // this is public.users.id for the staff user
+};
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { programId: string; memberId: string } }
+  context: { params: Promise<RouteParams> }
 ) {
-  const { programId, memberId } = params;
-  const staffUserId = memberId; // this slug represents the target user_id
+  const { programId, memberId } = await context.params;
+  const staffUserId = memberId;
 
-  if (!programId || !staffUserId) {
-    return NextResponse.json(
-      { error: "Missing programId or staffUserId" },
-      { status: 400 }
-    );
-  }
+  try {
+    // 1) Auth via Supabase (Auth user)
+    const { supabase } = supabaseServer(req);
+    const {
+      data: { user: authUser },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  // 1) Auth current user
-  const { supabase } = supabaseServer(req);
+    if (authError) {
+      console.error("[StaffAvatar] auth.getUser error:", authError.message);
+    }
 
-  const {
-    data: { user: authUser },
-    error: authError,
-  } = await supabase.auth.getUser();
+    if (!authUser) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
 
-  if (authError) {
-    console.warn("[staff avatar] auth.getUser error:", authError.message);
-  }
-
-  if (!authUser) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
-  const actingUserId = authUser.id;
-
-  // 2) Check acting user's membership + role in this program
-  const { data: actingMembership, error: actingMembershipError } =
-    await supabaseAdmin
-      .from("program_members")
-      .select("id, user_id, role")
-      .eq("program_id", programId)
-      .eq("user_id", actingUserId)
+    // 2) Resolve viewer's public.users.id
+    const { data: viewerRow, error: viewerError } = await supabaseAdmin
+      .from("users")
+      .select("id, auth_id")
+      .eq("auth_id", authUser.id)
       .maybeSingle();
 
-  if (actingMembershipError) {
-    console.error(
-      "[staff avatar] acting membership select error:",
-      actingMembershipError
-    );
-    return NextResponse.json(
-      { error: "Failed to load membership" },
-      { status: 500 }
-    );
-  }
+    if (viewerError || !viewerRow) {
+      console.error("[StaffAvatar] viewer users row error:", viewerError);
+      return NextResponse.json(
+        { error: "Viewer user record missing" },
+        { status: 400 }
+      );
+    }
 
-  if (!actingMembership) {
-    // user is not part of this program at all
-    return NextResponse.json(
-      { error: "Not a member of this program" },
-      { status: 403 }
-    );
-  }
+    const viewerUserId = viewerRow.id as string;
 
-  const actingRole = (actingMembership.role as string | null) ?? null;
-  const isSelf = actingUserId === staffUserId;
-  const isManager =
-    actingRole !== null && MANAGER_ROLES.includes(actingRole.toLowerCase());
-
-  if (!isSelf && !isManager) {
-    return NextResponse.json(
-      { error: "You do not have permission to edit this staff photo" },
-      { status: 403 }
-    );
-  }
-
-  // 3) Ensure the target user is actually a staff member of this program
-  const { data: targetMembership, error: targetMembershipError } =
-    await supabaseAdmin
+    // 3) Confirm viewer is a member of this program & get their role
+    const { data: membership, error: membershipError } = await supabaseAdmin
       .from("program_members")
-      .select("id, user_id")
+      .select("id, role")
       .eq("program_id", programId)
-      .eq("user_id", staffUserId)
+      .eq("user_id", viewerUserId)
       .maybeSingle();
 
-  if (targetMembershipError) {
-    console.error(
-      "[staff avatar] target membership select error:",
-      targetMembershipError
-    );
+    if (membershipError || !membership) {
+      console.error("[StaffAvatar] membership error:", membershipError);
+      return NextResponse.json(
+        { error: "Not a member of this program" },
+        { status: 403 }
+      );
+    }
+
+    const viewerRole = membership.role as string | null;
+    const managerRoles = ["head_coach", "director", "admin"];
+    const isManager =
+      viewerRole !== null &&
+      managerRoles.includes(viewerRole.toLowerCase());
+    const isSelf = viewerUserId === staffUserId;
+
+    if (!isSelf && !isManager) {
+      return NextResponse.json(
+        { error: "Not allowed to update this avatar" },
+        { status: 403 }
+      );
+    }
+
+    // 4) Parse file from multipart/form-data
+    const formData = await req.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        { error: "Missing file in upload" },
+        { status: 400 }
+      );
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const objectPath = `${programId}/${staffUserId}/${Date.now()}.${fileExt}`;
+
+    // 5) Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .upload(objectPath, buffer, {
+        contentType: file.type || "image/jpeg",
+        upsert: true,
+      });
+
+    if (uploadError || !uploadData) {
+      console.error("[StaffAvatar] upload error:", uploadError);
+      return NextResponse.json(
+        { error: "Failed to upload avatar" },
+        { status: 500 }
+      );
+    }
+
+    // 6) Get public URL
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from(BUCKET)
+      .getPublicUrl(uploadData.path);
+
+    const publicUrl = publicUrlData?.publicUrl;
+
+    if (!publicUrl) {
+      return NextResponse.json(
+        { error: "Failed to resolve avatar URL" },
+        { status: 500 }
+      );
+    }
+
+    // 7) Save avatar_url on users table for that staff member
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({ avatar_url: publicUrl })
+      .eq("id", staffUserId);
+
+    if (updateError) {
+      console.error(
+        "[StaffAvatar] update users.avatar_url error:",
+        updateError
+      );
+      return NextResponse.json(
+        { error: "Failed to save avatar URL" },
+        { status: 500 }
+      );
+    }
+
+    // 8) Done
     return NextResponse.json(
-      { error: "Failed to load target staff membership" },
+      {
+        ok: true,
+        avatarUrl: publicUrl,
+        isSelf,
+        isManager,
+      },
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error("[StaffAvatar] unexpected error:", err);
+    return NextResponse.json(
+      { error: "Unexpected error uploading avatar" },
       { status: 500 }
     );
   }
-
-  if (!targetMembership) {
-    return NextResponse.json(
-      { error: "Target user is not staff on this program" },
-      { status: 404 }
-    );
-  }
-
-  // 4) Read the uploaded file from multipart/form-data
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-
-  if (!file) {
-    return NextResponse.json(
-      { error: "No file uploaded (expected field 'file')" },
-      { status: 400 }
-    );
-  }
-
-  const fileExt = file.name.split(".").pop() || "jpg";
-  const objectPath = `${programId}/${staffUserId}/${Date.now()}.${fileExt}`;
-
-  // 5) Upload to Supabase Storage
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from(AVATAR_BUCKET)
-    .upload(objectPath, file, {
-      cacheControl: "3600",
-      upsert: true,
-      contentType: file.type || "image/jpeg",
-    });
-
-  if (uploadError) {
-    console.error("[staff avatar] upload error:", uploadError);
-    return NextResponse.json(
-      { error: "Failed to upload avatar" },
-      { status: 500 }
-    );
-  }
-
-  const {
-    data: { publicUrl },
-  } = supabaseAdmin.storage.from(AVATAR_BUCKET).getPublicUrl(objectPath);
-
-  // 6) Update the users.avatar_url for that staff user
-  const { error: updateError } = await supabaseAdmin
-    .from("users")
-    .update({ avatar_url: publicUrl })
-    .eq("id", staffUserId);
-
-  if (updateError) {
-    console.error("[staff avatar] users update error:", updateError);
-    return NextResponse.json(
-      { error: "Failed to update staff profile" },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json(
-    { ok: true, avatarUrl: publicUrl, isSelf, isManager },
-    { status: 200 }
-  );
 }

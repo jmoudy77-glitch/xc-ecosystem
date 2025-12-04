@@ -1,13 +1,40 @@
-// app/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster/route.ts
-// Team roster API: list and add athletes for a specific team season.
+// app/api/programs/[programId]/teams/[teamId]/seasons/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { supabaseServer } from "@/lib/supabaseServer";
 
-// Auth helper: ensure the current auth user belongs to this program.
-// Mirrors /api/programs/[programId]/teams and seasons routes.
-async function assertProgramMembership(req: NextRequest, programId: string) {
+const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
+
+// ---- helpers ----
+
+function parseIdsFromUrl(url: string): {
+  programId: string | null;
+  teamId: string | null;
+} {
+  const { pathname } = new URL(url);
+  const parts = pathname.split("/").filter(Boolean);
+  // ["api","programs", programId, "teams", teamId, "seasons"]
+  const idx = parts.indexOf("programs");
+  if (idx === -1) {
+    return { programId: null, teamId: null };
+  }
+
+  const programId = parts[idx + 1] ?? null;
+  const teamsIdx = parts.indexOf("teams", idx);
+  const teamId =
+    teamsIdx !== -1 && teamsIdx + 1 < parts.length ? parts[teamsIdx + 1] : null;
+
+  return { programId, teamId };
+}
+
+async function assertProgramManager(
+  req: NextRequest,
+  programId: string
+): Promise<
+  | { ok: true; viewerUserId: string; role: string | null }
+  | { ok: false; status: number; error: string }
+> {
   const { supabase } = supabaseServer(req);
 
   const {
@@ -16,442 +43,217 @@ async function assertProgramMembership(req: NextRequest, programId: string) {
   } = await supabase.auth.getUser();
 
   if (authError) {
-    console.warn(
-      "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] auth error:",
-      authError,
-    );
-    return {
-      ok: false as const,
-      status: 401 as const,
-      error: "Authentication error",
-    };
+    console.warn("[CreateSeason] auth.getUser error:", authError.message);
   }
 
   if (!authUser) {
-    return {
-      ok: false as const,
-      status: 401 as const,
-      error: "Not authenticated",
-    };
+    return { ok: false, status: 401, error: "Not authenticated" };
   }
 
-  // Resolve internal users.id from auth_id
+  const authId = authUser.id;
+
   const { data: userRow, error: userError } = await supabaseAdmin
     .from("users")
-    .select("id")
-    .eq("auth_id", authUser.id)
+    .select("id, auth_id")
+    .eq("auth_id", authId)
     .maybeSingle();
 
   if (userError) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] users lookup error:",
-      userError,
-    );
-    return {
-      ok: false as const,
-      status: 500 as const,
-      error: "Failed to resolve user record",
-    };
+    console.error("[CreateSeason] users select error:", userError);
+    return { ok: false, status: 500, error: "Failed to load viewer record" };
   }
 
   if (!userRow) {
     return {
-      ok: false as const,
-      status: 403 as const,
-      error: "No user record found for this account",
+      ok: false,
+      status: 403,
+      error: "User record not found for this account",
     };
   }
 
-  const userId = userRow.id as string;
+  const viewerUserId = userRow.id as string;
 
-  // Check membership in program_members
-  const { data: memberRow, error: memberError } = await supabaseAdmin
+  const { data: membershipRow, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select("id, role")
     .eq("program_id", programId)
-    .eq("user_id", userId)
+    .eq("user_id", viewerUserId)
     .maybeSingle();
 
-  if (memberError) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] program_members lookup error:",
-      memberError,
-    );
+  if (membershipError) {
+    console.error("[CreateSeason] membership error:", membershipError);
     return {
-      ok: false as const,
-      status: 500 as const,
+      ok: false,
+      status: 500,
       error: "Failed to verify program membership",
     };
   }
 
-  if (!memberRow) {
+  if (!membershipRow) {
     return {
-      ok: false as const,
-      status: 403 as const,
-      error: "You do not have access to this program",
+      ok: false,
+      status: 403,
+      error: "You are not a member of this program",
     };
   }
 
-  return { ok: true as const, status: 200 as const, error: null };
-}
-
-function parsePathParams(urlStr: string): {
-  programId?: string;
-  teamId?: string;
-  seasonId?: string;
-} {
-  try {
-    const url = new URL(urlStr);
-    const segments = url.pathname.split("/").filter(Boolean);
-    // ["api", "programs", "<programId>", "teams", "<teamId>", "seasons", "<seasonId>", "roster"]
-    const programsIndex = segments.indexOf("programs");
-    const teamsIndex = segments.indexOf("teams");
-    const seasonsIndex = segments.indexOf("seasons");
-    if (
-      programsIndex !== -1 &&
-      teamsIndex !== -1 &&
-      seasonsIndex !== -1 &&
-      programsIndex + 1 < segments.length &&
-      teamsIndex + 1 < segments.length &&
-      seasonsIndex + 1 < segments.length
-    ) {
-      return {
-        programId: segments[programsIndex + 1],
-        teamId: segments[teamsIndex + 1],
-        seasonId: segments[seasonsIndex + 1],
-      };
-    }
-  } catch {
-    // ignore
-  }
-  return {};
-}
-
-type RosterRow = {
-  id: string;
-  athlete_id: string;
-  team_season_id: string;
-  jersey_number: string | null;
-  role: string | null;
-  status: string | null;
-  depth_order: number | null;
-  notes: string | null;
-  created_at: string | null;
-};
-
-type CreateRosterBody = {
-  athleteId: string;
-  jerseyNumber?: string | null;
-  role?: string | null;
-  status?: string | null;
-  depthOrder?: number | null;
-  notes?: string | null;
-};
-
-// Ensure that the given team_season belongs to the program and team in the path.
-async function assertSeasonBelongsToTeamAndProgram(
-  programId: string,
-  teamId: string,
-  seasonId: string,
-) {
-  const { data: seasonRow, error } = await supabaseAdmin
-    .from("team_seasons")
-    .select("id, team_id, program_id, academic_year, season_label")
-    .eq("id", seasonId)
-    .maybeSingle();
-
-  if (error) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] team_seasons lookup error:",
-      error,
+  const role = (membershipRow.role as string | null) ?? null;
+  const isManager =
+    !!role &&
+    MANAGER_ROLES.includes(
+      role.toLowerCase() as (typeof MANAGER_ROLES)[number]
     );
+
+  if (!isManager) {
     return {
-      ok: false as const,
-      status: 500 as const,
-      error: "Failed to verify team season",
+      ok: false,
+      status: 403,
+      error: "Only head coaches / admins can create seasons",
     };
   }
 
-  if (!seasonRow) {
-    return {
-      ok: false as const,
-      status: 404 as const,
-      error: "Team season not found",
-    };
-  }
-
-  if (seasonRow.program_id !== programId || seasonRow.team_id !== teamId) {
-    return {
-      ok: false as const,
-      status: 400 as const,
-      error: "Season does not belong to this team/program",
-    };
-  }
-
-  return { ok: true as const, status: 200 as const, error: null };
+  return { ok: true, viewerUserId, role };
 }
 
-// GET /api/programs/:programId/teams/:teamId/seasons/:seasonId/roster
-// → list roster for this team season
-export async function GET(req: NextRequest) {
-  const { programId, teamId, seasonId } = parsePathParams(req.url);
+// ---- POST: create a new season and auto-populate returning roster ----
 
-  if (!programId || !teamId || !seasonId) {
-    return NextResponse.json(
-      { error: "Missing programId, teamId, or seasonId in path" },
-      { status: 400 },
-    );
-  }
-
-  const authCheck = await assertProgramMembership(req, programId);
-  if (!authCheck.ok) {
-    return NextResponse.json(
-      { error: authCheck.error },
-      { status: authCheck.status },
-    );
-  }
-
-  const seasonCheck = await assertSeasonBelongsToTeamAndProgram(
-    programId,
-    teamId,
-    seasonId,
-  );
-  if (!seasonCheck.ok) {
-    return NextResponse.json(
-      { error: seasonCheck.error },
-      { status: seasonCheck.status },
-    );
-  }
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("team_roster")
-      .select(
-        `
-        id,
-        program_id,
-        team_id,
-        team_season_id,
-        athlete_id,
-        jersey_number,
-        role,
-        status,
-        depth_order,
-        notes,
-        created_at
-      `,
-      )
-      .eq("program_id", programId)
-      .eq("team_id", teamId)
-      .eq("team_season_id", seasonId)
-      .order("depth_order", { ascending: true })
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error(
-        "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] select error:",
-        error,
-      );
-      return NextResponse.json(
-        { error: "Failed to load team roster" },
-        { status: 500 },
-      );
-    }
-
-    const roster: RosterRow[] =
-      (data ?? []).map((row: any) => ({
-        id: row.id,
-        athlete_id: row.athlete_id,
-        team_season_id: row.team_season_id,
-        jersey_number: row.jersey_number,
-        role: row.role,
-        status: row.status,
-        depth_order: row.depth_order,
-        notes: row.notes,
-        created_at: row.created_at,
-      })) ?? [];
-
-    return NextResponse.json(
-      {
-        programId,
-        teamId,
-        seasonId,
-        roster,
-      },
-      { status: 200 },
-    );
-  } catch (err) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] Unexpected GET error:",
-      err,
-    );
-    return NextResponse.json(
-      { error: "Unexpected error loading roster" },
-      { status: 500 },
-    );
-  }
-}
-
-// POST /api/programs/:programId/teams/:teamId/seasons/:seasonId/roster
-// → add an athlete to this team season's roster
 export async function POST(req: NextRequest) {
-  const { programId, teamId, seasonId } = parsePathParams(req.url);
+  const { programId, teamId } = parseIdsFromUrl(req.url);
 
-  if (!programId || !teamId || !seasonId) {
+  if (!programId || !teamId) {
     return NextResponse.json(
-      { error: "Missing programId, teamId, or seasonId in path" },
-      { status: 400 },
+      { error: "Missing programId or teamId in path" },
+      { status: 400 }
     );
   }
 
-  const authCheck = await assertProgramMembership(req, programId);
+  const authCheck = await assertProgramManager(req, programId);
   if (!authCheck.ok) {
     return NextResponse.json(
       { error: authCheck.error },
-      { status: authCheck.status },
+      { status: authCheck.status }
     );
   }
 
-  const seasonCheck = await assertSeasonBelongsToTeamAndProgram(
-    programId,
-    teamId,
-    seasonId,
-  );
-  if (!seasonCheck.ok) {
-    return NextResponse.json(
-      { error: seasonCheck.error },
-      { status: seasonCheck.status },
-    );
-  }
-
-  let body: CreateRosterBody;
+  let body: any;
   try {
-    body = (await req.json()) as CreateRosterBody;
+    body = await req.json();
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
-  const athleteId = (body.athleteId || "").trim();
-  if (!athleteId) {
+  const seasonLabel = (body?.season_label as string | undefined) ?? null;
+  const seasonYear = (body?.season_year as number | undefined) ?? null;
+  const rosterLockDateRaw = body?.roster_lock_date as string | null | undefined;
+
+  if (!seasonLabel || !seasonYear) {
     return NextResponse.json(
-      { error: "athleteId is required" },
-      { status: 400 },
+      { error: "season_label and season_year are required" },
+      { status: 400 }
     );
   }
 
-  try {
-    // Optional: verify athlete exists
-    const { data: athleteRow, error: athleteError } = await supabaseAdmin
-      .from("athletes")
-      .select("id")
-      .eq("id", athleteId)
-      .maybeSingle();
+  const rosterLockDate =
+    rosterLockDateRaw && rosterLockDateRaw.length > 0
+      ? new Date(rosterLockDateRaw).toISOString()
+      : null;
 
-    if (athleteError) {
-      console.error(
-        "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] athlete lookup error:",
-        athleteError,
-      );
-      return NextResponse.json(
-        { error: "Failed to verify athlete" },
-        { status: 500 },
-      );
-    }
+  // 1) Create new season row
+  const { data: newSeason, error: seasonError } = await supabaseAdmin
+    .from("team_seasons")
+    .insert({
+      team_id: teamId,
+      season_label: seasonLabel,
+      season_year: seasonYear,
+      roster_lock_date: rosterLockDate,
+    })
+    .select("id, team_id, season_label, season_year, roster_lock_date")
+    .single();
 
-    if (!athleteRow) {
-      return NextResponse.json(
-        { error: "Athlete not found" },
-        { status: 404 },
-      );
-    }
+  if (seasonError) {
+    console.error("[CreateSeason] insert season error:", seasonError);
+    return NextResponse.json(
+      { error: "Failed to create team season" },
+      { status: 500 }
+    );
+  }
 
-    const { data: inserted, error } = await supabaseAdmin
+  const newSeasonId = newSeason.id as string;
+
+  // 2) Find most recent prior season for this team
+  const { data: priorSeason, error: priorError } = await supabaseAdmin
+    .from("team_seasons")
+    .select("id, season_year, created_at")
+    .eq("team_id", teamId)
+    .neq("id", newSeasonId)
+    .order("season_year", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (priorError) {
+    console.error("[CreateSeason] prior season lookup error:", priorError);
+    // not fatal; we just won't copy roster
+  }
+
+  let copiedCount = 0;
+
+  if (priorSeason) {
+    // 3) Load prior season roster (returning athletes only)
+    const { data: priorRoster, error: rosterError } = await supabaseAdmin
       .from("team_roster")
-      .insert({
-        program_id: programId,
-        team_id: teamId,
-        team_season_id: seasonId,
-        athlete_id: athleteId,
-        jersey_number: body.jerseyNumber ?? null,
-        role: body.role ?? "athlete",
-        status: body.status ?? "active",
-        depth_order: body.depthOrder ?? null,
-        notes: body.notes ?? null,
-      })
       .select(
         `
-        id,
-        program_id,
-        team_id,
-        team_season_id,
         athlete_id,
-        jersey_number,
-        role,
+        program_recruit_id,
         status,
-        depth_order,
-        notes,
-        created_at
-      `,
+        role
+      `
       )
-      .single();
+      .eq("team_season_id", priorSeason.id)
+      // exclude non-returners; you can tweak this list as needed
+      .not("status", "in", '("graduated","removed","transfer_out")');
 
-    if (error) {
-      console.error(
-        "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] insert error:",
-        error,
-      );
-      // handle unique constraint nicely
-      if (
-        typeof error.code === "string" &&
-        error.code === "23505" /* unique_violation */
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "This athlete is already on the roster for this team season.",
-          },
-          { status: 409 },
+    if (rosterError) {
+      console.error("[CreateSeason] prior roster select error:", rosterError);
+      // again, not fatal; we just won't copy
+    } else if (priorRoster && priorRoster.length > 0) {
+      // 4) Build new roster rows for this season
+      const newRosterRows = priorRoster.map((row) => ({
+        program_id: programId,
+        team_id: teamId,
+        team_season_id: newSeasonId,
+        athlete_id: row.athlete_id,
+        program_recruit_id: row.program_recruit_id,
+        // you can choose to reset some statuses to "active" if you want:
+        status: row.status ?? "active",
+        role: row.role ?? null,
+      }));
+
+      const { error: insertRosterError } = await supabaseAdmin
+        .from("team_roster")
+        .insert(newRosterRows);
+
+      if (insertRosterError) {
+        console.error(
+          "[CreateSeason] insert new roster error:",
+          insertRosterError
         );
+      } else {
+        copiedCount = newRosterRows.length;
       }
-
-      return NextResponse.json(
-        { error: "Failed to add athlete to roster" },
-        { status: 500 },
-      );
     }
-
-    const rosterRow: RosterRow = {
-      id: inserted.id,
-      athlete_id: inserted.athlete_id,
-      team_season_id: inserted.team_season_id,
-      jersey_number: inserted.jersey_number,
-      role: inserted.role,
-      status: inserted.status,
-      depth_order: inserted.depth_order,
-      notes: inserted.notes,
-      created_at: inserted.created_at,
-    };
-
-    return NextResponse.json(
-      {
-        programId,
-        teamId,
-        seasonId,
-        rosterEntry: rosterRow,
-      },
-      { status: 200 },
-    );
-  } catch (err) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/roster] Unexpected POST error:",
-      err,
-    );
-    return NextResponse.json(
-      { error: "Unexpected error adding athlete to roster" },
-      { status: 500 },
-    );
   }
+
+  return NextResponse.json(
+    {
+      ok: true,
+      season: newSeason,
+      copiedRosterCount: copiedCount,
+    },
+    { status: 201 }
+  );
 }

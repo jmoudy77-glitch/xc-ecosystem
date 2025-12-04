@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import StaffAvatarUploader from "../StaffAvatarUploader";
+import StaffRoleEditor from "../StaffRoleEditor";
 
 type PageProps = {
   params: Promise<{
@@ -365,11 +366,18 @@ export default async function StaffProfilePage(props: PageProps) {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Coaching roles & responsibilities
               </p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Future: assign this staff member to specific teams, event
-                groups, or responsibilities (distance, sprints, throws, etc.),
-                and control what parts of the recruiting and practice modules
-                they can access.
+
+              <StaffRoleEditor
+                programId={programId}
+                memberId={staffProfile.userId}
+                initialRole={staffProfile.role}
+                canEdit={isManager}
+              />
+
+              <p className="mt-3 text-[11px] text-slate-500">
+                Future: assign this staff member to specific teams, event groups, or
+                responsibilities (distance, sprints, throws, etc.), and control what
+                parts of the recruiting and practice modules they can access.
               </p>
             </div>
 

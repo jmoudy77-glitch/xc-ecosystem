@@ -32,10 +32,21 @@ function extractIdsFromUrl(req: NextRequest): {
   }
 }
 
+// At the top of the file:
+const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
+
+type ManagerRoleCode = (typeof MANAGER_ROLES)[number];
+
+function isManagerRole(role: string | null | undefined): boolean {
+  if (!role) return false;
+  return MANAGER_ROLES.includes(role.toLowerCase() as ManagerRoleCode);
+}
+
 // Simple authorization helper: ensure the caller belongs to this program
 async function assertProgramMembership(
   req: NextRequest,
   programId: string,
+  opts?: { requireManager?: boolean },
 ) {
   const { supabase } = supabaseServer(req);
 
@@ -49,6 +60,7 @@ async function assertProgramMembership(
       "[/api/programs/[programId]/staff/[memberId]] auth error:",
       authError,
     );
+    return { error: "Not authenticated", status: 401 as const };
   }
 
   if (!authUser) {
@@ -100,10 +112,20 @@ async function assertProgramMembership(
     };
   }
 
-  // In the future, we can enforce role-based permissions here (e.g. only head_coach can edit).
+  const actingRole = (membership.role as string | null) ?? null;
+
+  if (opts?.requireManager && !isManagerRole(actingRole)) {
+    return {
+      error: "You do not have permission to manage staff in this program",
+      status: 403 as const,
+    };
+  }
+
+  // Success
   return { error: null, status: 200 as const };
 }
 
+// PATCH: update role for a staff member
 // PATCH: update role for a staff member
 export async function PATCH(req: NextRequest) {
   const { programId, memberId } = extractIdsFromUrl(req);
@@ -116,7 +138,9 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const authCheck = await assertProgramMembership(req, programId);
+    const authCheck = await assertProgramMembership(req, programId, {
+      requireManager: true,
+    });
     if (authCheck.error) {
       return NextResponse.json(
         { error: authCheck.error },
@@ -137,9 +161,9 @@ export async function PATCH(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("program_members")
       .update({ role })
-      .eq("id", memberId)
       .eq("program_id", programId)
-      .select("id, user_id, role")
+      .eq("user_id", memberId) // memberId = public.users.id for the staff
+      .select("id, role, user_id, created_at")
       .maybeSingle();
 
     if (error) {
@@ -173,12 +197,13 @@ export async function PATCH(req: NextRequest) {
       err,
     );
     return NextResponse.json(
-      { error: "Unexpected error updating staff member" },
+      { error: "Unexpected error updating staff role" },
       { status: 500 },
     );
   }
 }
 
+// DELETE: remove a staff member from the program
 // DELETE: remove a staff member from the program
 export async function DELETE(req: NextRequest) {
   const { programId, memberId } = extractIdsFromUrl(req);
@@ -191,7 +216,9 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const authCheck = await assertProgramMembership(req, programId);
+    const authCheck = await assertProgramMembership(req, programId, {
+      requireManager: true,
+    });
     if (authCheck.error) {
       return NextResponse.json(
         { error: authCheck.error },
@@ -202,8 +229,8 @@ export async function DELETE(req: NextRequest) {
     const { error } = await supabaseAdmin
       .from("program_members")
       .delete()
-      .eq("id", memberId)
-      .eq("program_id", programId);
+      .eq("program_id", programId)
+      .eq("user_id", memberId);
 
     if (error) {
       console.error(

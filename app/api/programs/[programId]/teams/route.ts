@@ -3,10 +3,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-// Helper: ensure the current auth user belongs to this program.
-// This mirrors the pattern used in /api/programs/[programId]/staff but
-// correctly resolves auth user -> users.id -> program_members.user_id.
-async function assertProgramMembership(req: NextRequest, programId: string) {
+const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
+
+type ManagerRole = (typeof MANAGER_ROLES)[number];
+
+function parseProgramIdFromUrl(url: string): string | null {
+  const { pathname } = new URL(url);
+  const parts = pathname.split("/").filter(Boolean);
+  const idx = parts.indexOf("programs");
+  if (idx === -1 || idx + 1 >= parts.length) return null;
+  return parts[idx + 1] || null;
+}
+
+// Ensure the current auth user belongs to this program.
+// Optionally require a manager-level role.
+async function assertProgramMembership(
+  req: NextRequest,
+  programId: string,
+  opts?: { requireManager?: boolean }
+): Promise<
+  | { ok: true; viewerUserId: string; role: string | null }
+  | { ok: false; status: number; error: string }
+> {
   const { supabase } = supabaseServer(req);
 
   const {
@@ -15,103 +33,101 @@ async function assertProgramMembership(req: NextRequest, programId: string) {
   } = await supabase.auth.getUser();
 
   if (authError) {
-    console.warn("[/api/programs/[programId]/teams] auth error:", authError);
-    return {
-      ok: false as const,
-      status: 401 as const,
-      error: "Authentication error",
-    };
+    console.warn(
+      "[/api/programs/[programId]/teams] auth.getUser error:",
+      authError.message
+    );
   }
 
   if (!authUser) {
-    return {
-      ok: false as const,
-      status: 401 as const,
-      error: "Not authenticated",
-    };
+    return { ok: false, status: 401, error: "Not authenticated" };
   }
 
-  // Resolve internal users.id from auth_id
+  const authId = authUser.id;
+
+  // Map auth user -> public.users row
   const { data: userRow, error: userError } = await supabaseAdmin
     .from("users")
-    .select("id")
-    .eq("auth_id", authUser.id)
+    .select("id, auth_id, email")
+    .eq("auth_id", authId)
     .maybeSingle();
 
   if (userError) {
     console.error(
-      "[/api/programs/[programId]/teams] users lookup error:",
-      userError,
+      "[/api/programs/[programId]/teams] users select error:",
+      userError
     );
     return {
-      ok: false as const,
-      status: 500 as const,
-      error: "Failed to resolve user record",
+      ok: false,
+      status: 500,
+      error: "Failed to load viewer user record",
     };
   }
 
   if (!userRow) {
     return {
-      ok: false as const,
-      status: 403 as const,
-      error: "No user record found for this account",
+      ok: false,
+      status: 403,
+      error: "User record not found for this account",
     };
   }
 
-  const userId = userRow.id as string;
+  const viewerUserId = userRow.id as string;
 
-  // Check membership in program_members
-  const { data: memberRow, error: memberError } = await supabaseAdmin
+  // Check membership in this program
+  const { data: membershipRow, error: membershipError } = await supabaseAdmin
     .from("program_members")
-    .select("id, role")
+    .select("id, role, program_id")
     .eq("program_id", programId)
-    .eq("user_id", userId)
+    .eq("user_id", viewerUserId)
     .maybeSingle();
 
-  if (memberError) {
+  if (membershipError) {
     console.error(
-      "[/api/programs/[programId]/teams] program_members lookup error:",
-      memberError,
+      "[/api/programs/[programId]/teams] membership select error:",
+      membershipError
     );
     return {
-      ok: false as const,
-      status: 500 as const,
-      error: "Failed to verify program membership",
+      ok: false,
+      status: 500,
+      error: "Failed to load membership for this program",
     };
   }
 
-  if (!memberRow) {
+  if (!membershipRow) {
     return {
-      ok: false as const,
-      status: 403 as const,
-      error: "You do not have access to this program",
+      ok: false,
+      status: 403,
+      error: "You are not a member of this program",
     };
   }
 
-  // In the future we can enforce specific roles (head_coach only, etc.)
-  return { ok: true as const, status: 200 as const, error: null };
+  const role = (membershipRow.role as string | null) ?? null;
+
+  if (opts?.requireManager) {
+    if (
+      !role ||
+      !MANAGER_ROLES.includes(role.toLowerCase() as ManagerRole)
+    ) {
+      return {
+        ok: false,
+        status: 403,
+        error: "You do not have permission to manage teams for this program",
+      };
+    }
+  }
+
+  return { ok: true, viewerUserId, role };
 }
 
-// GET /api/programs/:programId/teams → list teams/divisions for that program
+// GET: list teams for a program
 export async function GET(req: NextRequest) {
-  let programId: string | undefined;
-
-  try {
-    const url = new URL(req.url);
-    const segments = url.pathname.split("/").filter(Boolean);
-    // segments = ["api", "programs", "<programId>", "teams"]
-    const programsIndex = segments.indexOf("programs");
-    if (programsIndex !== -1 && segments.length > programsIndex + 1) {
-      programId = segments[programsIndex + 1];
-    }
-  } catch {
-    // ignore; we'll handle missing programId below
-  }
+  const programId = parseProgramIdFromUrl(req.url);
 
   if (!programId) {
     return NextResponse.json(
       { error: "Missing programId in path" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -119,7 +135,7 @@ export async function GET(req: NextRequest) {
   if (!authCheck.ok) {
     return NextResponse.json(
       { error: authCheck.error },
-      { status: authCheck.status },
+      { status: authCheck.status }
     );
   }
 
@@ -127,19 +143,28 @@ export async function GET(req: NextRequest) {
     const { data: teams, error } = await supabaseAdmin
       .from("teams")
       .select(
-        "id, program_id, name, code, sport, gender, level, season, is_primary, created_at",
+        `
+        id,
+        program_id,
+        name,
+        code,
+        sport,
+        gender,
+        level,
+        season
+      `
       )
       .eq("program_id", programId)
-      .order("created_at", { ascending: true });
+      .order("name", { ascending: true });
 
     if (error) {
       console.error(
         "[/api/programs/[programId]/teams] teams select error:",
-        error,
+        error
       );
       return NextResponse.json(
         { error: "Failed to load teams" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
@@ -148,123 +173,115 @@ export async function GET(req: NextRequest) {
         programId,
         teams: teams ?? [],
       },
-      { status: 200 },
+      { status: 200 }
     );
   } catch (err) {
     console.error(
       "[/api/programs/[programId]/teams] Unexpected GET error:",
-      err,
+      err
     );
     return NextResponse.json(
       { error: "Unexpected error loading teams" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
 
-type CreateTeamBody = {
-  name: string;
-  code?: string | null;
-  sport?: string | null;
-  gender?: string | null;
-  level?: string | null;
-  season?: string | null;
-  isPrimary?: boolean;
-};
-
-// POST /api/programs/:programId/teams → create a new team/division in the program
+// POST: create a team for this program (manager-only)
 export async function POST(req: NextRequest) {
-  let programId: string | undefined;
-
-  try {
-    const url = new URL(req.url);
-    const segments = url.pathname.split("/").filter(Boolean);
-    const programsIndex = segments.indexOf("programs");
-    if (programsIndex !== -1 && segments.length > programsIndex + 1) {
-      programId = segments[programsIndex + 1];
-    }
-  } catch {
-    // ignore; we'll handle missing programId below
-  }
+  const programId = parseProgramIdFromUrl(req.url);
 
   if (!programId) {
     return NextResponse.json(
       { error: "Missing programId in path" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
-  const authCheck = await assertProgramMembership(req, programId);
+  const authCheck = await assertProgramMembership(req, programId, {
+    requireManager: true,
+  });
+
   if (!authCheck.ok) {
     return NextResponse.json(
       { error: authCheck.error },
-      { status: authCheck.status },
+      { status: authCheck.status }
     );
   }
 
-  let body: CreateTeamBody;
+  let body: any;
   try {
-    body = (await req.json()) as CreateTeamBody;
+    body = await req.json();
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
-  const name = (body.name || "").trim();
+  const name = (body?.name as string | undefined)?.trim();
+  const code = (body?.code as string | undefined)?.trim() || null;
+  const sport = (body?.sport as string | undefined)?.trim() || null;
+  const gender = (body?.gender as string | undefined)?.trim() || null;
+  const level = (body?.level as string | undefined)?.trim() || null;
+  const season = (body?.season as string | undefined)?.trim() || null;
 
   if (!name) {
     return NextResponse.json(
       { error: "Team name is required" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
   try {
-    const { data: newTeam, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("teams")
       .insert({
         program_id: programId,
         name,
-        code: body.code ?? null,
-        sport: body.sport ?? null,
-        gender: body.gender ?? null,
-        level: body.level ?? null,
-        season: body.season ?? null,
-        is_primary: body.isPrimary ?? false,
+        code,
+        sport,
+        gender,
+        level,
+        season,
       })
       .select(
-        "id, program_id, name, code, sport, gender, level, season, is_primary, created_at",
+        `
+        id,
+        program_id,
+        name,
+        code,
+        sport,
+        gender,
+        level,
+        season
+      `
       )
       .single();
 
     if (error) {
       console.error(
         "[/api/programs/[programId]/teams] teams insert error:",
-        error,
+        error
       );
       return NextResponse.json(
         { error: "Failed to create team" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
     return NextResponse.json(
-      {
-        programId,
-        team: newTeam,
-      },
-      { status: 200 },
+      { ok: true, team: data },
+      { status: 201 }
     );
   } catch (err) {
     console.error(
       "[/api/programs/[programId]/teams] Unexpected POST error:",
-      err,
+      err
     );
     return NextResponse.json(
       { error: "Unexpected error creating team" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

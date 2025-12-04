@@ -3,9 +3,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-// Helper: ensure the current auth user belongs to this program.
-// Mirrors /api/programs/[programId]/teams and correctly resolves auth user -> users.id.
-async function assertProgramMembership(req: NextRequest, programId: string) {
+const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
+
+type ManagerRole = (typeof MANAGER_ROLES)[number];
+
+function parseIdsFromUrl(url: string): { programId: string | null; teamId: string | null } {
+  const { pathname } = new URL(url);
+  const parts = pathname.split("/").filter(Boolean);
+  // ["api", "programs", programId, "teams", teamId, "seasons"]
+  const pIdx = parts.indexOf("programs");
+  const tIdx = parts.indexOf("teams");
+  const programId = pIdx !== -1 ? parts[pIdx + 1] ?? null : null;
+  const teamId = tIdx !== -1 ? parts[tIdx + 1] ?? null : null;
+  return { programId, teamId };
+}
+
+async function assertProgramMembership(
+  req: NextRequest,
+  programId: string,
+  opts?: { requireManager?: boolean },
+): Promise<
+  | { ok: true; viewerUserId: string; role: string | null }
+  | { ok: false; status: number; error: string }
+> {
   const { supabase } = supabaseServer(req);
 
   const {
@@ -14,132 +34,78 @@ async function assertProgramMembership(req: NextRequest, programId: string) {
   } = await supabase.auth.getUser();
 
   if (authError) {
-    console.warn(
-      "[/api/programs/[programId]/teams/[teamId]/seasons] auth error:",
-      authError,
-    );
-    return {
-      ok: false as const,
-      status: 401 as const,
-      error: "Authentication error",
-    };
+    console.warn("[TeamSeasons] auth.getUser error:", authError.message);
   }
 
   if (!authUser) {
-    return {
-      ok: false as const,
-      status: 401 as const,
-      error: "Not authenticated",
-    };
+    return { ok: false, status: 401, error: "Not authenticated" };
   }
 
-  // Resolve internal users.id from auth_id
+  const authId = authUser.id;
+
   const { data: userRow, error: userError } = await supabaseAdmin
     .from("users")
-    .select("id")
-    .eq("auth_id", authUser.id)
+    .select("id, auth_id")
+    .eq("auth_id", authId)
     .maybeSingle();
 
   if (userError) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons] users lookup error:",
-      userError,
-    );
-    return {
-      ok: false as const,
-      status: 500 as const,
-      error: "Failed to resolve user record",
-    };
+    console.error("[TeamSeasons] users select error:", userError);
+    return { ok: false, status: 500, error: "Failed to load viewer record" };
   }
 
   if (!userRow) {
     return {
-      ok: false as const,
-      status: 403 as const,
-      error: "No user record found for this account",
+      ok: false,
+      status: 403,
+      error: "User record not found for this account",
     };
   }
 
-  const userId = userRow.id as string;
+  const viewerUserId = userRow.id as string;
 
-  // Check membership in program_members
-  const { data: memberRow, error: memberError } = await supabaseAdmin
+  const { data: membership, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select("id, role")
     .eq("program_id", programId)
-    .eq("user_id", userId)
+    .eq("user_id", viewerUserId)
     .maybeSingle();
 
-  if (memberError) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons] program_members lookup error:",
-      memberError,
-    );
+  if (membershipError) {
+    console.error("[TeamSeasons] membership error:", membershipError);
     return {
-      ok: false as const,
-      status: 500 as const,
+      ok: false,
+      status: 500,
       error: "Failed to verify program membership",
     };
   }
 
-  if (!memberRow) {
+  if (!membership) {
     return {
-      ok: false as const,
-      status: 403 as const,
-      error: "You do not have access to this program",
+      ok: false,
+      status: 403,
+      error: "You are not a member of this program",
     };
   }
 
-  return { ok: true as const, status: 200 as const, error: null };
-}
+  const role = (membership.role as string | null) ?? null;
 
-function parsePathParams(urlStr: string): { programId?: string; teamId?: string } {
-  try {
-    const url = new URL(urlStr);
-    const segments = url.pathname.split("/").filter(Boolean);
-    // ["api", "programs", "<programId>", "teams", "<teamId>", "seasons"]
-    const programsIndex = segments.indexOf("programs");
-    const teamsIndex = segments.indexOf("teams");
-    if (
-      programsIndex !== -1 &&
-      programsIndex + 1 < segments.length &&
-      teamsIndex !== -1 &&
-      teamsIndex + 1 < segments.length
-    ) {
+  if (opts?.requireManager) {
+    if (!role || !MANAGER_ROLES.includes(role.toLowerCase() as ManagerRole)) {
       return {
-        programId: segments[programsIndex + 1],
-        teamId: segments[teamsIndex + 1],
+        ok: false,
+        status: 403,
+        error: "You do not have permission to manage this team",
       };
     }
-  } catch {
-    // ignore
   }
-  return {};
+
+  return { ok: true, viewerUserId, role };
 }
 
-type TeamSeason = {
-  id: string;
-  team_id: string;
-  program_id: string;
-  academic_year: string;
-  year_start: number;
-  year_end: number | null;
-  season_label: string;
-  is_current: boolean;
-  created_at: string | null;
-};
-
-type CreateSeasonBody = {
-  academicYear: string;
-  yearStart: number;
-  yearEnd?: number | null;
-  seasonLabel: string;
-  isCurrent?: boolean;
-};
-
-// GET /api/programs/:programId/teams/:teamId/seasons → list seasons for this team
+// GET: seasons for this team
 export async function GET(req: NextRequest) {
-  const { programId, teamId } = parsePathParams(req.url);
+  const { programId, teamId } = parseIdsFromUrl(req.url);
 
   if (!programId || !teamId) {
     return NextResponse.json(
@@ -156,51 +122,40 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  try {
-    const { data: seasons, error } = await supabaseAdmin
-      .from("team_seasons")
-      .select(
-        "id, team_id, program_id, academic_year, year_start, year_end, season_label, is_current, created_at",
-      )
-      .eq("program_id", programId)
-      .eq("team_id", teamId)
-      .order("year_start", { ascending: false })
-      .order("season_label", { ascending: true });
+  const { data: seasons, error } = await supabaseAdmin
+    .from("team_seasons")
+    .select(
+      `
+      id,
+      team_id,
+      season_label,
+      season_year,
+      start_date,
+      end_date,
+      is_active,
+      created_at
+    `,
+    )
+    .eq("team_id", teamId)
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error(
-        "[/api/programs/[programId]/teams/[teamId]/seasons] select error:",
-        error,
-      );
-      return NextResponse.json(
-        { error: "Failed to load team seasons" },
-        { status: 500 },
-      );
-    }
-
+  if (error) {
+    console.error("[TeamSeasons] select error:", error);
     return NextResponse.json(
-      {
-        programId,
-        teamId,
-        seasons: seasons ?? [],
-      },
-      { status: 200 },
-    );
-  } catch (err) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons] Unexpected GET error:",
-      err,
-    );
-    return NextResponse.json(
-      { error: "Unexpected error loading team seasons" },
+      { error: "Failed to load team seasons" },
       { status: 500 },
     );
   }
+
+  return NextResponse.json(
+    { programId, teamId, seasons: seasons ?? [] },
+    { status: 200 },
+  );
 }
 
-// POST /api/programs/:programId/teams/:teamId/seasons → create a season for this team
+// POST: create a season for this team (manager only)
 export async function POST(req: NextRequest) {
-  const { programId, teamId } = parsePathParams(req.url);
+  const { programId, teamId } = parseIdsFromUrl(req.url);
 
   if (!programId || !teamId) {
     return NextResponse.json(
@@ -209,7 +164,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const authCheck = await assertProgramMembership(req, programId);
+  const authCheck = await assertProgramMembership(req, programId, {
+    requireManager: true,
+  });
+
   if (!authCheck.ok) {
     return NextResponse.json(
       { error: authCheck.error },
@@ -217,9 +175,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: CreateSeasonBody;
+  let body: any;
   try {
-    body = (await req.json()) as CreateSeasonBody;
+    body = await req.json();
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body" },
@@ -227,69 +185,49 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const academicYear = (body.academicYear || "").trim();
-  const seasonLabel = (body.seasonLabel || "").trim();
-  const yearStart = Number(body.yearStart);
+  const season_label = (body?.season_label as string | undefined)?.trim();
+  const season_year =
+    typeof body?.season_year === "number" ? body.season_year : null;
+  const start_date = (body?.start_date as string | undefined) || null;
+  const end_date = (body?.end_date as string | undefined) || null;
 
-  if (!academicYear || !seasonLabel || !yearStart) {
+  if (!season_label) {
     return NextResponse.json(
-      {
-        error:
-          "academicYear, seasonLabel, and yearStart are required to create a team season",
-      },
+      { error: "Season label is required" },
       { status: 400 },
     );
   }
 
-  const yearEnd =
-    body.yearEnd !== undefined && body.yearEnd !== null
-      ? Number(body.yearEnd)
-      : null;
+  const { data, error } = await supabaseAdmin
+    .from("team_seasons")
+    .insert({
+      team_id: teamId,
+      season_label,
+      season_year,
+      start_date,
+      end_date,
+    })
+    .select(
+      `
+      id,
+      team_id,
+      season_label,
+      season_year,
+      start_date,
+      end_date,
+      is_active,
+      created_at
+    `,
+    )
+    .single();
 
-  try {
-    const { data: newSeason, error } = await supabaseAdmin
-      .from("team_seasons")
-      .insert({
-        team_id: teamId,
-        program_id: programId,
-        academic_year: academicYear,
-        year_start: yearStart,
-        year_end: yearEnd,
-        season_label: seasonLabel,
-        is_current: body.isCurrent ?? false,
-      })
-      .select(
-        "id, team_id, program_id, academic_year, year_start, year_end, season_label, is_current, created_at",
-      )
-      .single();
-
-    if (error) {
-      console.error(
-        "[/api/programs/[programId]/teams/[teamId]/seasons] insert error:",
-        error,
-      );
-      return NextResponse.json(
-        { error: "Failed to create team season" },
-        { status: 500 },
-      );
-    }
-
+  if (error) {
+    console.error("[TeamSeasons] insert error:", error);
     return NextResponse.json(
-      {
-        programId,
-        teamId,
-        season: newSeason,
-      },
-      { status: 200 },
-    );
-  } catch (err) {
-    console.error(
-      "[/api/programs/[programId]/teams/[teamId]/seasons] Unexpected POST error:",
-      err,
-    );
-    return NextResponse.json(
-      { error: "Unexpected error creating team season" },
+      { error: "Failed to create team season" },
       { status: 500 },
     );
   }
+
+  return NextResponse.json({ ok: true, season: data }, { status: 201 });
 }

@@ -1,18 +1,36 @@
+// app/api/programs/[programId]/teams/[teamId]/roster-scenarios/[scenarioId]/entries/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
-type RouteParams = {
-  params: {
+type RouteContext = {
+  // In Next 16, params comes in as a Promise
+  params: Promise<{
     programId: string;
     teamId: string;
     scenarioId: string;
-  };
+  }>;
 };
 
-async function getViewerUserId(req: NextRequest) {
+type ViewerResult =
+  | {
+      ok: true;
+      viewerUserId: string;
+      role: string | null;
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+    };
+
+async function getViewerAndMembership(
+  req: NextRequest,
+  programId: string
+): Promise<ViewerResult> {
   const { supabase } = supabaseServer(req);
 
   const {
@@ -21,75 +39,95 @@ async function getViewerUserId(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (authError) {
-    console.warn("[RosterSandboxEntries] auth.getUser error:", authError.message);
+    console.warn("[ScenarioEntries] auth.getUser error:", authError.message);
   }
 
   if (!authUser) {
-    return { ok: false as const, status: 401, error: "Not authenticated" };
+    return { ok: false, status: 401, error: "Not authenticated" };
   }
 
   const authId = authUser.id;
 
+  // Map auth user -> users row
   const { data: userRow, error: userError } = await supabaseAdmin
     .from("users")
-    .select("id, auth_id")
+    .select("id, auth_id, email")
     .eq("auth_id", authId)
     .maybeSingle();
 
   if (userError) {
-    console.error("[RosterSandboxEntries] users select error:", userError);
+    console.error("[ScenarioEntries] users select error:", userError);
     return {
-      ok: false as const,
+      ok: false,
       status: 500,
-      error: "Failed to load viewer user record",
+      error: `Failed to load viewer record: ${userError.message}`,
     };
   }
 
   if (!userRow) {
     return {
-      ok: false as const,
+      ok: false,
       status: 403,
       error: "User record not found for this account",
     };
   }
 
-  return { ok: true as const, userId: userRow.id as string };
-}
+  const viewerUserId = userRow.id as string;
 
-async function assertProgramManager(
-  req: NextRequest,
-  programId: string
-) {
-  const viewer = await getViewerUserId(req);
-  if (!viewer.ok) return viewer;
-
-  const { userId } = viewer;
-
+  // Check membership & role
   const { data: membershipRow, error: membershipError } = await supabaseAdmin
     .from("program_members")
-    .select("id, role")
+    .select("id, role, program_id")
     .eq("program_id", programId)
-    .eq("user_id", userId)
+    .eq("user_id", viewerUserId)
     .maybeSingle();
 
   if (membershipError) {
-    console.error("[RosterSandboxEntries] membership error:", membershipError);
+    console.error("[ScenarioEntries] membership error:", membershipError);
     return {
-      ok: false as const,
+      ok: false,
       status: 500,
-      error: "Failed to verify program membership",
+      error: `Failed to verify program membership: ${membershipError.message}`,
     };
   }
 
   if (!membershipRow) {
     return {
-      ok: false as const,
+      ok: false,
       status: 403,
       error: "You are not a member of this program",
     };
   }
 
   const role = (membershipRow.role as string | null) ?? null;
+
+  return { ok: true, viewerUserId, role };
+}
+
+/**
+ * POST /api/programs/[programId]/teams/[teamId]/roster-scenarios/[scenarioId]/entries
+ *
+ * Minimal “add an entry to this scenario” handler.
+ * Expects JSON like:
+ * {
+ *   "athlete_id": "uuid" | null,
+ *   "program_recruit_id": "uuid" | null,
+ *   "status": "planned" | "offer" | "commit" | ... (optional),
+ *   "notes": "optional text"
+ * }
+ */
+export async function POST(req: NextRequest, ctx: RouteContext) {
+  const { programId, teamId, scenarioId } = await ctx.params;
+
+  const viewer = await getViewerAndMembership(req, programId);
+  if (!viewer.ok) {
+    return NextResponse.json(
+      { error: viewer.error },
+      { status: viewer.status }
+    );
+  }
+
+  const role = viewer.role;
   const isManager =
     !!role &&
     MANAGER_ROLES.includes(
@@ -97,28 +135,41 @@ async function assertProgramManager(
     );
 
   if (!isManager) {
-    return {
-      ok: false as const,
-      status: 403,
-      error: "Only head coaches / admins can modify roster scenarios",
-    };
-  }
-
-  return { ok: true as const, userId, role };
-}
-
-// POST: add an entry (athlete or recruit) to a scenario
-export async function POST(req: NextRequest, { params }: RouteParams) {
-  const { programId, teamId, scenarioId } = params;
-
-  const access = await assertProgramManager(req, programId);
-  if (!access.ok) {
     return NextResponse.json(
-      { error: access.error },
-      { status: access.status }
+      {
+        error: "Only head coaches / admins can modify scenario entries",
+      },
+      { status: 403 }
     );
   }
 
+  // Make sure the scenario belongs to this program + team
+  const { data: scenarioRow, error: scenarioError } = await supabaseAdmin
+    .from("roster_scenarios")
+    .select("id, program_id, team_id")
+    .eq("id", scenarioId)
+    .maybeSingle();
+
+  if (scenarioError) {
+    console.error("[ScenarioEntries] scenario lookup error:", scenarioError);
+    return NextResponse.json(
+      { error: "Failed to load scenario" },
+      { status: 500 }
+    );
+  }
+
+  if (
+    !scenarioRow ||
+    scenarioRow.program_id !== programId ||
+    scenarioRow.team_id !== teamId
+  ) {
+    return NextResponse.json(
+      { error: "Scenario does not belong to this program/team" },
+      { status: 403 }
+    );
+  }
+
+  // Parse body
   let body: any;
   try {
     body = await req.json();
@@ -129,94 +180,48 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const athleteId = (body?.athlete_id as string | undefined) ?? null;
+  const athleteId =
+    (body?.athlete_id as string | undefined) ?? null;
   const programRecruitId =
     (body?.program_recruit_id as string | undefined) ?? null;
-  const projectedRole = (body?.projected_role as string | undefined) ?? null;
-  const projectedStatus =
-    (body?.projected_status as string | undefined) ?? null;
-  const projectedClassYear =
-    (body?.projected_class_year as number | undefined) ?? null;
-  const eventGroup = (body?.event_group as string | undefined) ?? null;
-  const notes = (body?.notes as string | undefined) ?? null;
+  const status =
+    (body?.status as string | undefined)?.trim() || "planned";
+  const notes =
+    (body?.notes as string | undefined)?.trim() || null;
 
   if (!athleteId && !programRecruitId) {
     return NextResponse.json(
       {
         error:
-          "Either athlete_id or program_recruit_id is required for a scenario entry",
+          "Either athlete_id or program_recruit_id is required to create an entry",
       },
       { status: 400 }
     );
   }
 
-  // Optional: verify the scenario belongs to this program/team
-  const { data: scenarioRow, error: scenarioError } = await supabaseAdmin
-    .from("roster_scenarios")
-    .select("id, program_id, team_id")
-    .eq("id", scenarioId)
-    .maybeSingle();
-
-  if (scenarioError) {
-    console.error("[RosterSandboxEntries] scenario lookup error:", scenarioError);
-    return NextResponse.json(
-      { error: "Failed to load scenario" },
-      { status: 500 }
-    );
-  }
-
-  if (!scenarioRow) {
-    return NextResponse.json(
-      { error: "Scenario not found" },
-      { status: 404 }
-    );
-  }
-
-  if (
-    scenarioRow.program_id !== programId ||
-    scenarioRow.team_id !== teamId
-  ) {
-    return NextResponse.json(
-      { error: "Scenario does not belong to this team" },
-      { status: 403 }
-    );
-  }
-
+  // Insert into roster_scenario_entries
   const { data: inserted, error: insertError } = await supabaseAdmin
     .from("roster_scenario_entries")
     .insert({
       scenario_id: scenarioId,
       athlete_id: athleteId,
       program_recruit_id: programRecruitId,
-      projected_role: projectedRole,
-      projected_status: projectedStatus,
-      projected_class_year: projectedClassYear,
-      event_group: eventGroup,
+      status,
       notes,
     })
-    .select(
-      `
-      id,
-      scenario_id,
-      athlete_id,
-      program_recruit_id,
-      projected_role,
-      projected_status,
-      projected_class_year,
-      event_group,
-      notes,
-      created_at
-    `
-    )
+    .select("*")
     .single();
 
   if (insertError) {
-    console.error("[RosterSandboxEntries] insert error:", insertError);
+    console.error("[ScenarioEntries] insert error:", insertError);
     return NextResponse.json(
-      { error: "Failed to add entry to roster scenario" },
+      { error: "Failed to create scenario entry" },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({ entry: inserted }, { status: 201 });
+  return NextResponse.json(
+    { entry: inserted },
+    { status: 201 }
+  );
 }

@@ -50,7 +50,7 @@ export default function SeasonRosterClient({
   const [addingId, setAddingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Build a set of program_recruit_ids already on this season's roster
+  // program_recruit_ids already on this season's roster
   const rosteredRecruitIds = new Set(
     roster
       .map((r) => r.programRecruitId)
@@ -72,12 +72,52 @@ export default function SeasonRosterClient({
         return;
       }
 
-      const all: RecruitOption[] = body.recruits ?? [];
+      const raw: any[] = body.recruits ?? body ?? [];
 
-      // 🔴 Filter out recruits already rostered for this season
+      console.log("[SeasonRosterClient] recruits payload (raw):", raw);
+
+      const all: RecruitOption[] = raw.map((r: any, index: number) => {
+        // API is already giving us programRecruitId, status, source, profileType, athleteId
+        const programRecruitId: string =
+          r.programRecruitId ?? r.program_recruit_id ?? r.id ?? "";
+
+        // Try to derive some kind of human-friendly label
+        const nameParts = [r.first_name, r.last_name]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+
+        let label: string =
+          r.label ??
+          r.name ??
+          (nameParts.length > 0 ? nameParts : "") ??
+          "";
+
+        // Fallback if nothing is available
+        if (!label || label.trim().length === 0) {
+          label = programRecruitId
+            ? `Recruit ${String(index + 1).padStart(2, "0")}`
+            : "Recruit";
+        }
+
+        return {
+          programRecruitId,
+          athleteId: r.athleteId ?? r.athlete_id ?? null,
+          label,
+          email: r.email ?? null,
+          avatarUrl: r.avatarUrl ?? null,
+          status: r.status ?? "active",
+          source: r.source ?? "unknown",
+          profileType: r.profileType ?? r.profile_type ?? "hs",
+        };
+      });
+
+      // Filter out recruits already rostered for this season
       const available = all.filter(
         (rec) => !rosteredRecruitIds.has(rec.programRecruitId)
       );
+
+      console.log("[SeasonRosterClient] mapped recruits:", available);
 
       setRecruits(available);
       setRecruitsLoaded(true);
@@ -119,7 +159,6 @@ export default function SeasonRosterClient({
       );
 
       setAddingId(null);
-      // Let the server refresh the roster list
       router.refresh();
     } catch (err: any) {
       console.error("[SeasonRosterClient] handleAdd error:", err);
@@ -149,13 +188,13 @@ export default function SeasonRosterClient({
         ) : (
           <div className="mt-3 space-y-2">
             {roster.map((entry) => {
-              const initials =
-                (entry.name || entry.email || "A")
-                  .split(" ")
-                  .map((p) => p[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase();
+              const displayLabel = entry.name || entry.email || "Athlete";
+              const initials = displayLabel
+                .split(" ")
+                .map((p) => p[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
 
               return (
                 <div
@@ -168,7 +207,7 @@ export default function SeasonRosterClient({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={entry.avatarUrl}
-                          alt={entry.name}
+                          alt={displayLabel}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -177,7 +216,7 @@ export default function SeasonRosterClient({
                     </div>
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-slate-100">
-                        {entry.name}
+                        {displayLabel}
                       </span>
                       {entry.email && (
                         <span className="text-xs text-slate-400">
@@ -215,7 +254,7 @@ export default function SeasonRosterClient({
           this season&apos;s roster.
         </p>
 
-                {isManager ? (
+        {isManager ? (
           isLocked ? (
             <p className="mt-2 text-[11px] text-amber-400">
               Roster changes are locked for this season per your conference
@@ -231,38 +270,79 @@ export default function SeasonRosterClient({
                   disabled={loadingRecruits}
                   className="mt-1 rounded-md bg-sky-600 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-sky-500 disabled:opacity-60"
                 >
-                  {loadingRecruits
-                    ? "Loading recruits…"
-                    : "Load eligible recruits"}
+                  {loadingRecruits ? "Loading recruits…" : "Load eligible recruits"}
                 </button>
               ) : recruits.length === 0 ? (
                 <p className="mt-2 text-[11px] text-slate-500">
                   No roster-eligible recruits found yet, or all eligible recruits
                   are already on this season&apos;s roster. Mark recruits as
-                  signed, enrolled, committed, or walk-on in your recruiting board
-                  to see them here.
+                  signed, enrolled, committed, or walk-on in your recruiting
+                  board to see them here.
                 </p>
               ) : (
-                // ... rest of the recruits list stays the same
                 <div className="mt-2 space-y-2">
-                  {recruits.map((rec) => (
-                    <div
-                      key={rec.programRecruitId}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-2 py-1.5"
-                    >
-                      {/* existing recruit row UI */}
-                      <button
-                        type="button"
-                        onClick={() => handleAdd(rec.programRecruitId)}
-                        disabled={addingId === rec.programRecruitId}
-                        className="rounded-md border border-sky-500 px-2 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-600/10 disabled:opacity-60"
+                  {recruits.map((rec) => {
+                    const displayLabel = rec.label || "Recruit";
+                    const initials = displayLabel
+                      .split(" ")
+                      .map((p) => p[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase();
+
+                    return (
+                      <div
+                        key={rec.programRecruitId}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-2 py-1.5"
                       >
-                        {addingId === rec.programRecruitId
-                          ? "Adding…"
-                          : "Add to roster"}
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-slate-800 text-[10px] font-semibold text-slate-100">
+                            {rec.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={rec.avatarUrl}
+                                alt={displayLabel}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span>{initials}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-medium text-slate-100">
+                              {displayLabel}
+                            </span>
+                            {rec.email && (
+                              <span className="text-[10px] text-slate-400">
+                                {rec.email}
+                              </span>
+                            )}
+                            <div className="mt-1 flex flex-wrap gap-1 text-[9px] text-slate-400">
+                              <span className="rounded-full border border-slate-700 px-2 py-[1px]">
+                                {rec.profileType}
+                              </span>
+                              <span className="rounded-full border border-slate-700 px-2 py-[1px]">
+                                {rec.status}
+                              </span>
+                              <span className="rounded-full border border-slate-700 px-2 py-[1px]">
+                                {rec.source}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAdd(rec.programRecruitId)}
+                          disabled={addingId === rec.programRecruitId}
+                          className="rounded-md border border-sky-500 px-2 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-600/10 disabled:opacity-60"
+                        >
+                          {addingId === rec.programRecruitId
+                            ? "Adding…"
+                            : "Add to roster"}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>

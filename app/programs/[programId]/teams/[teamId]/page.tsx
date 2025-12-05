@@ -7,6 +7,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import TeamSeasonsClient, {
   type TeamSeasonSummary,
 } from "./TeamSeasonsClient";
+import RosterSandboxClient from "./RosterSandboxClient";
+
 
 type PageProps = {
   params: Promise<{
@@ -158,12 +160,13 @@ export default async function TeamDetailPage({ params }: PageProps) {
                 <span>›</span>
                 <span>{teamName}</span>
               </div>
-              <h1 className="mt-1 text-base font-semibold text-slate-100">
+              {/*(<h1 className="mt-1 text-base font-semibold text-slate-100">
                 {teamName}
               </h1>
               <p className="mt-1 text-[11px] text-slate-500">
                 Seasons and rosters for this team.
-              </p>
+              </p>*/}
+              
             </div>
           </div>
         </div>
@@ -177,6 +180,23 @@ export default async function TeamDetailPage({ params }: PageProps) {
           isManager={isManager}
           seasons={seasons}
         />
+        {/* Roster Sandbox */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 mt-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Roster Sandbox
+            </p>
+
+            <p className="mt-1 text-[11px] text-slate-500 max-w-xl">
+                Create future roster projection scenarios for planning scholarships, 
+                athlete retention, transfers, and incoming classes.
+            </p>
+
+            <RosterSandboxClient
+                programId={programId}
+                teamId={teamId}
+                isManager={isManager}
+            />
+            </div>
       </main>
     </div>
   );

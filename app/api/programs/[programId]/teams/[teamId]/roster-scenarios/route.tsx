@@ -7,10 +7,11 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
 type RouteContext = {
-  params: {
+  // NOTE: In Next 16, params is a Promise in this runtime.
+  params: Promise<{
     programId: string;
     teamId: string;
-  };
+  }>;
 };
 
 type ViewerResult =
@@ -72,7 +73,7 @@ async function getViewerAndMembership(
 
   const viewerUserId = userRow.id as string;
 
-  // Check membership & role – same pattern used in other working routes
+  // Check membership & role
   const { data: membershipRow, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select("id, role, program_id")
@@ -103,8 +104,9 @@ async function getViewerAndMembership(
 }
 
 // GET: list scenarios for this team
-export async function GET(req: NextRequest, { params }: RouteContext) {
-  const { programId, teamId } = params;
+export async function GET(req: NextRequest, ctx: RouteContext) {
+  // 🔑 THIS is the important bit
+  const { programId, teamId } = await ctx.params;
 
   const viewer = await getViewerAndMembership(req, programId);
   if (!viewer.ok) {
@@ -134,17 +136,8 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error("[RosterScenarios] list error:", error);
-    // TEMP: surface details so we can debug
     return NextResponse.json(
-      {
-        error: "Failed to load roster scenarios",
-        details: {
-          message: error.message,
-          code: error.code,
-          hint: error.hint,
-          details: error.details,
-        },
-      },
+      { error: "Failed to load roster scenarios" },
       { status: 500 }
     );
   }
@@ -162,8 +155,9 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 }
 
 // POST: create a new scenario for this team
-export async function POST(req: NextRequest, { params }: RouteContext) {
-  const { programId, teamId } = params;
+export async function POST(req: NextRequest, ctx: RouteContext) {
+  // 🔑 Same fix here
+  const { programId, teamId } = await ctx.params;
 
   const viewer = await getViewerAndMembership(req, programId);
   if (!viewer.ok) {

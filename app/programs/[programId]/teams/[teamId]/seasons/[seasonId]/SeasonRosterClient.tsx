@@ -5,13 +5,21 @@ import { useRouter } from "next/navigation";
 
 export type RosterEntry = {
   id: string;
-  athleteId: string;
+  teamSeasonId: string;
+  athleteId: string | null;
+  programRecruitId: string | null;
+  status: string | null;
+  role: string | null;
+
   name: string;
   email: string | null;
   avatarUrl: string | null;
-  status: string;
-  role: string | null;
-  programRecruitId: string | null;
+
+  gradYear: number | null;
+  scholarshipAmount: number | null;
+  scholarshipUnit: string | null; // "percent" | "amount" eventually
+  scholarshipNotes: string | null;
+  createdAt: string | null;
 };
 
 export type RecruitOption = {

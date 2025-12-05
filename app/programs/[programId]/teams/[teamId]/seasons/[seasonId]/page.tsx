@@ -4,9 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import SeasonRosterClient, {
-  type RosterEntry,
-} from "./SeasonRosterClient";
+import SeasonRosterClient from "./SeasonRosterClient";
 
 type PageProps = {
   params: Promise<{
@@ -18,7 +16,95 @@ type PageProps = {
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
-export default async function TeamSeasonRosterPage({ params }: PageProps) {
+type ScholarshipSummary = {
+  hasBudget: boolean;
+  budgetEquiv: number | null;
+  usedEquiv: number | null;
+  remainingEquiv: number | null;
+  budgetAmount: number | null;
+  usedAmount: number | null;
+  remainingAmount: number | null;
+};
+
+function computeScholarshipSummary(opts: {
+  season: any;
+  rosterRows: any[] | null;
+}): ScholarshipSummary {
+  const budgetEquivRaw =
+    (opts.season?.scholarship_budget_equivalents as number | null) ?? null;
+  const budgetAmountRaw =
+    (opts.season?.scholarship_budget_amount as number | null) ?? null;
+
+  const budgetEquiv = budgetEquivRaw !== null ? Number(budgetEquivRaw) : null;
+  const budgetAmount =
+    budgetAmountRaw !== null ? Number(budgetAmountRaw) : null;
+
+  let usedEquiv: number | null = null;
+  let usedAmount: number | null = null;
+
+  if (budgetEquiv !== null || budgetAmount !== null) {
+    let equivSum = 0;
+    let amountSum = 0;
+
+    for (const row of opts.rosterRows ?? []) {
+      const raw = row.scholarship_amount as number | null;
+      if (raw == null) continue;
+
+      const amt = Number(raw);
+      const unit = (row.scholarship_unit as string | null) ?? "percent";
+
+      // Equivalency usage
+      if (budgetEquiv !== null) {
+        if (unit === "percent") {
+          equivSum += amt / 100;
+        } else if (unit === "amount" && budgetAmount && budgetAmount > 0) {
+          const perEquiv = budgetAmount / budgetEquiv; // $ per equivalency
+          if (perEquiv > 0) {
+            equivSum += amt / perEquiv;
+          }
+        }
+      }
+
+      // Dollar usage
+      if (budgetAmount !== null) {
+        if (unit === "amount") {
+          amountSum += amt;
+        } else if (unit === "percent") {
+          amountSum += (budgetAmount * amt) / 100;
+        }
+      }
+    }
+
+    if (budgetEquiv !== null) {
+      usedEquiv = Number(equivSum.toFixed(2));
+    }
+    if (budgetAmount !== null) {
+      usedAmount = Number(amountSum.toFixed(0));
+    }
+  }
+
+  const remainingEquiv =
+    budgetEquiv !== null && usedEquiv !== null
+      ? Number(Math.max(budgetEquiv - usedEquiv, 0).toFixed(2))
+      : null;
+
+  const remainingAmount =
+    budgetAmount !== null && usedAmount !== null
+      ? Number(Math.max(budgetAmount - usedAmount, 0).toFixed(0))
+      : null;
+
+  return {
+    hasBudget: budgetEquiv !== null || budgetAmount !== null,
+    budgetEquiv,
+    usedEquiv,
+    remainingEquiv,
+    budgetAmount,
+    usedAmount,
+    remainingAmount,
+  };
+}
+
+export default async function SeasonRosterPage({ params }: PageProps) {
   const { programId, teamId, seasonId } = await params;
 
   const supabase = await supabaseServerComponent();
@@ -26,7 +112,12 @@ export default async function TeamSeasonRosterPage({ params }: PageProps) {
   // 1) Auth
   const {
     data: { user: authUser },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.warn("[SeasonRoster] auth.getUser error:", authError.message);
+  }
 
   if (!authUser) {
     redirect("/login");
@@ -34,12 +125,17 @@ export default async function TeamSeasonRosterPage({ params }: PageProps) {
 
   const authId = authUser.id;
 
-  // 2) Viewer user row
-  const { data: userRow } = await supabaseAdmin
+  // 2) Ensure viewer has a users row
+  const { data: userRow, error: userError } = await supabaseAdmin
     .from("users")
     .select("id, auth_id, email")
     .eq("auth_id", authId)
     .maybeSingle();
+
+  if (userError) {
+    console.error("[SeasonRoster] users select error:", userError);
+    throw new Error("Failed to load viewer user record");
+  }
 
   if (!userRow) {
     redirect("/dashboard");
@@ -47,8 +143,8 @@ export default async function TeamSeasonRosterPage({ params }: PageProps) {
 
   const viewerUserId = userRow.id as string;
 
-  // 3) Membership + program
-  const { data: membership } = await supabaseAdmin
+  // 3) Membership in this program + program name
+  const { data: membership, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select(
       `
@@ -65,6 +161,11 @@ export default async function TeamSeasonRosterPage({ params }: PageProps) {
     .eq("user_id", viewerUserId)
     .maybeSingle();
 
+  if (membershipError) {
+    console.error("[SeasonRoster] membership error:", membershipError);
+    throw new Error("Failed to load program membership");
+  }
+
   if (!membership || !membership.programs) {
     redirect("/dashboard");
   }
@@ -80,13 +181,18 @@ export default async function TeamSeasonRosterPage({ params }: PageProps) {
     actingRole !== null &&
     MANAGER_ROLES.includes(actingRole.toLowerCase() as any);
 
-  // 4) Team
-  const { data: teamRow } = await supabaseAdmin
+  // 4) Load team
+  const { data: teamRow, error: teamError } = await supabaseAdmin
     .from("teams")
-    .select("id, name")
+    .select("id, program_id, name, code, sport, gender, level")
     .eq("id", teamId)
     .eq("program_id", programId)
     .maybeSingle();
+
+  if (teamError) {
+    console.error("[SeasonRoster] team error:", teamError);
+    throw new Error("Failed to load team");
+  }
 
   if (!teamRow) {
     redirect(`/programs/${programId}/teams`);
@@ -94,78 +200,115 @@ export default async function TeamSeasonRosterPage({ params }: PageProps) {
 
   const teamName = (teamRow.name as string) ?? "Team";
 
-  // 5) Season
-    const { data: seasonRow } = await supabaseAdmin
-        .from("team_seasons")
-        .select("id, season_label, roster_lock_date")
-        .eq("id", seasonId)
-        .eq("team_id", teamId)
-        .maybeSingle();
+  // 5) Load season (budget fields, no is_locked yet)
+  const { data: seasonRow, error: seasonError } = await supabaseAdmin
+    .from("team_seasons")
+    .select(
+      `
+      id,
+      team_id,
+      season_label,
+      season_year,
+      scholarship_budget_equivalents,
+      scholarship_budget_amount,
+      scholarship_currency
+    `
+    )
+    .eq("id", seasonId)
+    .eq("team_id", teamId)
+    .maybeSingle();
+
+  if (seasonError) {
+    console.error("[SeasonRoster] season error:", seasonError);
+    throw new Error("Failed to load season");
+  }
 
   if (!seasonRow) {
     redirect(`/programs/${programId}/teams/${teamId}`);
   }
 
-  const seasonLabel = (seasonRow.season_label as string) ?? "Season";
-  const lockDateStr = seasonRow.roster_lock_date as string | null;
-  const isLocked =
-    !!lockDateStr && new Date(lockDateStr).getTime() <= Date.now();
+  const seasonLabel =
+    (seasonRow.season_label as string | null) ??
+    (seasonRow.season_year
+      ? `Season ${seasonRow.season_year}`
+      : "Season");
 
-  // 6) Roster (JOIN → athletes, using actual columns)
+  // TODO: wire real lock flag once we add it to team_seasons
+  const isLocked = false;
+
+  // 6) Load roster rows (with scholarship fields)
   const { data: rosterRows, error: rosterError } = await supabaseAdmin
     .from("team_roster")
     .select(
       `
       id,
-      program_id,
-      team_id,
       team_season_id,
       athlete_id,
+      program_recruit_id,
       status,
       role,
-      program_recruit_id,
+      scholarship_amount,
+      scholarship_unit,
+      scholarship_notes,
       created_at,
-      athlete:athletes!inner (
+      athletes (
         id,
         first_name,
         last_name,
-        grad_year,
-        event_group
+        grad_year
       )
     `
     )
-    .eq("team_season_id", seasonId);
+    .eq("team_season_id", seasonId)
+    .order("created_at", { ascending: true });
 
   if (rosterError) {
-    console.error("[TeamSeasonRoster] roster select error:", rosterError);
-    throw new Error("Failed to load roster");
+    console.error("[SeasonRoster] roster error:", rosterError);
+    throw new Error("Failed to load season roster");
   }
 
-  const roster: RosterEntry[] = (rosterRows ?? []).map((row: any) => {
-    const athleteRel = row.athlete;
-    const athleteRecord = Array.isArray(athleteRel)
-      ? athleteRel[0]
-      : athleteRel;
+  // 7) Map roster to client shape
+  const roster = (rosterRows ?? []).map((row: any) => {
+    const athleteRel = (row as any).athletes;
+    const athleteRecord = Array.isArray(athleteRel) ? athleteRel[0] : athleteRel;
 
-    const firstName =
-      (athleteRecord?.first_name as string | null) ?? null;
-    const lastName =
-      (athleteRecord?.last_name as string | null) ?? null;
-    const name =
-      [firstName, lastName].filter(Boolean).join(" ").trim() || "Athlete";
+    const firstName = athleteRecord?.first_name as string | undefined;
+    const lastName = athleteRecord?.last_name as string | undefined;
+    const fullName =
+      [firstName, lastName].filter(Boolean).join(" ") || "Athlete";
 
-    // We don't have email/avatar on athletes; keep null and let UI use initials, etc.
-    return {
-      id: row.id as string,
-      athleteId: row.athlete_id as string,
-      name,
-      email: null,
-      avatarUrl: null,
-      status: (row.status as string) ?? "active",
-      role: (row.role as string | null) ?? null,
-      programRecruitId:
-        (row.program_recruit_id as string | null) ?? null,
-    };
+        return {
+            id: row.id as string,
+            teamSeasonId: row.team_season_id as string,
+            athleteId: (row.athlete_id as string | null) ?? null,
+            programRecruitId:
+                (row.program_recruit_id as string | null) ?? null,
+            status: (row.status as string | null) ?? null,
+            role: (row.role as string | null) ?? null,
+
+            // Fields expected by SeasonRosterClient
+            name: fullName,
+            email: null,
+            avatarUrl: null,
+
+            // Extra metadata
+            athleteName: fullName,
+            gradYear:
+                (athleteRecord?.grad_year as number | null | undefined) ?? null,
+            scholarshipAmount:
+                (row.scholarship_amount as number | null) ?? null,
+            scholarshipUnit:
+                (row.scholarship_unit as string | null) ?? "percent",
+            scholarshipNotes:
+                (row.scholarship_notes as string | null) ?? null,
+            createdAt: row.created_at as string | null,
+        };
+  });
+
+  // 8) Scholarship summary
+  const scholarshipSummary = computeScholarshipSummary({
+    season: seasonRow,
+    rosterRows,
   });
 
   return (
@@ -206,15 +349,139 @@ export default async function TeamSeasonRosterPage({ params }: PageProps) {
                 {teamName} — {seasonLabel}
               </h1>
               <p className="mt-1 text-[11px] text-slate-500">
-                Roster view for this season. Add signed / enrolled recruits
-                directly into this team&apos;s lineup.
+                Official roster and scholarship allocations for this season.
+              </p>
+            </div>
+            <div className="text-right text-[11px] text-slate-400">
+              <p>
+                Roster status:{" "}
+                {isLocked ? (
+                  <span className="font-semibold text-rose-300">
+                    Locked
+                  </span>
+                ) : (
+                  <span className="font-semibold text-emerald-300">
+                    Open
+                  </span>
+                )}
               </p>
             </div>
           </div>
         </div>
       </header>
 
-    <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {scholarshipSummary.hasBudget && (
+          <section className="mb-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Scholarship summary
+                </p>
+
+                {scholarshipSummary.budgetEquiv !== null && (
+                  <p className="mt-1 text-xs text-slate-200">
+                    Equivalency budget:{" "}
+                    <span className="font-semibold">
+                      {scholarshipSummary.budgetEquiv.toFixed(2)} eq
+                    </span>
+                    {scholarshipSummary.usedEquiv !== null && (
+                      <>
+                        {" "}
+                        • Committed{" "}
+                        <span className="font-semibold">
+                          {scholarshipSummary.usedEquiv.toFixed(2)} eq
+                        </span>
+                        {scholarshipSummary.remainingEquiv !== null && (
+                          <>
+                            {" "}
+                            • Remaining{" "}
+                            <span className="font-semibold">
+                              {scholarshipSummary.remainingEquiv.toFixed(2)} eq
+                            </span>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </p>
+                )}
+
+                {scholarshipSummary.budgetAmount !== null && (
+                  <p className="mt-1 text-[11px] text-slate-200">
+                    Budget:{" "}
+                    <span className="font-semibold">
+                      $
+                      {scholarshipSummary.budgetAmount.toLocaleString(
+                        undefined,
+                        { maximumFractionDigits: 0 }
+                      )}
+                    </span>
+                    {scholarshipSummary.usedAmount !== null && (
+                      <>
+                        {" "}
+                        • Committed{" "}
+                        <span className="font-semibold">
+                          $
+                          {scholarshipSummary.usedAmount.toLocaleString(
+                            undefined,
+                            { maximumFractionDigits: 0 }
+                          )}
+                        </span>
+                        {scholarshipSummary.remainingAmount !== null && (
+                          <>
+                            {" "}
+                            • Remaining{" "}
+                            <span className="font-semibold">
+                              $
+                              {scholarshipSummary.remainingAmount.toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 0 }
+                              )}
+                            </span>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              {scholarshipSummary.budgetEquiv !== null &&
+                scholarshipSummary.usedEquiv !== null && (
+                  <div className="w-full max-w-xs">
+                    <div className="mb-1 flex items-center justify-between text-[10px] text-slate-400">
+                      <span>Equivalencies used</span>
+                      <span>
+                        {scholarshipSummary.usedEquiv.toFixed(2)} /{" "}
+                        {scholarshipSummary.budgetEquiv.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className={`h-full rounded-full ${
+                          scholarshipSummary.usedEquiv >
+                          (scholarshipSummary.budgetEquiv ?? 0)
+                            ? "bg-rose-500"
+                            : "bg-emerald-500"
+                        }`}
+                        style={{
+                          width: `${
+                            Math.min(
+                              (scholarshipSummary.usedEquiv /
+                                (scholarshipSummary.budgetEquiv || 1)) *
+                                100,
+                              120
+                            ) || 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+            </div>
+          </section>
+        )}
+
         <SeasonRosterClient
           programId={programId}
           teamId={teamId}

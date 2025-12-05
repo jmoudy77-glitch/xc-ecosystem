@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+type ScholarshipUnit = "percent" | "equivalency" | "amount";
+
 type RosterEntry = {
   id: string;
   teamSeasonId: string;
@@ -17,7 +19,7 @@ type RosterEntry = {
 
   gradYear: number | null;
   scholarshipAmount: number | null;
-  scholarshipUnit: string | null; // "percent" | "amount"
+  scholarshipUnit: string | null; // "percent" | "equivalency" | "amount"
   scholarshipNotes: string | null;
   createdAt: string | null;
 };
@@ -58,7 +60,7 @@ export default function SeasonRosterClient({
   // Scholarship editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState<string>("");
-  const [editUnit, setEditUnit] = useState<"percent" | "amount">("percent");
+  const [editUnit, setEditUnit] = useState<ScholarshipUnit>("percent");
   const [editNotes, setEditNotes] = useState<string>("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -68,59 +70,59 @@ export default function SeasonRosterClient({
     setRoster(initialRoster);
   }, [initialRoster]);
 
-      // Load recruits for "Add from recruits"
-    async function loadRecruits() {
-        setLoadingRecruits(true);
-        setRecruitsError(null);
+  // Load recruits for "Add from recruits"
+  async function loadRecruits() {
+    setLoadingRecruits(true);
+    setRecruitsError(null);
 
-        try {
-        const res = await fetch(`/api/programs/${programId}/recruits`);
-        const body = await res.json();
+    try {
+      const res = await fetch(`/api/programs/${programId}/recruits`);
+      const body = await res.json();
 
-        if (!res.ok) {
-            setRecruitsError(body.error || "Failed to load recruits");
-            setLoadingRecruits(false);
-            return;
-        }
+      if (!res.ok) {
+        setRecruitsError(body.error || "Failed to load recruits");
+        setLoadingRecruits(false);
+        return;
+      }
 
-        // Now guaranteed: body = { recruits: [...] }
-        const raw = (body.recruits ?? []) as any[];
+      // Now guaranteed: body = { recruits: [...] }
+      const raw = (body.recruits ?? []) as any[];
 
-        // Build a set of program_recruit_id values already on this roster
-        const alreadyOnRosterByRecruitId = new Set(
-            roster
-            .map((r) => r.programRecruitId)
-            .filter((id): id is string => !!id)
+      // Build a set of program_recruit_id values already on this roster
+      const alreadyOnRosterByRecruitId = new Set(
+        roster
+          .map((r) => r.programRecruitId)
+          .filter((id): id is string => !!id)
+      );
+
+      const mapped: RecruitEntry[] = raw
+        .map((r) => ({
+          programRecruitId: r.program_recruit_id as string,
+          athleteId: (r.athlete_id as string | null) ?? "",
+          fullName: (r.full_name as string) ?? "Athlete",
+          gradYear: (r.grad_year as number | null) ?? null,
+          status: (r.status as string | null) ?? null,
+          profileType: (r.profile_type as string | null) ?? null,
+        }))
+        // Require a valid program_recruit_id and filter out someone already on this roster
+        .filter(
+          (r) =>
+            !!r.programRecruitId &&
+            !alreadyOnRosterByRecruitId.has(r.programRecruitId)
         );
 
-        const mapped: RecruitEntry[] = raw
-            .map((r) => ({
-            programRecruitId: r.program_recruit_id as string,
-            athleteId: (r.athlete_id as string | null) ?? "",
-            fullName: (r.full_name as string) ?? "Athlete",
-            gradYear: (r.grad_year as number | null) ?? null,
-            status: (r.status as string | null) ?? null,
-            profileType: (r.profile_type as string | null) ?? null,
-            }))
-            // Require a valid program_recruit_id and filter out someone already on this roster
-            .filter(
-            (r) =>
-                !!r.programRecruitId &&
-                !alreadyOnRosterByRecruitId.has(r.programRecruitId)
-            );
-
-        setRecruits(mapped);
-        } catch (e: any) {
-        setRecruitsError(e?.message || "Unexpected error");
-        }
-
-        setLoadingRecruits(false);
+      setRecruits(mapped);
+    } catch (e: any) {
+      setRecruitsError(e?.message || "Unexpected error");
     }
 
-        useEffect(() => {
-            loadRecruits();
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, []);
+    setLoadingRecruits(false);
+  }
+
+  useEffect(() => {
+    loadRecruits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- Scholarship editing ---
 
@@ -129,9 +131,8 @@ export default function SeasonRosterClient({
     setEditAmount(
       entry.scholarshipAmount != null ? String(entry.scholarshipAmount) : ""
     );
-    setEditUnit(
-      (entry.scholarshipUnit as "percent" | "amount") || "percent"
-    );
+    const unit = (entry.scholarshipUnit as ScholarshipUnit | null) ?? "percent";
+    setEditUnit(unit);
     setEditNotes(entry.scholarshipNotes ?? "");
     setEditError(null);
   }
@@ -150,12 +151,24 @@ export default function SeasonRosterClient({
 
     const trimmed = editAmount.trim();
     let amountPayload: number | null = null;
+
     if (trimmed.length > 0) {
       const parsed = Number(trimmed);
       if (!Number.isFinite(parsed)) {
         setEditError("Amount must be a valid number");
         return;
       }
+
+      // Basic sanity checks by unit
+      if (editUnit === "percent" && (parsed < 0 || parsed > 100)) {
+        setEditError("Percent scholarships must be between 0 and 100.");
+        return;
+      }
+      if ((editUnit === "equivalency" || editUnit === "amount") && parsed < 0) {
+        setEditError("Scholarship cannot be negative.");
+        return;
+      }
+
       amountPayload = parsed;
     }
 
@@ -272,14 +285,25 @@ export default function SeasonRosterClient({
           <div className="space-y-2">
             {roster.map((entry) => {
               const isEditing = editingId === entry.id;
-              const displayScholarship =
-                entry.scholarshipAmount != null
-                  ? `${entry.scholarshipAmount}${
-                      (entry.scholarshipUnit || "percent") === "percent"
-                        ? "%"
-                        : ""
-                    }`
-                  : "None";
+
+              let displayScholarship: string;
+              if (entry.scholarshipAmount == null) {
+                displayScholarship = "None";
+              } else {
+                const unit = (entry.scholarshipUnit ??
+                  "percent") as ScholarshipUnit;
+                if (unit === "percent") {
+                  displayScholarship = `${entry.scholarshipAmount}%`;
+                } else if (unit === "equivalency") {
+                  displayScholarship = entry.scholarshipAmount.toString();
+                } else {
+                  // amount
+                  displayScholarship = `$${entry.scholarshipAmount.toLocaleString(
+                    undefined,
+                    { maximumFractionDigits: 0 }
+                  )}`;
+                }
+              }
 
               return (
                 <div
@@ -304,10 +328,16 @@ export default function SeasonRosterClient({
                         <span className="font-medium text-slate-100">
                           {displayScholarship}
                         </span>
-                        {entry.scholarshipUnit === "amount" &&
-                          " (amount)"}
-                        {entry.scholarshipUnit === "percent" &&
-                          " (percent)"}
+                        {entry.scholarshipAmount != null && (
+                          <>
+                            {entry.scholarshipUnit === "amount" &&
+                              " (amount)"}
+                            {entry.scholarshipUnit === "percent" &&
+                              " (percent)"}
+                            {entry.scholarshipUnit === "equivalency" &&
+                              " (equiv)"}
+                          </>
+                        )}
                       </p>
                       {entry.scholarshipNotes && (
                         <p className="mt-0.5 text-[10px] text-slate-500">
@@ -331,6 +361,8 @@ export default function SeasonRosterClient({
                                 placeholder={
                                   editUnit === "percent"
                                     ? "e.g., 75"
+                                    : editUnit === "equivalency"
+                                    ? "e.g., 0.75"
                                     : "e.g., 8500"
                                 }
                                 className="w-24 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 outline-none focus:border-sky-500"
@@ -339,12 +371,13 @@ export default function SeasonRosterClient({
                                 value={editUnit}
                                 onChange={(e) =>
                                   setEditUnit(
-                                    e.target.value as "percent" | "amount"
+                                    e.target.value as ScholarshipUnit
                                   )
                                 }
-                                className="w-24 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 outline-none focus:border-sky-500"
+                                className="w-28 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 outline-none focus:border-sky-500"
                               >
-                                <option value="percent">% equiv</option>
+                                <option value="percent">% percent</option>
+                                <option value="equivalency">Eq equiv</option>
                                 <option value="amount">$ amount</option>
                               </select>
                             </div>

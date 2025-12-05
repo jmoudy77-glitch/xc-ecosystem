@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import SeasonRosterClient from "./SeasonRosterClient";
+import SeasonBudgetControls from "./SeasonBudgetControls";
 
 type PageProps = {
   params: Promise<{
@@ -15,6 +16,8 @@ type PageProps = {
 };
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
+const BUDGET_VIEWERS = ["head_coach", "director", "admin"] as const;
+const BUDGET_EDITORS = ["head_coach"] as const;
 
 type ScholarshipSummary = {
   hasBudget: boolean;
@@ -24,6 +27,7 @@ type ScholarshipSummary = {
   budgetAmount: number | null;
   usedAmount: number | null;
   remainingAmount: number | null;
+  hasAnyScholarships?: boolean;
 };
 
 function computeScholarshipSummary(opts: {
@@ -32,12 +36,17 @@ function computeScholarshipSummary(opts: {
 }): ScholarshipSummary {
   const budgetEquivRaw =
     (opts.season?.scholarship_budget_equivalents as number | null) ?? null;
+
   const budgetAmountRaw =
     (opts.season?.scholarship_budget_amount as number | null) ?? null;
 
   const budgetEquiv = budgetEquivRaw !== null ? Number(budgetEquivRaw) : null;
   const budgetAmount =
     budgetAmountRaw !== null ? Number(budgetAmountRaw) : null;
+
+  const hasAnyScholarships = (opts.rosterRows ?? []).some(
+    (row) => row.scholarship_amount != null
+  );
 
   let usedEquiv: number | null = null;
   let usedAmount: number | null = null;
@@ -53,44 +62,35 @@ function computeScholarshipSummary(opts: {
       const amt = Number(raw);
       const unit = (row.scholarship_unit as string | null) ?? "percent";
 
-      // Equivalency usage
+      // If budget is in equivalencies, treat % as fraction of 1.0 FTE
       if (budgetEquiv !== null) {
         if (unit === "percent") {
           equivSum += amt / 100;
-        } else if (unit === "amount" && budgetAmount && budgetAmount > 0) {
-          const perEquiv = budgetAmount / budgetEquiv; // $ per equivalency
-          if (perEquiv > 0) {
-            equivSum += amt / perEquiv;
-          }
+        } else if (unit === "equivalency") {
+          equivSum += amt;
         }
       }
 
-      // Dollar usage
+      // If budget is in dollars, just sum the amounts
       if (budgetAmount !== null) {
         if (unit === "amount") {
           amountSum += amt;
-        } else if (unit === "percent") {
-          amountSum += (budgetAmount * amt) / 100;
         }
       }
     }
 
-    if (budgetEquiv !== null) {
-      usedEquiv = Number(equivSum.toFixed(2));
-    }
-    if (budgetAmount !== null) {
-      usedAmount = Number(amountSum.toFixed(0));
-    }
+    usedEquiv = budgetEquiv !== null ? Number(equivSum.toFixed(2)) : null;
+    usedAmount = budgetAmount !== null ? Math.round(amountSum) : null;
   }
 
   const remainingEquiv =
     budgetEquiv !== null && usedEquiv !== null
-      ? Number(Math.max(budgetEquiv - usedEquiv, 0).toFixed(2))
+      ? Number((budgetEquiv - usedEquiv).toFixed(2))
       : null;
 
   const remainingAmount =
     budgetAmount !== null && usedAmount !== null
-      ? Number(Math.max(budgetAmount - usedAmount, 0).toFixed(0))
+      ? Math.max(budgetAmount - usedAmount, 0)
       : null;
 
   return {
@@ -101,6 +101,7 @@ function computeScholarshipSummary(opts: {
     budgetAmount,
     usedAmount,
     remainingAmount,
+    hasAnyScholarships,
   };
 }
 
@@ -177,9 +178,18 @@ export default async function SeasonRosterPage({ params }: PageProps) {
   const programName = (programRecord?.name as string) ?? "Program";
 
   const actingRole: string | null = (membership.role as string) ?? null;
+
   const isManager =
     actingRole !== null &&
     MANAGER_ROLES.includes(actingRole.toLowerCase() as any);
+
+  const canViewBudget =
+    actingRole !== null &&
+    BUDGET_VIEWERS.includes(actingRole.toLowerCase() as any);
+
+  const canEditBudget =
+    actingRole !== null &&
+    BUDGET_EDITORS.includes(actingRole.toLowerCase() as any);
 
   // 4) Load team
   const { data: teamRow, error: teamError } = await supabaseAdmin
@@ -277,35 +287,34 @@ export default async function SeasonRosterPage({ params }: PageProps) {
     const fullName =
       [firstName, lastName].filter(Boolean).join(" ") || "Athlete";
 
-        return {
-            id: row.id as string,
-            teamSeasonId: row.team_season_id as string,
-            athleteId: (row.athlete_id as string | null) ?? null,
-            programRecruitId:
-                (row.program_recruit_id as string | null) ?? null,
-            status: (row.status as string | null) ?? null,
-            role: (row.role as string | null) ?? null,
+    return {
+      id: row.id as string,
+      teamSeasonId: row.team_season_id as string,
+      athleteId: (row.athlete_id as string | null) ?? null,
+      programRecruitId: (row.program_recruit_id as string | null) ?? null,
+      status: (row.status as string | null) ?? null,
+      role: (row.role as string | null) ?? null,
 
-            // Fields expected by SeasonRosterClient
-            name: fullName,
-            email: null,
-            avatarUrl: null,
+      // Fields expected by SeasonRosterClient
+      name: fullName,
+      email: null,
+      avatarUrl: null,
 
-            // Extra metadata
-            athleteName: fullName,
-            gradYear:
-                (athleteRecord?.grad_year as number | null | undefined) ?? null,
-            scholarshipAmount:
-                (row.scholarship_amount as number | null) ?? null,
-            scholarshipUnit:
-                (row.scholarship_unit as string | null) ?? "percent",
-            scholarshipNotes:
-                (row.scholarship_notes as string | null) ?? null,
-            createdAt: row.created_at as string | null,
-        };
+      // Extra metadata
+      athleteName: fullName,
+      gradYear:
+        (athleteRecord?.grad_year as number | null | undefined) ?? null,
+      scholarshipAmount:
+        (row.scholarship_amount as number | null) ?? null,
+      scholarshipUnit:
+        (row.scholarship_unit as string | null) ?? "percent",
+      scholarshipNotes:
+        (row.scholarship_notes as string | null) ?? null,
+      createdAt: row.created_at as string | null,
+    };
   });
 
-  // 8) Scholarship summary
+  // 8) Scholarship summary (season-only budget)
   const scholarshipSummary = computeScholarshipSummary({
     season: seasonRow,
     rosterRows,
@@ -371,113 +380,196 @@ export default async function SeasonRosterPage({ params }: PageProps) {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6">
-        {scholarshipSummary.hasBudget && (
+        {(scholarshipSummary.hasBudget || canViewBudget) && (
           <section className="mb-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                   Scholarship summary
                 </p>
-
-                {scholarshipSummary.budgetEquiv !== null && (
-                  <p className="mt-1 text-xs text-slate-200">
-                    Equivalency budget:{" "}
-                    <span className="font-semibold">
-                      {scholarshipSummary.budgetEquiv.toFixed(2)} eq
-                    </span>
-                    {scholarshipSummary.usedEquiv !== null && (
+                {!scholarshipSummary.hasBudget ? (
+                  <p className="mt-1 text-xs text-slate-400">
+                    No season scholarship budget has been set yet.
+                    {canEditBudget && (
                       <>
                         {" "}
-                        • Committed{" "}
+                        As head coach, you&apos;ll manage the{" "}
                         <span className="font-semibold">
-                          {scholarshipSummary.usedEquiv.toFixed(2)} eq
-                        </span>
-                        {scholarshipSummary.remainingEquiv !== null && (
-                          <>
-                            {" "}
-                            • Remaining{" "}
-                            <span className="font-semibold">
-                              {scholarshipSummary.remainingEquiv.toFixed(2)} eq
-                            </span>
-                          </>
-                        )}
+                          season scholarship budget
+                        </span>{" "}
+                        from this page.
                       </>
                     )}
                   </p>
-                )}
+                ) : (
+                  <>
+                    {scholarshipSummary.budgetEquiv !== null && (
+                      <p className="mt-1 text-xs text-slate-200">
+                        Equivalency budget:{" "}
+                        <span className="font-semibold">
+                          {scholarshipSummary.budgetEquiv.toFixed(2)} eq
+                        </span>
+                        {scholarshipSummary.usedEquiv !== null && (
+                          <>
+                            {" "}
+                            • Committed{" "}
+                            <span className="font-semibold">
+                              {scholarshipSummary.usedEquiv.toFixed(2)} eq
+                            </span>
+                            {scholarshipSummary.remainingEquiv !== null && (
+                              <>
+                                {" "}
+                                • Remaining{" "}
+                                <span className="font-semibold">
+                                  {scholarshipSummary.remainingEquiv.toFixed(
+                                    2
+                                  )}{" "}
+                                  eq
+                                </span>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </p>
+                    )}
 
-                {scholarshipSummary.budgetAmount !== null && (
-                  <p className="mt-1 text-[11px] text-slate-200">
-                    Budget:{" "}
-                    <span className="font-semibold">
-                      $
-                      {scholarshipSummary.budgetAmount.toLocaleString(
-                        undefined,
-                        { maximumFractionDigits: 0 }
-                      )}
-                    </span>
-                    {scholarshipSummary.usedAmount !== null && (
-                      <>
-                        {" "}
-                        • Committed{" "}
+                    {scholarshipSummary.budgetAmount !== null && (
+                      <p className="mt-1 text-[11px] text-slate-200">
+                        Budget:{" "}
                         <span className="font-semibold">
                           $
-                          {scholarshipSummary.usedAmount.toLocaleString(
+                          {scholarshipSummary.budgetAmount.toLocaleString(
                             undefined,
                             { maximumFractionDigits: 0 }
                           )}
                         </span>
-                        {scholarshipSummary.remainingAmount !== null && (
+                        {scholarshipSummary.usedAmount !== null && (
                           <>
                             {" "}
-                            • Remaining{" "}
+                            • Committed{" "}
                             <span className="font-semibold">
                               $
-                              {scholarshipSummary.remainingAmount.toLocaleString(
+                              {scholarshipSummary.usedAmount.toLocaleString(
                                 undefined,
                                 { maximumFractionDigits: 0 }
                               )}
                             </span>
+                            {scholarshipSummary.remainingAmount !== null && (
+                              <>
+                                {" "}
+                                • Remaining{" "}
+                                <span className="font-semibold">
+                                  $
+                                  {scholarshipSummary.remainingAmount.toLocaleString(
+                                    undefined,
+                                    { maximumFractionDigits: 0 }
+                                  )}
+                                </span>
+                              </>
+                            )}
                           </>
                         )}
-                      </>
+                      </p>
                     )}
-                  </p>
+                  </>
                 )}
+
+                {scholarshipSummary.hasAnyScholarships &&
+                  !scholarshipSummary.hasBudget && (
+                    <p className="mt-1 text-[11px] text-amber-300/80">
+                      Scholarships are being assigned to athletes, but no
+                      overall season budget has been defined yet.
+                    </p>
+                  )}
               </div>
 
-              {scholarshipSummary.budgetEquiv !== null &&
-                scholarshipSummary.usedEquiv !== null && (
-                  <div className="w-full max-w-xs">
-                    <div className="mb-1 flex items-center justify-between text-[10px] text-slate-400">
-                      <span>Equivalencies used</span>
-                      <span>
-                        {scholarshipSummary.usedEquiv.toFixed(2)} /{" "}
-                        {scholarshipSummary.budgetEquiv.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className={`h-full rounded-full ${
-                          scholarshipSummary.usedEquiv >
-                          (scholarshipSummary.budgetEquiv ?? 0)
-                            ? "bg-rose-500"
-                            : "bg-emerald-500"
-                        }`}
-                        style={{
-                          width: `${
-                            Math.min(
-                              (scholarshipSummary.usedEquiv /
-                                (scholarshipSummary.budgetEquiv || 1)) *
-                                100,
-                              120
-                            ) || 0
-                          }%`,
-                        }}
+              {scholarshipSummary.hasBudget && (
+  <div className="w-full max-w-xs space-y-3">
+    {scholarshipSummary.budgetEquiv !== null &&
+      scholarshipSummary.usedEquiv !== null && (
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Equivalencies used</span>
+            <span>
+              {scholarshipSummary.usedEquiv.toFixed(2)} /{" "}
+              {scholarshipSummary.budgetEquiv.toFixed(2)}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+            <div
+              className={`h-full rounded-full ${
+                scholarshipSummary.usedEquiv >
+                (scholarshipSummary.budgetEquiv ?? 0)
+                  ? "bg-rose-500"
+                  : "bg-emerald-500"
+              }`}
+              style={{
+                width: `${
+                  Math.min(
+                    (scholarshipSummary.usedEquiv /
+                      (scholarshipSummary.budgetEquiv || 1)) *
+                      100,
+                    120
+                  ) || 0
+                }%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {scholarshipSummary.budgetAmount !== null &&
+        scholarshipSummary.usedAmount !== null && (
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[10px] text-slate-400">
+              <span>Budget used ({(seasonRow.scholarship_currency as string | null) ?? "USD"})</span>
+              <span>
+                $
+                {scholarshipSummary.usedAmount.toLocaleString(undefined, {
+                  maximumFractionDigits: 0,
+                })}{" "}
+                / $
+                {scholarshipSummary.budgetAmount.toLocaleString(undefined, {
+                  maximumFractionDigits: 0,
+                })}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className={`h-full rounded-full ${
+                  scholarshipSummary.usedAmount >
+                  (scholarshipSummary.budgetAmount ?? 0)
+                    ? "bg-rose-500"
+                    : "bg-emerald-500"
+                }`}
+                style={{
+                  width: `${
+                    Math.min(
+                      (scholarshipSummary.usedAmount /
+                        (scholarshipSummary.budgetAmount || 1)) *
+                        100,
+                      120
+                    ) || 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+    </div>
+  )}
+                  {canEditBudget && (
+                    <div className="ml-auto">
+                      <SeasonBudgetControls
+                        programId={programId}
+                        teamId={teamId}
+                        seasonId={seasonId}
+                        initialEquiv={scholarshipSummary.budgetEquiv}
+                        initialAmount={scholarshipSummary.budgetAmount}
+                        currency={(seasonRow.scholarship_currency as string | null) ?? "USD"}
                       />
                     </div>
-                  </div>
-                )}
+                  )}
             </div>
           </section>
         )}

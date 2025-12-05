@@ -7,10 +7,11 @@ const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 type RouteParams = {
   params: Promise<{
     programId: string;
+    teamId: string;
   }>;
 };
 
-async function assertProgramMember(
+async function assertProgramManager(
   req: NextRequest,
   programId: string
 ): Promise<
@@ -25,7 +26,7 @@ async function assertProgramMember(
   } = await supabase.auth.getUser();
 
   if (authError) {
-    console.warn("[ProgramRecruits] auth.getUser error:", authError.message);
+    console.warn("[RosterCandidates] auth.getUser error:", authError.message);
   }
 
   if (!authUser) {
@@ -34,15 +35,14 @@ async function assertProgramMember(
 
   const authId = authUser.id;
 
-  // Map auth -> users row
   const { data: userRow, error: userError } = await supabaseAdmin
     .from("users")
-    .select("id, auth_id, email")
+    .select("id, auth_id")
     .eq("auth_id", authId)
     .maybeSingle();
 
   if (userError) {
-    console.error("[ProgramRecruits] users select error:", userError);
+    console.error("[RosterCandidates] users select error:", userError);
     return { ok: false, status: 500, error: "Failed to load viewer record" };
   }
 
@@ -56,7 +56,6 @@ async function assertProgramMember(
 
   const viewerUserId = userRow.id as string;
 
-  // Ensure membership in this program
   const { data: membershipRow, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select("id, role")
@@ -65,7 +64,7 @@ async function assertProgramMember(
     .maybeSingle();
 
   if (membershipError) {
-    console.error("[ProgramRecruits] membership error:", membershipError);
+    console.error("[RosterCandidates] membership error:", membershipError);
     return {
       ok: false,
       status: 500,
@@ -82,15 +81,26 @@ async function assertProgramMember(
   }
 
   const role = (membershipRow.role as string | null) ?? null;
+  const isManager =
+    !!role &&
+    MANAGER_ROLES.includes(role.toLowerCase() as (typeof MANAGER_ROLES)[number]);
+
+  if (!isManager) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Only head coaches / admins can view roster candidates",
+    };
+  }
 
   return { ok: true, viewerUserId, role };
 }
 
-// GET /api/programs/[programId]/recruits
+// GET: distinct athletes who have ever been on this team's roster
 export async function GET(req: NextRequest, ctx: RouteParams) {
-  const { programId } = await ctx.params;
+  const { programId, teamId } = await ctx.params;
 
-  const authCheck = await assertProgramMember(req, programId);
+  const authCheck = await assertProgramManager(req, programId);
   if (!authCheck.ok) {
     return NextResponse.json(
       { error: authCheck.error },
@@ -98,65 +108,59 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
     );
   }
 
-  // Pull recruits for this program with their athlete + profile info
   const { data: rows, error } = await supabaseAdmin
-    .from("program_recruits")
+    .from("team_roster")
     .select(
       `
-      id,
-      program_id,
-      status,
-      recruiting_profile:recruiting_profiles!inner (
+      athlete_id,
+      athletes!inner (
         id,
-        profile_type,
-        athlete:athletes!inner (
-          id,
-          first_name,
-          last_name,
-          grad_year
-        )
+        first_name,
+        last_name,
+        grad_year
+      ),
+      team_seasons!inner (
+        id,
+        team_id
       )
     `
     )
-    .eq("program_id", programId)
-    // You can add status filters here later if needed
-    .order("created_at", { ascending: false });
+    .eq("team_seasons.team_id", teamId);
 
   if (error) {
-    console.error("[ProgramRecruits] select error:", error);
+    console.error("[RosterCandidates] select error:", error);
     return NextResponse.json(
-      { error: "Failed to load recruits" },
+      { error: "Failed to load roster candidates" },
       { status: 500 }
     );
   }
 
-  const recruits =
-    (rows ?? []).map((row: any) => {
-      const rpRel = (row as any).recruiting_profile;
-      const rpRecord = Array.isArray(rpRel) ? rpRel[0] : rpRel;
+  const map = new Map<
+    string,
+    { athlete_id: string; full_name: string; grad_year: number | null }
+  >();
 
-      const athleteRel = rpRecord?.athlete;
-      const athleteRecord = Array.isArray(athleteRel)
-        ? athleteRel[0]
-        : athleteRel;
+  for (const row of rows ?? []) {
+    const athleteRel = (row as any).athletes;
+    const athleteRecord = Array.isArray(athleteRel) ? athleteRel[0] : athleteRel;
 
-      const first =
-        (athleteRecord?.first_name as string | null | undefined) ?? "";
-      const last =
-        (athleteRecord?.last_name as string | null | undefined) ?? "";
-      const fullName = `${first} ${last}`.trim() || "Athlete";
+    if (!athleteRecord?.id) continue;
 
-      return {
-        program_recruit_id: row.id as string,
-        athlete_id: (athleteRecord?.id as string | undefined) ?? null,
-        full_name: fullName,
-        grad_year:
-          (athleteRecord?.grad_year as number | null | undefined) ?? null,
-        status: (row.status as string | null) ?? null,
-        profile_type:
-          (rpRecord?.profile_type as string | null | undefined) ?? null,
-      };
-    }) ?? [];
+    const athleteId = athleteRecord.id as string;
+    const first =
+      (athleteRecord.first_name as string | null | undefined) ?? "";
+    const last =
+      (athleteRecord.last_name as string | null | undefined) ?? "";
+    const fullName = `${first} ${last}`.trim() || "Athlete";
+    const gradYear =
+      (athleteRecord.grad_year as number | null | undefined) ?? null;
 
-  return NextResponse.json({ recruits }, { status: 200 });
+    if (!map.has(athleteId)) {
+      map.set(athleteId, { athlete_id: athleteId, full_name: fullName, grad_year: gradYear });
+    }
+  }
+
+  const athletes = Array.from(map.values());
+
+  return NextResponse.json({ athletes }, { status: 200 });
 }

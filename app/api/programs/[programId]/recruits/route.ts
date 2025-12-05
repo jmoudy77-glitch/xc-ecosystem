@@ -155,6 +155,7 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
         status: (row.status as string | null) ?? null,
         profile_type:
           (rpRecord?.profile_type as string | null | undefined) ?? null,
+        gender: null,
       };
     }) ?? [];
 

@@ -4,11 +4,16 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: { programId: string; teamId: string; seasonId: string } }
-) {
-  const { programId, teamId, seasonId } = context.params;
+type RouteParams = {
+  params: Promise<{
+    programId: string;
+    teamId: string;
+    seasonId: string;
+  }>;
+};
+
+export async function PATCH(req: NextRequest, { params }: RouteParams) {
+  const { programId, teamId, seasonId } = await params;
 
   try {
     // 1) Auth via Supabase (same helper pattern as server components)

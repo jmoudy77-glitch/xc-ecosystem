@@ -4,8 +4,6 @@ import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 import SeasonRosterClient from "./SeasonRosterClient";
-import SeasonBudgetControls from "./SeasonBudgetControls";
-import ScholarshipWhatIf from "./ScholarshipWhatIf";
 
 type PageProps = {
   params: Promise<{
@@ -196,7 +194,23 @@ export default async function SeasonRosterPage({ params }: PageProps) {
     .eq("program_id", programId)
     .maybeSingle();
 
-  if (!seasonRow) redirect(`/programs/${programId}/teams/${teamId}`);
+  if (seasonErr) {
+    console.error("[SeasonRoster] season error:", seasonErr, {
+      seasonId,
+      teamId,
+      programId,
+    });
+    throw new Error("Failed to load season");
+  }
+
+  if (!seasonRow) {
+    console.error("[SeasonRoster] no season found for", {
+      seasonId,
+      teamId,
+      programId,
+    });
+    throw new Error("Season not found");
+  }
 
   const seasonLabel =
     seasonRow.season_label ??
@@ -234,6 +248,7 @@ export default async function SeasonRosterPage({ params }: PageProps) {
         program_recruit_id,
         status,
         role,
+        event_group,
         scholarship_amount,
         scholarship_unit,
         scholarship_notes,
@@ -243,6 +258,31 @@ export default async function SeasonRosterPage({ params }: PageProps) {
     )
     .eq("team_season_id", seasonId)
     .order("created_at", { ascending: true });
+
+  // Load specific events per roster row
+  let eventsByRosterId: Record<
+    string,
+    { team_roster_id: string; event_code: string; is_primary: boolean }[]
+  > = {};
+
+  const rosterIds = (rosterRows ?? []).map((r: any) => r.id as string);
+
+  if (rosterIds.length > 0) {
+    const { data: eventRows, error: eventErr } = await supabaseAdmin
+      .from("team_roster_events")
+      .select("team_roster_id, event_code, is_primary")
+      .in("team_roster_id", rosterIds);
+
+    if (eventErr) {
+      console.error("[SeasonRoster] events load error:", eventErr);
+    } else {
+      for (const ev of eventRows ?? []) {
+        const key = ev.team_roster_id as string;
+        if (!eventsByRosterId[key]) eventsByRosterId[key] = [];
+        eventsByRosterId[key].push(ev as any);
+      }
+    }
+  }
 
   //
   // MAP ROSTER FOR CLIENT
@@ -255,6 +295,8 @@ export default async function SeasonRosterPage({ params }: PageProps) {
     const fullName =
       [a?.first_name, a?.last_name].filter(Boolean).join(" ") ||
       "Athlete";
+
+    const rowEvents = eventsByRosterId[row.id as string] ?? [];
 
     return {
       id: row.id,
@@ -273,7 +315,11 @@ export default async function SeasonRosterPage({ params }: PageProps) {
       scholarshipUnit: row.scholarship_unit,
       scholarshipNotes: row.scholarship_notes,
       createdAt: row.created_at,
-      eventGroup: (row.role as string | null) ?? null
+      eventGroup: (row.event_group as string | null) ?? null,
+      events: rowEvents.map((ev) => ({
+        eventCode: ev.event_code as string,
+        isPrimary: !!ev.is_primary,
+      })),
     };
   });
 
@@ -343,7 +389,7 @@ export default async function SeasonRosterPage({ params }: PageProps) {
     <div className="min-h-screen bg-slate-950 text-slate-50">
       {/* HEADER */}
       <header className="border-b border-slate-800 bg-slate-950">
-        <div className="mx-auto max-w-6xl px-4 py-4">
+        <div className="mx-auto max-w-[90vw] px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-[11px] text-slate-500">
@@ -417,153 +463,28 @@ export default async function SeasonRosterPage({ params }: PageProps) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        {/* GOVERNING BODY LOCK DATE */}
-        {seasonRow.roster_lock_date && (
-          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-[12px]">
-            <p className="text-slate-300">
-              <span className="font-semibold text-slate-100">
-                Governing body lock date:
-              </span>{" "}
-              {new Date(seasonRow.roster_lock_date).toLocaleDateString()}
-            </p>
-
-            {externalLock && (
-              <p className="mt-1 text-rose-400">
-                This season is permanently locked by association rules.
+      <main className="px-4 py-6">
+        <div className="mx-auto w-[98%] space-y-6">
+          {/* GOVERNING BODY LOCK DATE */}
+          {seasonRow.roster_lock_date && (
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-[12px]">
+              <p className="text-slate-300">
+                <span className="font-semibold text-slate-100">
+                  Governing body lock date:
+                </span>{" "}
+                {new Date(seasonRow.roster_lock_date).toLocaleDateString()}
               </p>
-            )}
-          </div>
-        )}
 
-        {/* MAIN GRID LAYOUT */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* LEFT COLUMN: SUMMARY + CONTROLS + ROSTER */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* SCHOLARSHIP SUMMARY CARD */}
-            {scholarshipSummary.hasBudget && (
-              <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  Scholarship Summary
+              {externalLock && (
+                <p className="mt-1 text-rose-400">
+                  This season is permanently locked by association rules.
                 </p>
-
-                {/* EQUIVALENCY SUMMARY */}
-                {scholarshipSummary.budgetEquiv !== null && (
-                  <p className="mt-1 text-sm text-slate-100">
-                    Equivalency Budget:{" "}
-                    <span className="font-bold">
-                      {scholarshipSummary.budgetEquiv.toFixed(2)} eq
-                    </span>
-                    {"  "}
-                    • Committed:{" "}
-                    <span
-                      className={
-                        (scholarshipSummary.usedEquiv ?? 0) >
-                        (scholarshipSummary.budgetEquiv ?? 0)
-                          ? "text-rose-300 font-semibold"
-                          : "text-emerald-300 font-semibold"
-                      }
-                    >
-                      {(scholarshipSummary.usedEquiv ?? 0).toFixed(2)} eq
-                    </span>
-                    {"  "}
-                    • Remaining:{" "}
-                    <span className="font-semibold text-slate-200">
-                      {scholarshipSummary.remainingEquiv?.toFixed(2)}
-                    </span>
-                  </p>
-                )}
-
-                {/* AMOUNT SUMMARY */}
-                {scholarshipSummary.budgetAmount !== null && (
-                  <p className="mt-1 text-sm text-slate-100">
-                    Dollar Budget:{" "}
-                    <span className="font-bold">
-                      {formatCurrency(scholarshipSummary.budgetAmount)}
-                    </span>
-                    {"  "}
-                    • Committed:{" "}
-                    <span
-                      className={
-                        (scholarshipSummary.usedAmount ?? 0) >
-                        (scholarshipSummary.budgetAmount ?? 0)
-                          ? "text-rose-300 font-semibold"
-                          : "text-emerald-300 font-semibold"
-                      }
-                    >
-                      {formatCurrency(scholarshipSummary.usedAmount ?? 0)}
-                    </span>
-                    {"  "}
-                    • Remaining:{" "}
-                    <span className="font-semibold">
-                      {formatCurrency(scholarshipSummary.remainingAmount)}
-                    </span>
-                  </p>
-                )}
-
-                {/* What-if Calculator */}
-                <div className="mt-4">
-                  <ScholarshipWhatIf
-                    budgetEquiv={scholarshipSummary.budgetEquiv}
-                    budgetAmount={scholarshipSummary.budgetAmount}
-                    usedEquiv={scholarshipSummary.usedEquiv}
-                    usedAmount={scholarshipSummary.usedAmount}
-                    currency={seasonRow.scholarship_currency}
-                  />
-                </div>
-              </section>
-            )}
-
-            {/* BUDGET CONTROLS & LOCKING */}
-            <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Season Budget Controls
-              </p>
-
-              {/* LOCK MESSAGING */}
-              {externalLock ? (
-                <div className="mb-3 rounded-md border border-rose-500/40 bg-rose-900/40 p-2 text-[12px] text-rose-200">
-                  <p className="font-semibold">
-                    This season is locked by the governing body.
-                  </p>
-                  <p className="text-[11px]">
-                    No scholarship or budget changes may be made after{" "}
-                    <span className="font-semibold">
-                      {new Date(seasonRow.roster_lock_date).toLocaleDateString()}
-                    </span>
-                    .
-                  </p>
-                </div>
-              ) : internalLock ? (
-                <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-900/30 p-2 text-[12px] text-amber-200">
-                  <p className="font-semibold">
-                    This season is locked by the head coach.
-                  </p>
-                  <p className="text-[11px]">
-                    Unlock the season to make further changes.
-                  </p>
-                </div>
-              ) : (
-                <div className="mb-3 rounded-md border border-emerald-500/40 bg-emerald-900/30 p-2 text-[12px] text-emerald-200">
-                  <p className="font-semibold">Season is open for editing.</p>
-                  <p className="text-[11px]">
-                    You may adjust scholarships and season budgets.
-                  </p>
-                </div>
               )}
+            </div>
+          )}
 
-              {/* BUDGET CONTROLS COMPONENT */}
-              <SeasonBudgetControls
-                programId={programId}
-                teamId={teamId}
-                seasonId={seasonId}
-                initialEquiv={seasonRow.scholarship_budget_equivalents}
-                initialAmount={seasonRow.scholarship_budget_amount}
-                currency={seasonRow.scholarship_currency ?? "USD"}
-                initialIsLocked={internalLock}
-              />
-            </section>
-
+          {/* MAIN COLUMN LAYOUT */}
+          <div className="space-y-6">
             {/* ROSTER SECTION */}
             <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -579,113 +500,14 @@ export default async function SeasonRosterPage({ params }: PageProps) {
                 teamGender={teamRow.gender ?? null}
                 initialGroupQuotas={initialGroupQuotas}
                 roster={roster}
+                scholarshipSummary={scholarshipSummary}
+                budgetHistory={historySummary}
+                initialBudgetEquiv={seasonRow.scholarship_budget_equivalents ?? null}
+                initialBudgetAmount={seasonRow.scholarship_budget_amount ?? null}
+                budgetCurrency={seasonRow.scholarship_currency ?? "USD"}
+                initialSeasonLocked={internalLock}
               />
             </section>
-          </div>
-
-          {/* RIGHT COLUMN: HISTORY, ANALYTICS, ETC. */}
-          <div className="space-y-6">
-            {/* BUDGET HISTORY SUMMARY (TOP 5) */}
-            {historySummary.length > 0 && (
-              <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                    Recent Scholarship Budget Changes
-                  </p>
-
-                  <div className="flex items-center gap-3">
-                    <Link
-                      href={`/programs/${programId}/teams/${teamId}/seasons/${seasonId}/scholarship-history`}
-                      className="text-[11px] text-sky-300 hover:underline"
-                    >
-                      View Full History
-                    </Link>
-
-                    <Link
-                      href={`/api/programs/${programId}/teams/${teamId}/seasons/${seasonId}/scholarship-history/export`}
-                      className="rounded-md border border-sky-600 bg-sky-900/40 px-2 py-1 text-[10px] text-sky-200 hover:bg-sky-800/60"
-                    >
-                      Export CSV
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-2">
-                  {historySummary.map((h) => {
-                    const eqDiff =
-                      h.newEquiv !== null && h.oldEquiv !== null
-                        ? Number(h.newEquiv - h.oldEquiv)
-                        : null;
-
-                    const amtDiff =
-                      h.newAmount !== null && h.oldAmount !== null
-                        ? Number(h.newAmount - h.oldAmount)
-                        : null;
-
-                    return (
-                      <div
-                        key={h.id}
-                        className="rounded-md border border-slate-800 bg-slate-950/50 p-2 text-[12px]"
-                      >
-                        <p className="text-slate-300">
-                          <span className="font-semibold text-slate-100">
-                            {new Date(h.timestamp).toLocaleString()}
-                          </span>{" "}
-                          — {h.coach}
-                        </p>
-
-                        <div className="mt-1 grid grid-cols-2 gap-2 text-[11px]">
-                          <div>
-                            <span className="text-slate-400">Equiv: </span>
-                            {h.oldEquiv} → {h.newEquiv}{" "}
-                            {eqDiff !== null && (
-                              <span
-                                className={
-                                  eqDiff > 0
-                                    ? "text-emerald-300"
-                                    : eqDiff < 0
-                                    ? "text-rose-300"
-                                    : "text-slate-400"
-                                }
-                              >
-                                ({eqDiff > 0 ? "+" : ""}
-                                {eqDiff})
-                              </span>
-                            )}
-                          </div>
-
-                          <div>
-                            <span className="text-slate-400">Amount: </span>
-                            {formatCurrency(h.oldAmount)} →{" "}
-                            {formatCurrency(h.newAmount)}{" "}
-                            {amtDiff !== null && (
-                              <span
-                                className={
-                                  amtDiff > 0
-                                    ? "text-emerald-300"
-                                    : amtDiff < 0
-                                    ? "text-rose-300"
-                                    : "text-slate-400"
-                                }
-                              >
-                                ({amtDiff > 0 ? "+" : ""}
-                                {formatCurrency(amtDiff)})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {h.notes && (
-                          <p className="mt-1 text-[10px] text-slate-500 italic">
-                            Notes: {h.notes}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
           </div>
         </div>
       </main>

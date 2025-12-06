@@ -35,7 +35,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-slate-950 text-slate-50 antialiased">
         {/* Global top nav */}
         <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <div className="mx-auto flex max-w-[6xl] items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-950 flex items-center justify-center text-xs font-semibold">
                 XC
@@ -58,7 +58,7 @@ export default function RootLayout({
         </header>
 
         {/* Page content */}
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+        <main className="mx-auto max-w-[95vw] px-4 py-6">{children}</main>
       </body>
     </html>
   );

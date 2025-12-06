@@ -523,7 +523,7 @@ export default function SeasonRosterClient({
       <div className={isToolPanelOpen ? "w-full md:flex-1" : "w-full"}>
         {/* Header + lock status */}
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <p className="text-xs font-semibold uppercase text-[24px] tracking-wide text-slate-400">
             Season roster
           </p>
           {isLocked && (
@@ -533,61 +533,61 @@ export default function SeasonRosterClient({
           )}
         </div>
 
-          {/* Tools bar */}
-            <div className="mb-1 mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
-              <span className="text-slate-500">Tools:</span>
+        {/* Tools bar */}
+        <div className="mb-1 mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
+          <span className="text-slate-500">Tools:</span>
 
-              {/* Recruits tool toggle */}
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTool((current) =>
-                    current === "recruits" ? "none" : "recruits"
-                  )
-                }
-                className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
-                  activeTool === "recruits"
-                    ? "border-sky-400/60 bg-sky-900/60 text-sky-100"
-                    : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-sky-500/60 hover:text-sky-100"
-                }`}
-              >
-                Recruits
-              </button>
+          {/* Recruits tool toggle */}
+          <button
+            type="button"
+            onClick={() =>
+              setActiveTool((current) =>
+                current === "recruits" ? "none" : "recruits"
+              )
+            }
+            className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
+              activeTool === "recruits"
+                ? "border-sky-400/60 bg-sky-900/60 text-sky-100"
+                : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-sky-500/60 hover:text-sky-100"
+            }`}
+          >
+            Recruits
+          </button>
 
-              {/* Scholarship budget tool toggle */}
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTool((current) =>
-                    current === "budget" ? "none" : "budget"
-                  )
-                }
-                className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
-                  activeTool === "budget"
-                    ? "border-amber-400/60 bg-amber-900/60 text-amber-100"
-                    : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-amber-400/60 hover:text-amber-100"
-                }`}
-              >
-                Scholarship budget
-              </button>
+          {/* Scholarship budget tool toggle */}
+          <button
+            type="button"
+            onClick={() =>
+              setActiveTool((current) =>
+                current === "budget" ? "none" : "budget"
+              )
+            }
+            className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
+              activeTool === "budget"
+                ? "border-amber-400/60 bg-amber-900/60 text-amber-100"
+                : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-amber-400/60 hover:text-amber-100"
+            }`}
+          >
+            Scholarship budget
+          </button>
 
-              {/* Scholarship audit tool toggle */}
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTool((current) =>
-                    current === "audit" ? "none" : "audit"
-                  )
-                }
-                className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
-                  activeTool === "audit"
-                    ? "border-emerald-400/60 bg-emerald-900/60 text-emerald-100"
-                    : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-emerald-400/60 hover:text-emerald-100"
-                }`}
-              >
-                Scholarship audit
-              </button>
-            </div>
+          {/* Scholarship audit tool toggle */}
+          <button
+            type="button"
+            onClick={() =>
+              setActiveTool((current) =>
+                current === "audit" ? "none" : "audit"
+              )
+            }
+            className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
+              activeTool === "audit"
+                ? "border-emerald-400/60 bg-emerald-900/60 text-emerald-100"
+                : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-emerald-400/60 hover:text-emerald-100"
+            }`}
+          >
+            Scholarship audit
+          </button>
+        </div>
 
         {/* Roster groups */}
         {groupedRoster.length === 0 ? (
@@ -690,7 +690,7 @@ export default function SeasonRosterClient({
                             {/* Top row: photo + bio/events */}
                             <div className="flex gap-3">
                               <div
-                                className="relative overflow-hidden rounded-md bg-slate-800 text-xs font-semibold text-slate-100 cursor-pointer basis-[30%]"
+                                className="relative overflow-hidden rounded-md bg-slate-800 text-xs font-semibold text-slate-100 cursor-pointer basis-[35%]"
                                 style={{
                                   aspectRatio: "2 / 3.75", // same as the card: width / height (~1.875:1 height/width)
                                 }}

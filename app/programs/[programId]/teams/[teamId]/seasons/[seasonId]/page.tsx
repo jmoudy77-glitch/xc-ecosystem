@@ -253,7 +253,7 @@ export default async function SeasonRosterPage({ params }: PageProps) {
         scholarship_unit,
         scholarship_notes,
         created_at,
-        athletes ( first_name, last_name, grad_year )
+        athletes ( first_name, last_name, grad_year, avatar_url )
       `
     )
     .eq("team_season_id", seasonId)
@@ -308,7 +308,7 @@ export default async function SeasonRosterPage({ params }: PageProps) {
 
       name: fullName,
       email: null,
-      avatarUrl: null,
+      avatarUrl: (a?.avatar_url as string | null) ?? null,
 
       gradYear: a?.grad_year ?? null,
       scholarshipAmount: row.scholarship_amount,
@@ -487,9 +487,9 @@ export default async function SeasonRosterPage({ params }: PageProps) {
           <div className="space-y-6">
             {/* ROSTER SECTION */}
             <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              {/*<p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                 Season Roster
-              </p>
+              </p>*/}
 
               <SeasonRosterClient
                 programId={programId}

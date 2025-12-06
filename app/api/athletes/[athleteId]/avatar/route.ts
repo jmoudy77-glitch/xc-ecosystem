@@ -2,17 +2,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-// Ensure we run in Node.js runtime (not Edge), since we're using supabaseAdmin
+// Ensure Node.js runtime since we use supabaseAdmin + Buffer
 export const runtime = "nodejs";
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     athleteId: string;
-  };
+  }>;
 };
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
-  const { athleteId } = params;
+  const { athleteId } = await params;
 
   if (!athleteId) {
     return NextResponse.json(
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const ext = file.type.split("/")[1] || "jpg";
     const filePath = `athletes/${athleteId}.${ext}`;
 
-    // Convert File -> Buffer for Node environment
+    // File -> Buffer for Node environment
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 

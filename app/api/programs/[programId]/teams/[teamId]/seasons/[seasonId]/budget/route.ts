@@ -135,7 +135,8 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       id,
       scholarship_budget_equivalents,
       scholarship_budget_amount,
-      scholarship_currency
+      scholarship_currency,
+      is_locked
     `
     )
     .eq("id", seasonId)
@@ -149,6 +150,14 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
   if (!currentSeason) {
     return NextResponse.json({ error: "Season not found" }, { status: 404 });
+  }
+
+  const isLocked = (currentSeason.is_locked as boolean | null) ?? false;
+  if (isLocked) {
+    return NextResponse.json(
+      { error: "Season is locked. Scholarship budget cannot be edited." },
+      { status: 403 }
+    );
   }
 
   const oldEquiv =

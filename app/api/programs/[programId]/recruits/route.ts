@@ -106,6 +106,7 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
       id,
       program_id,
       status,
+      athletes!program_recruits_athlete_id_fkey ( gender ),
       recruiting_profile:recruiting_profiles!inner (
         id,
         profile_type,
@@ -146,6 +147,11 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
         (athleteRecord?.last_name as string | null | undefined) ?? "";
       const fullName = `${first} ${last}`.trim() || "Athlete";
 
+      const genderRel = (row as any).athletes;
+      const genderRecord = Array.isArray(genderRel) ? genderRel[0] : genderRel;
+      const gender =
+        (genderRecord?.gender as string | null | undefined) ?? null;
+
       return {
         program_recruit_id: row.id as string,
         athlete_id: (athleteRecord?.id as string | undefined) ?? null,
@@ -155,7 +161,7 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
         status: (row.status as string | null) ?? null,
         profile_type:
           (rpRecord?.profile_type as string | null | undefined) ?? null,
-        gender: null,
+        gender,
       };
     }) ?? [];
 

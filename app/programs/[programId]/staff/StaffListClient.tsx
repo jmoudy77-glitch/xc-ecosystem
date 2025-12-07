@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Avatar } from "@/components/Avatar";
 
 type StaffListItem = {
   userId: string;
@@ -189,14 +190,6 @@ export default function StaffListClient({ programId, isManager, staff }: Props) 
         )}
 
         {staff.map((member) => {
-          const initials =
-            (member.fullName || member.email || "?")
-              .split(" ")
-              .map((p) => p[0])
-              .join("")
-              .slice(0, 2)
-              .toUpperCase();
-
           const label =
             member.fullName ||
             member.email?.split("@")[0] ||
@@ -216,18 +209,11 @@ export default function StaffListClient({ programId, isManager, staff }: Props) 
                 className="flex flex-1 items-center justify-between text-left hover:text-slate-50"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-slate-800 text-xs font-semibold text-slate-100">
-                    {member.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                        src={member.avatarUrl}
-                        alt={member.fullName || member.email || "Staff avatar"}
-                        className="h-full w-full object-cover"
-                        />
-                    ) : (
-                        <span>{initials}</span>
-                    )}
-                    </div>
+                  <Avatar
+                    src={member.avatarUrl || undefined}
+                    name={member.fullName || member.email || "Staff member"}
+                    size="sm"
+                  />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-slate-100">
                       {member.fullName || member.email || "Staff member"}

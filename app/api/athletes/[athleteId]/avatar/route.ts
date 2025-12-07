@@ -141,7 +141,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    return NextResponse.json({ ok: true, url: publicUrl });
+    return NextResponse.json({
+      ok: true,
+      url: publicUrl,
+      avatarUrl: publicUrl,
+    });
   } catch (err) {
     console.error("[AvatarUpload] unexpected error", err);
     return NextResponse.json(

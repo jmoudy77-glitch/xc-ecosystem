@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Avatar } from "@/components/Avatar";
 
 type ScenarioEntry = {
   id: string;
@@ -351,40 +352,48 @@ export default function ScenarioRosterClient({
                   key={entry.id}
                   className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 md:flex-row md:items-center md:justify-between"
                 >
-                  <div>
-                    <p className="text-sm font-medium text-slate-100">
-                      {entry.name}
-                      {entry.gradYear && (
-                        <span className="ml-2 text-[10px] text-slate-400">
-                          • {entry.gradYear}
+                  <div className="flex items-start gap-3">
+                    <Avatar
+                      src={undefined}
+                      name={entry.name}
+                      size="md"
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-slate-100">
+                        {entry.name}
+                        {entry.gradYear && (
+                          <span className="ml-2 text-[10px] text-slate-400">
+                            • {entry.gradYear}
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-0.5 flex flex-wrap gap-2 text-[10px] text-slate-400">
+                        {entry.status && (
+                          <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
+                            {entry.status}
+                          </span>
+                        )}
+                        {entry.role && (
+                          <span className="rounded-full border border-emerald-400/40 bg-emerald-900/40 px-2 py-0.5 text-emerald-100">
+                            {entry.role}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Scholarship (scenario):{" "}
+                        <span className="font-medium text-slate-100">
+                          {displayScholarship}
                         </span>
-                      )}
-                    </p>
-                    <div className="mt-0.5 flex flex-wrap gap-2 text-[10px] text-slate-400">
-                      {entry.status && (
-                        <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
-                          {entry.status}
-                        </span>
-                      )}
-                      {entry.role && (
-                        <span className="rounded-full border border-emerald-400/40 bg-emerald-900/40 px-2 py-0.5 text-emerald-100">
-                          {entry.role}
-                        </span>
+                        {entry.scholarshipUnit === "amount" && " (amount)"}
+                        {entry.scholarshipUnit === "percent" && " (percent)"}
+                      </p>
+                      {entry.scholarshipNotes && (
+                        <p className="mt-0.5 text-[10px] text-slate-500">
+                          {entry.scholarshipNotes}
+                        </p>
                       )}
                     </div>
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Scholarship (scenario):{" "}
-                      <span className="font-medium text-slate-100">
-                        {displayScholarship}
-                      </span>
-                      {entry.scholarshipUnit === "amount" && " (amount)"}
-                      {entry.scholarshipUnit === "percent" && " (percent)"}
-                    </p>
-                    {entry.scholarshipNotes && (
-                      <p className="mt-0.5 text-[10px] text-slate-500">
-                        {entry.scholarshipNotes}
-                      </p>
-                    )}
                   </div>
 
                   <div className="md:w-64">

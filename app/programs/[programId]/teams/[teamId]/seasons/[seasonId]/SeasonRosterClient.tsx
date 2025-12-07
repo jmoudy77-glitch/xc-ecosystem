@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import SeasonBudgetControls from "./SeasonBudgetControls";
 import ScholarshipWhatIf from "./ScholarshipWhatIf";
+import { Avatar } from "@/components/Avatar";
 
 type ScholarshipUnit = "percent" | "equivalency" | "amount";
 
@@ -82,7 +83,7 @@ type Props = {
 
 type AuditSortKey = "name" | "equiv" | "amount";
 
-type ActiveTool = "none" | "recruits" | "audit" | "budget";
+type ActiveTool = "none" | "recruits" | "budget";
 
 type ScholarshipAuditRow = {
   id: string;
@@ -100,6 +101,26 @@ function formatCurrency(value: number | null | undefined): string {
   return `$${Number(value).toLocaleString(undefined, {
     maximumFractionDigits: 0,
   })}`;
+}
+
+// Gender normalization helper
+function normalizeGender(value: string | null | undefined): "men" | "women" | null {
+  if (!value) return null;
+  const v = value.toLowerCase().trim();
+
+  // Handle common variants
+  if (["m", "male", "man", "mens", "men", "boys", "boy"].some((g) => v.startsWith(g))) {
+    return "men";
+  }
+  if (
+    ["f", "female", "woman", "womens", "women", "girls", "girl"].some((g) =>
+      v.startsWith(g)
+    )
+  ) {
+    return "women";
+  }
+
+  return null;
 }
 
 export default function SeasonRosterClient({
@@ -124,6 +145,7 @@ export default function SeasonRosterClient({
   const [recruits, setRecruits] = useState<RecruitEntry[]>([]);
   const [loadingRecruits, setLoadingRecruits] = useState(false);
   const [recruitsError, setRecruitsError] = useState<string | null>(null);
+  const [recruitGenderFilter, setRecruitGenderFilter] = useState<"program" | "all">("program");
 
 
   // Event group UI state
@@ -143,50 +165,49 @@ export default function SeasonRosterClient({
   const [avatarUploadingId, setAvatarUploadingId] = useState<string | null>(null);
 
   async function handleAvatarUpload(entry: RosterEntry, file: File) {
-  if (!entry.athleteId) return;
+    if (!entry.athleteId) return;
 
-  try {
-    setAvatarUploadingId(entry.id);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("athleteId", entry.athleteId);
-
-    const res = await fetch(`/api/athletes/${entry.athleteId}/avatar`, {
-      method: "POST",
-      body: formData,
-    });
-
-    let body: any = null;
     try {
-      body = await res.json();
-    } catch {
-      // ignore JSON parse errors
-    }
+      setAvatarUploadingId(entry.id);
 
-    if (!res.ok) {
-      console.error(
-        "[SeasonRosterClient] Avatar upload failed",
-        res.status,
-        body
-      );
-      if (body?.error) {
-        alert(`Avatar upload failed: ${body.error}`);
-      } else {
-        alert(`Avatar upload failed (status ${res.status})`);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/athletes/${entry.athleteId}/avatar`, {
+        method: "POST",
+        body: formData,
+      });
+
+      let body: any = null;
+      try {
+        body = await res.json();
+      } catch {
+        // ignore JSON parse errors
       }
-      return;
-    }
 
-    // Success: refresh to pull new avatarUrl
-    router.refresh();
-  } catch (err) {
-    console.error("[SeasonRosterClient] Error uploading avatar", err);
-    alert("Unexpected error uploading avatar – check console for details.");
-  } finally {
-    setAvatarUploadingId(null);
+      if (!res.ok) {
+        console.error(
+          "[SeasonRosterClient] Avatar upload failed",
+          res.status,
+          body
+        );
+        if (body?.error) {
+          alert(`Avatar upload failed: ${body.error}`);
+        } else {
+          alert(`Avatar upload failed (status ${res.status})`);
+        }
+        return;
+      }
+
+      // Success: refresh to pull new avatarUrl
+      router.refresh();
+    } catch (err) {
+      console.error("[SeasonRosterClient] Error uploading avatar", err);
+      alert("Unexpected error uploading avatar – check console for details.");
+    } finally {
+      setAvatarUploadingId(null);
+    }
   }
-}
 
   // Audit pane state (sorting)
   const [auditSortKey, setAuditSortKey] = useState<AuditSortKey>("equiv");
@@ -195,6 +216,11 @@ export default function SeasonRosterClient({
   const [activeTool, setActiveTool] = useState<ActiveTool>("none");
 
   const isToolPanelOpen = activeTool !== "none";
+
+  // Collapsible scholarship sections in the tools panel
+  const [showBudgetControls, setShowBudgetControls] = useState(true);
+  const [showWhatIf, setShowWhatIf] = useState(true);
+  const [showScholarshipAudit, setShowScholarshipAudit] = useState(false);
 
 
   // Keep local roster in sync if server sends a new one
@@ -271,11 +297,12 @@ export default function SeasonRosterClient({
                   !alreadyOnRosterByRecruitId.has(r.programRecruitId)
               );
 
-            const teamGenderNorm = teamGender?.toLowerCase();
+            const teamGenderNorm = normalizeGender(teamGender);
             const genderFiltered = teamGenderNorm
               ? mapped.filter((rec) => {
-                  if (!rec.gender) return true; // keep unknown gender
-                  return rec.gender.toLowerCase() === teamGenderNorm;
+                  const recGenderNorm = normalizeGender(rec.gender);
+                  if (!recGenderNorm) return true; // keep unknown gender
+                  return recGenderNorm === teamGenderNorm;
                 })
               : mapped;
 
@@ -521,72 +548,60 @@ export default function SeasonRosterClient({
     <div className="flex flex-col gap-4 md:flex-row">
       {/* Main content: tools bar + roster + audit */}
       <div className={isToolPanelOpen ? "w-full md:flex-1" : "w-full"}>
-        {/* Header + lock status */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase text-[24px] tracking-wide text-slate-400">
-            Season roster
-          </p>
-          {isLocked && (
-            <span className="rounded-full border border-rose-500/40 bg-rose-900/40 px-2 py-0.5 text-[10px] text-rose-100">
-              Roster locked — scholarships read-only
+        {/* Header + lock status removed, now handled below */}
+
+        {/* Header + Tools */}
+        <div className="mb-3 flex flex-col md:flex-row md:items-center md:justify-between">
+          {/* Left side: Title + Lock */}
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold uppercase tracking-wide text-slate-300">
+              Season Roster
+            </h1>
+            {isLocked && (
+              <span className="rounded-full border border-rose-500/40 bg-rose-900/40 px-2 py-0.5 text-[10px] text-rose-100">
+                Locked
+              </span>
+            )}
+          </div>
+
+          {/* Right side: tools */}
+          <div className="mt-2 flex flex-wrap items-center gap-2 md:mt-0">
+            <span className="text-[10px] uppercase tracking-wide text-slate-500">
+              Tools:
             </span>
-          )}
-        </div>
 
-        {/* Tools bar */}
-        <div className="mb-1 mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
-          <span className="text-slate-500">Tools:</span>
+            <button
+              type="button"
+              onClick={() =>
+                setActiveTool((current) =>
+                  current === "recruits" ? "none" : "recruits"
+                )
+              }
+              className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
+                activeTool === "recruits"
+                  ? "border-sky-400/60 bg-sky-900/60 text-sky-100"
+                  : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-sky-400/60 hover:text-sky-100"
+              }`}
+            >
+              Recruits
+            </button>
 
-          {/* Recruits tool toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              setActiveTool((current) =>
-                current === "recruits" ? "none" : "recruits"
-              )
-            }
-            className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
-              activeTool === "recruits"
-                ? "border-sky-400/60 bg-sky-900/60 text-sky-100"
-                : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-sky-500/60 hover:text-sky-100"
-            }`}
-          >
-            Recruits
-          </button>
-
-          {/* Scholarship budget tool toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              setActiveTool((current) =>
-                current === "budget" ? "none" : "budget"
-              )
-            }
-            className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
-              activeTool === "budget"
-                ? "border-amber-400/60 bg-amber-900/60 text-amber-100"
-                : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-amber-400/60 hover:text-amber-100"
-            }`}
-          >
-            Scholarship budget
-          </button>
-
-          {/* Scholarship audit tool toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              setActiveTool((current) =>
-                current === "audit" ? "none" : "audit"
-              )
-            }
-            className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
-              activeTool === "audit"
-                ? "border-emerald-400/60 bg-emerald-900/60 text-emerald-100"
-                : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-emerald-400/60 hover:text-emerald-100"
-            }`}
-          >
-            Scholarship audit
-          </button>
+            <button
+              type="button"
+              onClick={() =>
+                setActiveTool((current) =>
+                  current === "budget" ? "none" : "budget"
+                )
+              }
+              className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
+                activeTool === "budget"
+                  ? "border-amber-400/60 bg-amber-900/60 text-amber-100"
+                  : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-amber-400/60 hover:text-amber-100"
+              }`}
+            >
+              Scholarship tools
+            </button>
+          </div>
         </div>
 
         {/* Roster groups */}
@@ -701,17 +716,14 @@ export default function SeasonRosterClient({
                                   if (input) input.click();
                                 }}
                               >
-                                {entry.avatarUrl ? (
-                                  <img
-                                    src={entry.avatarUrl}
-                                    alt={entry.name}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center">
-                                    {entry.name.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
+                                <Avatar
+                                  src={entry.avatarUrl || undefined}
+                                  name={entry.name}
+                                  size="lg"
+                                  variant="square"
+                                  bordered={false}
+                                  className="h-full w-full"
+                                />
 
                                 <input
                                   type="file"
@@ -915,6 +927,37 @@ export default function SeasonRosterClient({
                 place them on this season&apos;s roster.
               </p>
 
+              {/* Gender filter (only shown if team has a gender) */}
+              {teamGender && (
+                <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Filter:</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRecruitGenderFilter("program")}
+                      className={`rounded-full px-2 py-0.5 ${
+                        recruitGenderFilter === "program"
+                          ? "bg-sky-700 text-sky-100"
+                          : "bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      {teamGender} only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecruitGenderFilter("all")}
+                      className={`rounded-full px-2 py-0.5 ${
+                        recruitGenderFilter === "all"
+                          ? "bg-sky-700 text-sky-100"
+                          : "bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      All
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {recruitsError && (
                 <p className="mt-2 text-[11px] text-rose-400">{recruitsError}</p>
               )}
@@ -929,56 +972,65 @@ export default function SeasonRosterClient({
                 </p>
               ) : (
                 <div className="mt-3 space-y-2">
-                  {recruits.map((rec) => (
-                    <div
-                      key={rec.programRecruitId}
-                      className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2"
-                      draggable={isManager && !isLocked}
-                      onDragStart={(e) => {
-                        if (!isManager || isLocked) return;
-                        try {
-                          e.dataTransfer.setData(
-                            "text/plain",
-                            `recruit:${rec.programRecruitId}`
-                          );
-                          e.dataTransfer.effectAllowed = "copyMove";
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-slate-100">
-                          {rec.fullName}
-                          {rec.gradYear && (
-                            <span className="ml-2 text-[10px] text-slate-400">
-                              • {rec.gradYear}
-                            </span>
-                          )}
-                        </p>
-                        <div className="mt-0.5 flex flex-wrap gap-1 text-[10px] text-slate-400">
-                          {rec.status && (
-                            <span className="rounded-full border border-emerald-400/40 bg-emerald-900/40 px-2 py-0.5 text-emerald-100">
-                              {rec.status}
-                            </span>
-                          )}
-                          {rec.profileType && (
-                            <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
-                              {rec.profileType}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={!isManager || isLocked}
-                        onClick={() => handleAddFromRecruit(rec)}
-                        className="rounded-md border border-sky-500 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-slate-950 hover:bg-sky-500 disabled:opacity-60"
+                  {recruits
+                    .filter((rec) => {
+                      if (recruitGenderFilter === "all") return true;
+                      const teamGenderNorm = normalizeGender(teamGender);
+                      if (!teamGenderNorm) return true;
+                      const recGenderNorm = normalizeGender(rec.gender);
+                      if (!recGenderNorm) return true;
+                      return recGenderNorm === teamGenderNorm;
+                    })
+                    .map((rec) => (
+                      <div
+                        key={rec.programRecruitId}
+                        className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2"
+                        draggable={isManager && !isLocked}
+                        onDragStart={(e) => {
+                          if (!isManager || isLocked) return;
+                          try {
+                            e.dataTransfer.setData(
+                              "text/plain",
+                              `recruit:${rec.programRecruitId}`
+                            );
+                            e.dataTransfer.effectAllowed = "copyMove";
+                          } catch {
+                            // ignore
+                          }
+                        }}
                       >
-                        Add to roster
-                      </button>
-                    </div>
-                  ))}
+                        <div>
+                          <p className="text-sm font-medium text-slate-100">
+                            {rec.fullName}
+                            {rec.gradYear && (
+                              <span className="ml-2 text-[10px] text-slate-400">
+                                • {rec.gradYear}
+                              </span>
+                            )}
+                          </p>
+                          <div className="mt-0.5 flex flex-wrap gap-1 text-[10px] text-slate-400">
+                            {rec.status && (
+                              <span className="rounded-full border border-emerald-400/40 bg-emerald-900/40 px-2 py-0.5 text-emerald-100">
+                                {rec.status}
+                              </span>
+                            )}
+                            {rec.profileType && (
+                              <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
+                                {rec.profileType}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!isManager || isLocked}
+                          onClick={() => handleAddFromRecruit(rec)}
+                          className="rounded-md border border-sky-500 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-slate-950 hover:bg-sky-500 disabled:opacity-60"
+                        >
+                          Add to roster
+                        </button>
+                      </div>
+                    ))}
                 </div>
               )}
             </>
@@ -986,43 +1038,44 @@ export default function SeasonRosterClient({
 
           {activeTool === "budget" && (
             <>
+              {/* Budget summary (always visible) */}
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Scholarship budget
               </p>
 
               {/* Equivalency usage bar */}
-                  {scholarshipSummary.budgetEquiv !== null &&
-                    scholarshipSummary.usedEquiv !== null && (
-                      <div className="mt-3">
-                        <div className="mb-1 flex items-center justify-between text-[12px] text-slate-400">
-                          <span>Equivalencies used</span>
-                          <span>
-                            {scholarshipSummary.usedEquiv.toFixed(2)} /{" "}
-                            {scholarshipSummary.budgetEquiv.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                          <div
-                            className={`h-full rounded-full ${
-                              scholarshipSummary.usedEquiv >
-                              (scholarshipSummary.budgetEquiv ?? 0)
-                                ? "bg-rose-500"
-                                : "bg-emerald-500"
-                            }`}
-                            style={{
-                              width: `${
-                                Math.min(
-                                  (scholarshipSummary.usedEquiv /
-                                    (scholarshipSummary.budgetEquiv || 1)) *
-                                    100,
-                                  120
-                                ) || 0
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
+              {scholarshipSummary.budgetEquiv !== null &&
+                scholarshipSummary.usedEquiv !== null && (
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-center justify-between text-[12px] text-slate-400">
+                      <span>Equivalencies used</span>
+                      <span>
+                        {scholarshipSummary.usedEquiv.toFixed(2)} /{" "}
+                        {scholarshipSummary.budgetEquiv.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className={`h-full rounded-full ${
+                          scholarshipSummary.usedEquiv >
+                          (scholarshipSummary.budgetEquiv ?? 0)
+                            ? "bg-rose-500"
+                            : "bg-emerald-500"
+                        }`}
+                        style={{
+                          width: `${
+                            Math.min(
+                              (scholarshipSummary.usedEquiv /
+                                (scholarshipSummary.budgetEquiv || 1)) *
+                                100,
+                              120
+                            ) || 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
 
               {!scholarshipSummary.hasBudget ? (
                 <p className="mt-1 text-[11px] text-slate-500">
@@ -1117,33 +1170,216 @@ export default function SeasonRosterClient({
                 </div>
               )}
 
-              {/* Budget controls */}
-              <div className="mt-3">
-                <SeasonBudgetControls
-                  programId={programId}
-                  teamId={teamId}
-                  seasonId={seasonId}
-                  initialEquiv={initialBudgetEquiv}
-                  initialAmount={initialBudgetAmount}
-                  currency={budgetCurrency}
-                  initialIsLocked={initialSeasonLocked}
-                />
+              {/* Budget controls (collapsible) */}
+              <div className="mt-4 border-t border-slate-800 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBudgetControls((prev) => !prev)}
+                  className="flex w-full items-center justify-between text-[11px] text-slate-300 hover:text-slate-100"
+                >
+                  <span className="font-semibold">Budget controls</span>
+                  <span className="text-[14px] text-slate-500">
+                    {showBudgetControls ? "▾" : "▸"}
+                  </span>
+                </button>
+                {showBudgetControls && (
+                  <div className="mt-2">
+                    <SeasonBudgetControls
+                      programId={programId}
+                      teamId={teamId}
+                      seasonId={seasonId}
+                      initialEquiv={initialBudgetEquiv}
+                      initialAmount={initialBudgetAmount}
+                      currency={budgetCurrency}
+                      initialIsLocked={initialSeasonLocked}
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* What-if calculator */}
-              <div className="mt-4">
-                <ScholarshipWhatIf
-                  budgetEquiv={scholarshipSummary.budgetEquiv}
-                  budgetAmount={scholarshipSummary.budgetAmount}
-                  usedEquiv={scholarshipSummary.usedEquiv}
-                  usedAmount={scholarshipSummary.usedAmount}
-                  currency={budgetCurrency}
-                />
+              {/* What-if calculator (collapsible) */}
+              <div className="mt-4 border-t border-slate-800 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowWhatIf((prev) => !prev)}
+                  className="flex w-full items-center justify-between text-[11px] text-slate-300 hover:text-slate-100"
+                >
+                  <span className="font-semibold">What-if calculator</span>
+                  <span className="text-[14px] text-slate-500">
+                    {showWhatIf ? "▾" : "▸"}
+                  </span>
+                </button>
+                {showWhatIf && (
+                  <div className="mt-2">
+                    <ScholarshipWhatIf
+                      budgetEquiv={scholarshipSummary.budgetEquiv}
+                      budgetAmount={scholarshipSummary.budgetAmount}
+                      usedEquiv={scholarshipSummary.usedEquiv}
+                      usedAmount={scholarshipSummary.usedAmount}
+                      currency={budgetCurrency}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Scholarship audit (collapsible) */}
+              <div className="mt-4 border-t border-slate-800 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowScholarshipAudit((prev) => !prev)}
+                  className="flex w-full items-center justify-between text-[11px] text-slate-300 hover:text-slate-100"
+                >
+                  <span className="font-semibold">Scholarship audit</span>
+                  <span className="text-[14px] text-slate-500">
+                    {showScholarshipAudit ? "▾" : "▸"}
+                  </span>
+                </button>
+
+                {showScholarshipAudit && (
+                  <div className="mt-2">
+                    {auditRows.length === 0 ? (
+                      <p className="text-[11px] text-slate-500">
+                        No scholarships recorded yet for this roster.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-slate-400">
+                          <div>
+                            <p className="text-[10px] text-slate-500">
+                              Breakdown of individual awards with equivalency and
+                              dollar values.
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <div>
+                              Total equiv:{" "}
+                              <span className="font-semibold text-slate-100">
+                                {totalEquiv.toFixed(2)}
+                              </span>
+                            </div>
+                            <div>
+                              Total amount:{" "}
+                              <span className="font-semibold text-slate-100">
+                                $
+                                {totalDollar.toLocaleString(undefined, {
+                                  maximumFractionDigits: 0,
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mb-2 flex flex-wrap gap-2 text-[10px] text-slate-300">
+                          <span className="text-slate-500">Sort by:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleAuditSort("name")}
+                            className={`rounded px-2 py-0.5 ${
+                              auditSortKey === "name"
+                                ? "bg-slate-800 text-sky-200"
+                                : "bg-slate-900 text-slate-400"
+                            }`}
+                          >
+                            Name
+                            {auditSortKey === "name" &&
+                              (auditSortDir === "asc" ? " ↑" : " ↓")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAuditSort("equiv")}
+                            className={`rounded px-2 py-0.5 ${
+                              auditSortKey === "equiv"
+                                ? "bg-slate-800 text-sky-200"
+                                : "bg-slate-900 text-slate-400"
+                            }`}
+                          >
+                            Equiv
+                            {auditSortKey === "equiv" &&
+                              (auditSortDir === "asc" ? " ↑" : " ↓")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAuditSort("amount")}
+                            className={`rounded px-2 py-0.5 ${
+                              auditSortKey === "amount"
+                                ? "bg-slate-800 text-sky-200"
+                                : "bg-slate-900 text-slate-400"
+                            }`}
+                          >
+                            $
+                            {auditSortKey === "amount" &&
+                              (auditSortDir === "asc" ? " ↑" : " ↓")}
+                          </button>
+                        </div>
+
+                        <div className="mt-1 max-h-80 space-y-2 overflow-y-auto text-[11px]">
+                          {auditRows.map((row) => (
+                            <div
+                              key={row.id}
+                              className="rounded-md border border-slate-800 bg-slate-950/70 p-2"
+                            >
+                              <p className="font-medium text-slate-100">
+                                {row.name}
+                                {row.gradYear && (
+                                  <span className="ml-2 text-[10px] text-slate-400">
+                                    • {row.gradYear}
+                                  </span>
+                                )}
+                              </p>
+                              {row.notes && (
+                                <p className="mt-0.5 text-[10px] text-slate-500">
+                                  {row.notes}
+                                </p>
+                              )}
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-300">
+                                <span
+                                  className={`rounded-full border px-2 py-0.5 ${
+                                    row.unit === "amount"
+                                      ? "border-emerald-400/40 bg-emerald-900/40 text-emerald-100"
+                                      : row.unit === "equivalency"
+                                      ? "border-sky-400/40 bg-sky-900/40 text-sky-100"
+                                      : "border-slate-500/40 bg-slate-900/60 text-slate-100"
+                                  }`}
+                                >
+                                  {row.unit === "percent"
+                                    ? `${row.rawAmount}%`
+                                    : row.unit === "equivalency"
+                                    ? `${row.rawAmount} eq`
+                                    : `$${row.rawAmount?.toLocaleString(
+                                        undefined,
+                                        {
+                                          maximumFractionDigits: 0,
+                                        }
+                                      )}`}
+                                </span>
+
+                                {row.equiv != null && (
+                                  <span className="rounded-full border border-sky-500/30 bg-sky-900/40 px-2 py-0.5 text-sky-100">
+                                    {row.equiv.toFixed(2)} eq
+                                  </span>
+                                )}
+
+                                {row.dollar != null && (
+                                  <span className="rounded-full border border-emerald-500/30 bg-emerald-900/40 px-2 py-0.5 text-emerald-100">
+                                    $
+                                    {row.dollar.toLocaleString(undefined, {
+                                      maximumFractionDigits: 0,
+                                    })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Recent history */}
               {budgetHistory.length > 0 && (
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 border-t border-slate-800 pt-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                       Recent changes
@@ -1239,146 +1475,6 @@ export default function SeasonRosterClient({
             </>
           )}
 
-          {activeTool === "audit" && (
-            <>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Scholarship audit
-              </p>
-              {auditRows.length === 0 ? (
-                <p className="mt-1 text-[11px] text-slate-500">
-                  No scholarships recorded yet for this roster.
-                </p>
-              ) : (
-                <>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-400">
-                    <div>
-                      <p className="text-[10px] text-slate-500">
-                        Breakdown of individual awards with equivalency and
-                        dollar values.
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div>
-                        Total equiv:{" "}
-                        <span className="font-semibold text-slate-100">
-                          {totalEquiv.toFixed(2)}
-                        </span>
-                      </div>
-                      <div>
-                        Total amount:{" "}
-                        <span className="font-semibold text-slate-100">
-                          $
-                          {totalDollar.toLocaleString(undefined, {
-                            maximumFractionDigits: 0,
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 mb-2 flex flex-wrap gap-2 text-[10px] text-slate-300">
-                    <span className="text-slate-500">Sort by:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleAuditSort("name")}
-                      className={`rounded px-2 py-0.5 ${
-                        auditSortKey === "name"
-                          ? "bg-slate-800 text-sky-200"
-                          : "bg-slate-900 text-slate-400"
-                      }`}
-                    >
-                      Name
-                      {auditSortKey === "name" &&
-                        (auditSortDir === "asc" ? " ↑" : " ↓")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAuditSort("equiv")}
-                      className={`rounded px-2 py-0.5 ${
-                        auditSortKey === "equiv"
-                          ? "bg-slate-800 text-sky-200"
-                          : "bg-slate-900 text-slate-400"
-                      }`}
-                    >
-                      Equiv
-                      {auditSortKey === "equiv" &&
-                        (auditSortDir === "asc" ? " ↑" : " ↓")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAuditSort("amount")}
-                      className={`rounded px-2 py-0.5 ${
-                        auditSortKey === "amount"
-                          ? "bg-slate-800 text-sky-200"
-                          : "bg-slate-900 text-slate-400"
-                      }`}
-                    >
-                      $
-                      {auditSortKey === "amount" &&
-                        (auditSortDir === "asc" ? " ↑" : " ↓")}
-                    </button>
-                  </div>
-
-                  <div className="mt-1 max-h-80 space-y-2 overflow-y-auto text-[11px]">
-                    {auditRows.map((row) => (
-                      <div
-                        key={row.id}
-                        className="rounded-md border border-slate-800 bg-slate-950/70 p-2"
-                      >
-                        <p className="font-medium text-slate-100">
-                          {row.name}
-                          {row.gradYear && (
-                            <span className="ml-2 text-[10px] text-slate-400">
-                              • {row.gradYear}
-                            </span>
-                          )}
-                        </p>
-                        {row.notes && (
-                          <p className="mt-0.5 text-[10px] text-slate-500">
-                            {row.notes}
-                          </p>
-                        )}
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-300">
-                          <span
-                            className={`rounded-full border px-2 py-0.5 ${
-                              row.unit === "amount"
-                                ? "border-emerald-400/40 bg-emerald-900/40 text-emerald-100"
-                                : row.unit === "equivalency"
-                                ? "border-sky-400/40 bg-sky-900/40 text-sky-100"
-                                : "border-slate-500/40 bg-slate-900/60 text-slate-100"
-                            }`}
-                          >
-                            {row.unit === "percent"
-                              ? `${row.rawAmount}%`
-                              : row.unit === "equivalency"
-                              ? `${row.rawAmount} eq`
-                              : `$${row.rawAmount?.toLocaleString(undefined, {
-                                  maximumFractionDigits: 0,
-                                })}`}
-                          </span>
-
-                          {row.equiv != null && (
-                            <span className="rounded-full border border-sky-500/30 bg-sky-900/40 px-2 py-0.5 text-sky-100">
-                              {row.equiv.toFixed(2)} eq
-                            </span>
-                          )}
-
-                          {row.dollar != null && (
-                            <span className="rounded-full border border-emerald-500/30 bg-emerald-900/40 px-2 py-0.5 text-emerald-100">
-                              $
-                              {row.dollar.toLocaleString(undefined, {
-                                maximumFractionDigits: 0,
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
-          )}
         </aside>
       )}
        

@@ -7,6 +7,7 @@ import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import StaffAvatarUploader from "../StaffAvatarUploader";
 import StaffRoleEditor from "../StaffRoleEditor";
+import { Avatar } from "@/components/Avatar";
 
 type PageProps = {
   params: Promise<{
@@ -255,20 +256,12 @@ export default async function StaffProfilePage(props: PageProps) {
             {/* Main row: avatar + identity */}
             <div className="relative mt-4 flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-16 w-16 rounded-full bg-slate-900/80 ring-2 ring-slate-100/20 flex items-center justify-center overflow-hidden">
-                  {staffProfile.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={staffProfile.avatarUrl}
-                      alt={displayName}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-lg font-semibold text-slate-200">
-                      {displayName.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
+                <Avatar
+                  src={staffProfile.avatarUrl || undefined}
+                  name={displayName}
+                  size="xl"
+                  className="h-16 w-16 ring-2 ring-slate-100/20"
+                />
                 <div>
                   <p className="text-base font-semibold text-slate-50">
                     {displayName}
@@ -339,20 +332,12 @@ export default async function StaffProfilePage(props: PageProps) {
             </p>
 
             <div className="mt-3 flex items-center gap-3">
-              <div className="h-16 w-16 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                {staffProfile.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={staffProfile.avatarUrl}
-                    alt={displayName}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-lg font-semibold text-slate-300">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
+              <Avatar
+                src={staffProfile.avatarUrl || undefined}
+                name={displayName}
+                size="xl"
+                className="h-16 w-16"
+              />
               <div className="text-[11px] text-slate-400">
                 <p>Update this staff member&apos;s photo.</p>
                 <p className="mt-1">

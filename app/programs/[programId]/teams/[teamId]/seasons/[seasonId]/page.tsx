@@ -69,21 +69,38 @@ function computeScholarshipSummary(opts: {
     usedAmount = budgetAmount !== null ? Math.round(amtSum) : null;
   }
 
+  const rawRemainingEquiv =
+    budgetEquiv !== null && usedEquiv !== null
+      ? Number((budgetEquiv - usedEquiv).toFixed(2))
+      : null;
+
+  const rawRemainingAmount =
+    budgetAmount !== null && usedAmount !== null
+      ? budgetAmount - usedAmount
+      : null;
+
+  const remainingEquiv = rawRemainingEquiv !== null ? rawRemainingEquiv : null;
+  const overEquiv =
+    rawRemainingEquiv !== null && rawRemainingEquiv < 0
+      ? Number(Math.abs(rawRemainingEquiv).toFixed(2))
+      : 0;
+
+  const remainingAmount =
+    rawRemainingAmount !== null ? Math.max(rawRemainingAmount, 0) : null;
+  const overAmount =
+    rawRemainingAmount !== null && rawRemainingAmount < 0
+      ? Math.abs(rawRemainingAmount)
+      : 0;
+
   return {
     budgetEquiv,
     usedEquiv,
-    remainingEquiv:
-      budgetEquiv !== null && usedEquiv !== null
-        ? Number((budgetEquiv - usedEquiv).toFixed(2))
-        : null,
-
+    remainingEquiv,
+    overEquiv,
     budgetAmount,
     usedAmount,
-    remainingAmount:
-      budgetAmount !== null && usedAmount !== null
-        ? Math.max(budgetAmount - usedAmount, 0)
-        : null,
-
+    remainingAmount,
+    overAmount,
     hasBudget: budgetEquiv !== null || budgetAmount !== null
   };
 }

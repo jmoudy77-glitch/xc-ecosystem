@@ -2,16 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-type RouteParams = {
-  params: {
-    programId: string;
-    teamId: string;
-    seasonId: string;
-    rosterEntryId: string;
-  };
-};
-
-export async function PATCH(req: NextRequest, { params }: RouteParams) {
+export async function PATCH(req: NextRequest, context: any) {
+  const params = await context.params;
   const { programId, teamId, seasonId, rosterEntryId } = params;
 
   try {

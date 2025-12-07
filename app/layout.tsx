@@ -53,6 +53,7 @@ export default function RootLayout({
               <NavLink href="/dashboard" label="Dashboard" />
               <NavLink href="/onboarding/coach" label="Coach Onboarding" />
               <NavLink href="/onboarding/athlete" label="Athlete Onboarding" />
+              <NavLink href="/athletes/ffd7f622-aead-416f-8ff6-3cca7dd22b1d" label="Test Athlete" />
             </nav>
           </div>
         </header>

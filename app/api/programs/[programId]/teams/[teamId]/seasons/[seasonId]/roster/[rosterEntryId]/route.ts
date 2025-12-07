@@ -248,3 +248,77 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
   return NextResponse.json({ entry: updated }, { status: 200 });
 }
+
+// DELETE: remove a single roster row
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const { programId, teamId, seasonId, rosterEntryId } = await context.params;
+
+  const authCheck = await assertProgramManager(req, programId);
+  if (!authCheck.ok) {
+    return NextResponse.json(
+      { error: authCheck.error },
+      { status: authCheck.status }
+    );
+  }
+
+  // Ensure the season belongs to this team/program and is not locked
+  const { data: seasonRow, error: seasonError } = await supabaseAdmin
+    .from("team_seasons")
+    .select("id, team_id, program_id, is_locked")
+    .eq("id", seasonId)
+    .maybeSingle();
+
+  if (seasonError) {
+    console.error("[RosterEntry DELETE] team_seasons error:", seasonError);
+    return NextResponse.json(
+      { error: "Failed to load team season" },
+      { status: 500 }
+    );
+  }
+
+  if (!seasonRow) {
+    return NextResponse.json(
+      { error: "Season not found" },
+      { status: 404 }
+    );
+  }
+
+  if (
+    seasonRow.team_id !== teamId ||
+    seasonRow.program_id !== programId
+  ) {
+    return NextResponse.json(
+      { error: "Season does not belong to this team/program" },
+      { status: 403 }
+    );
+  }
+
+  const isLocked = (seasonRow.is_locked as boolean | null) ?? false;
+  if (isLocked) {
+    return NextResponse.json(
+      {
+        error: "Season is locked. The roster cannot be edited.",
+      },
+      { status: 403 }
+    );
+  }
+
+  // Delete the roster row, scoped to this team/season/program
+  const { error: deleteError } = await supabaseAdmin
+    .from("team_roster")
+    .delete()
+    .eq("id", rosterEntryId)
+    .eq("team_season_id", seasonId)
+    .eq("team_id", teamId)
+    .eq("program_id", programId);
+
+  if (deleteError) {
+    console.error("[RosterEntry DELETE] delete error:", deleteError);
+    return NextResponse.json(
+      { error: "Failed to remove athlete from roster" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}

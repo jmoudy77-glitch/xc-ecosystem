@@ -97,7 +97,8 @@ export async function GET(req: NextRequest, { params }: Params) {
           first_name,
           last_name,
           grad_year,
-          event_group
+          event_group,
+          avatar_url
         )
       `
       )
@@ -125,6 +126,7 @@ export async function GET(req: NextRequest, { params }: Params) {
           athlete_last_name: (athlete.last_name as string) ?? "",
           athlete_grad_year: (athlete.grad_year as number | null) ?? null,
           athlete_event_group: (athlete.event_group as string | null) ?? null,
+          athlete_avatar_url: row.athletes?.avatar_url ?? null,
           status: (row.status as string | null) ?? null,
           scholarship_amount: (row.scholarship_amount as number | null) ?? null,
           scholarship_unit: (row.scholarship_unit as string | null) ?? null,

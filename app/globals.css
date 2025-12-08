@@ -19,6 +19,37 @@
   }
 }
 
+@keyframes coach-panel-slide-in {
+  from {
+    transform: translateX(66px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Used for the coach panel in TeamToolsPanel */
+.coach-panel-slide-in {
+  animation: coach-panel-slide-in 0.48s ease-out;
+}
+
+@keyframes coach-panel-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+.coach-panel-slide-out {
+  animation: coach-panel-slide-out 0.38s ease-in forwards;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

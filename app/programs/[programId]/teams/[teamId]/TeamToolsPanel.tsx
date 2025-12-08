@@ -146,6 +146,8 @@ function ActiveRosterTab({
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  const [isPanelClosing, setIsPanelClosing] = useState(false);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -285,8 +287,13 @@ function ActiveRosterTab({
   ) => {
     // Toggle behavior: click same row again to close
     if (row.id === selectedId) {
-      setSelectedId(null);
-      return;
+        setIsPanelClosing(true);
+        // Match the CSS animation duration (0.18s)
+        setTimeout(() => {
+        setSelectedId(null);
+        setIsPanelClosing(false);
+        }, 180);
+        return;
     }
 
     const containerRect = containerRef.current?.getBoundingClientRect();
@@ -316,7 +323,10 @@ function ActiveRosterTab({
       {/* Slide-out coach panel, aligned with selected row and butted to its left */}
       {selectedRow && (
         <div
-          className="absolute right-full mr-3 w-[420px] md:w-[800px] rounded-2xl border border-amber-400/80 bg-slate-950/95 p-3 text-[11px] text-slate-50 shadow-2xl ring-2 ring-amber-400/60 z-30"
+          className={
+            (isPanelClosing ? "coach-panel-slide-out " : "coach-panel-slide-in ") +
+            "absolute right-full mr-3 w-[420px] md:w-[800px] rounded-2xl border border-amber-400/80 bg-slate-950/95 p-3 text-[11px] text-slate-50 shadow-2xl ring-2 ring-amber-400/60 z-30"
+            }
           style={{ top: panelTop }}
         >
           <div className="flex flex-col gap-3">
@@ -562,21 +572,40 @@ function ActiveRosterTab({
                     : "bg-slate-900/80 ring-1 ring-slate-800 hover:bg-slate-900")
                 }
               >
-                <div>
-                  <div className="text-[11px] font-semibold">
-                    {row.athlete_first_name} {row.athlete_last_name}
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    {row.athlete_event_group ?? "Event group not set"}
-                    {row.athlete_grad_year
-                      ? ` · ${row.athlete_grad_year} grad`
-                      : ""}
-                  </div>
-                  {row.status && (
-                    <div className="mt-0.5 text-[10px] text-slate-500">
-                      Status: {row.status}
+                <div className="flex items-start gap-2">
+                    {/* Small circular avatar */}
+                    <div className="mt-0.5 h-10 w-10 overflow-hidden rounded-full bg-slate-800 text-[10px] text-slate-400 flex items-center justify-center">
+                        {row.athlete_avatar_url ? (
+                        <Image
+                            src={row.athlete_avatar_url}
+                            alt={`${row.athlete_first_name} ${row.athlete_last_name}`}
+                            width={28}
+                            height={28}
+                            className="h-full w-full object-cover"
+                        />
+                        ) : (
+                        <span>
+                            {row.athlete_first_name.charAt(0)}
+                            {row.athlete_last_name.charAt(0)}
+                        </span>
+                        )}
                     </div>
-                  )}
+
+                    {/* Name + meta */}
+                    <div>
+                        <div className="text-[11px] font-semibold">
+                        {row.athlete_first_name} {row.athlete_last_name}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                        {row.athlete_event_group ?? "Event group not set"}
+                        {row.athlete_grad_year ? ` · ${row.athlete_grad_year} grad` : ""}
+                        </div>
+                        {row.status && (
+                        <div className="mt-0.5 text-[10px] text-slate-500">
+                            Status: {row.status}
+                        </div>
+                        )}
+                    </div>
                 </div>
                 <div className="ml-2 text-right">
                   {row.scholarship_amount != null ? (

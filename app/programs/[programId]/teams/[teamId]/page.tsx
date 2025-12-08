@@ -4,11 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import TeamSeasonsClient, {
-  type TeamSeasonSummary,
-} from "./TeamSeasonsClient";
-import RosterSandboxClient from "./RosterSandboxClient";
-
+import TeamManagementShell from "./TeamManagementShell";
+import type { TeamSeasonSummary } from "./TeamSeasonsClient";
 
 type PageProps = {
   params: Promise<{
@@ -20,6 +17,7 @@ type PageProps = {
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
 export default async function TeamDetailPage({ params }: PageProps) {
+  // Next 16: params is a Promise, so we await it
   const { programId, teamId } = await params;
 
   const supabase = await supabaseServerComponent();
@@ -131,7 +129,19 @@ export default async function TeamDetailPage({ params }: PageProps) {
     start_date: (row.start_date as string | null) ?? null,
     end_date: (row.end_date as string | null) ?? null,
     is_active: (row.is_active as boolean) ?? true,
-    }));
+  }));
+
+  // Determine the active or next-up season for display
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const activeSeason =
+    seasons.find((s) => s.is_active) ??
+    seasons
+      .filter((s) => !s.start_date || s.start_date <= todayIso)
+      .sort((a, b) => {
+        const ay = a.season_year ?? 0;
+        const by = b.season_year ?? 0;
+        return by - ay;
+      })[0];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
@@ -160,44 +170,31 @@ export default async function TeamDetailPage({ params }: PageProps) {
                 <span>›</span>
                 <span>{teamName}</span>
               </div>
-              {/*(<h1 className="mt-1 text-base font-semibold text-slate-100">
+              <h1 className="mt-1 text-base font-semibold text-slate-100">
                 {teamName}
               </h1>
               <p className="mt-1 text-[11px] text-slate-500">
-                Seasons and rosters for this team.
-              </p>*/}
-              
+                Team management, seasons, and roster planning.
+              </p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <TeamSeasonsClient
-          programId={programId}
-          teamId={teamId}
-          teamName={teamName}
-          isManager={isManager}
-          seasons={seasons}
-        />
-        {/* Roster Sandbox */}
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 mt-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Roster Sandbox
-            </p>
-
-            <p className="mt-1 text-[11px] text-slate-500 max-w-xl">
-                Create future roster projection scenarios for planning scholarships, 
-                athlete retention, transfers, and incoming classes.
-            </p>
-
-            <RosterSandboxClient
-                programId={programId}
-                teamId={teamId}
-                isManager={isManager}
-            />
-            </div>
-      </main>
+      <TeamManagementShell
+        programId={programId}
+        teamId={teamId}
+        programName={programName}
+        teamName={teamName}
+        teamMeta={{
+          sport: teamRow.sport as string,
+          gender: (teamRow.gender as string | null) ?? null,
+          level: (teamRow.level as string | null) ?? null,
+        }}
+        seasons={seasons}
+        isManager={isManager}
+        activeSeason={activeSeason ?? null}
+      />
     </div>
   );
 }

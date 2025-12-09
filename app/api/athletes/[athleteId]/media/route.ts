@@ -4,13 +4,12 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 const BUCKET = "athlete-media";
 
-type RouteParams = {
-  params: { athleteId: string };
-};
-
 // POST: upload highlight or action shot
-export async function POST(req: NextRequest, { params }: RouteParams) {
-  const { athleteId } = params;
+export async function POST(
+  req: NextRequest,
+  context: { params: { athleteId: string } }
+) {
+  const { athleteId } = context.params;
 
   if (!athleteId) {
     return NextResponse.json({ error: "Missing athleteId" }, { status: 400 });
@@ -135,8 +134,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE: remove a specific media item (action shot or highlight)
-export async function DELETE(req: NextRequest, { params }: RouteParams) {
-  const { athleteId } = params;
+export async function DELETE(
+  req: NextRequest,
+  context: { params: { athleteId: string } }
+) {
+  const { athleteId } = context.params;
 
   const { mediaId } = (await req.json().catch(() => ({}))) as {
     mediaId?: string;

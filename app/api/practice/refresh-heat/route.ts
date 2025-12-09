@@ -1,28 +1,27 @@
-// app/api/programs/[programId]/teams/[teamId]/seasons/[seasonId]/refresh-heat/route.ts
+//app/api/practice/refresh-heat/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { refreshWeekHeatForSeason } from "@/lib/heatPolicies";
 
-export async function POST(
-  req: NextRequest,
-  {
-    params,
-  }: {
-    params: { programId: string; teamId: string; seasonId: string };
-  }
-) {
+export async function POST(req: NextRequest) {
   try {
-    const { seasonId } = params;
+    const body = await req.json().catch(() => ({} as any));
 
-    const body = await req.json().catch(() => ({}));
+    const seasonId = body?.seasonId as string | undefined;
     const weekStartIso = body?.weekStartIso as string | undefined;
     const lat = typeof body?.lat === "number" ? body.lat : 32.0;
     const lon = typeof body?.lon === "number" ? body.lon : -90.0;
 
+    if (!seasonId) {
+      return NextResponse.json(
+        { error: "seasonId is required in the request body." },
+        { status: 400 }
+      );
+    }
+
     if (!weekStartIso) {
       return NextResponse.json(
         {
-          error:
-            "weekStartIso is required in the request body (YYYY-MM-DD).",
+          error: "weekStartIso is required in the request body (YYYY-MM-DD).",
         },
         { status: 400 }
       );

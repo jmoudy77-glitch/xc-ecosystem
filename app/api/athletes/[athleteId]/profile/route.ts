@@ -1,19 +1,21 @@
+// app/api/athletes/[athleteId]/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
-export async function PATCH(req: NextRequest, context: any) {
-  const { athleteId } = context.params;
-  const body = await req.json().catch(() => ({} as any));
+// PATCH: update athlete profile fields owned by this athlete's user
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ athleteId: string }> }
+) {
+  const { athleteId } = await context.params;
 
-  const { bio, gpa, test_scores } = body as {
-    bio?: string;
-    gpa?: number | null;
-    test_scores?: any;
-  };
+  if (!athleteId) {
+    return NextResponse.json({ error: "Missing athleteId" }, { status: 400 });
+  }
 
   const { supabase } = supabaseServer(req);
 
-  // Who is calling?
+  // Identify the caller
   const {
     data: { user },
     error: userError,
@@ -23,7 +25,7 @@ export async function PATCH(req: NextRequest, context: any) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  // Load the athlete to verify ownership
+  // Verify athlete belongs to this user
   const { data: athlete, error: athleteError } = await supabase
     .from("athletes")
     .select("id, user_id")
@@ -38,20 +40,37 @@ export async function PATCH(req: NextRequest, context: any) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const updatePayload: any = {};
+  const body = (await req.json().catch(() => ({}))) as {
+    firstName?: string;
+    lastName?: string;
+    bio?: string;
+    gradYear?: number;
+    eventGroup?: string;
+  };
 
-  if (typeof bio === "string") {
-    updatePayload.bio = bio;
+  const updatePayload: Record<string, any> = {};
+
+  if (typeof body.firstName === "string") {
+    updatePayload.first_name = body.firstName;
   }
-  if (gpa === null || typeof gpa === "number") {
-    updatePayload.gpa = gpa;
+  if (typeof body.lastName === "string") {
+    updatePayload.last_name = body.lastName;
   }
-  if (test_scores === null || typeof test_scores === "object") {
-    updatePayload.test_scores = test_scores;
+  if (typeof body.bio === "string") {
+    updatePayload.bio = body.bio;
+  }
+  if (typeof body.gradYear === "number") {
+    updatePayload.grad_year = body.gradYear;
+  }
+  if (typeof body.eventGroup === "string") {
+    updatePayload.event_group = body.eventGroup;
   }
 
   if (Object.keys(updatePayload).length === 0) {
-    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    return NextResponse.json(
+      { error: "No valid fields to update" },
+      { status: 400 }
+    );
   }
 
   const { error: updateError } = await supabase

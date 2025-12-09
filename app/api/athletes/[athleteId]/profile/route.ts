@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
-type RouteParams = {
-  params: { athleteId: string };
-};
-
-export async function PATCH(req: NextRequest, { params }: RouteParams) {
-  const { athleteId } = params;
+export async function PATCH(req: NextRequest, context: any) {
+  const { athleteId } = context.params;
   const body = await req.json().catch(() => ({} as any));
 
   const { bio, gpa, test_scores } = body as {

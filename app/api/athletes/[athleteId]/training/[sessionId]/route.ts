@@ -2,13 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
-type Params = {
-  params: {
-    athleteId: string;
-    sessionId: string;
-  };
-};
-
 async function getAuthAndVerifyAthlete(req: NextRequest, athleteId: string) {
   const { supabase } = supabaseServer(req);
 
@@ -60,8 +53,8 @@ async function getAuthAndVerifyAthlete(req: NextRequest, athleteId: string) {
 }
 
 // PATCH: mark a training session complete (and future: other updates)
-export async function PATCH(req: NextRequest, { params }: Params) {
-  const { athleteId, sessionId } = params;
+export async function PATCH(req: NextRequest, context: any) {
+  const { athleteId, sessionId } = context.params;
 
   const { supabase, errorResponse } = await getAuthAndVerifyAthlete(req, athleteId);
   if (errorResponse) return errorResponse;

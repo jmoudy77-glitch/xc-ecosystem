@@ -3,6 +3,9 @@ import React from "react";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import AddPracticeDialogTrigger from "./AddPracticeDialogTrigger";
 import { getWeeklyWeatherFromTomorrowIo } from "@/lib/weather/tomorrow";
+import { getHeatPolicyForTeamSeason } from "@/lib/heatPolicies";
+import HeatPolicyPopover from "./HeatPolicyPopover";
+import Link from "next/link";
 
 type PracticePageParams = {
   programId: string;
@@ -12,6 +15,7 @@ type PracticePageParams = {
 
 type PracticePageProps = {
   params: Promise<PracticePageParams>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 type PracticePlan = {
@@ -27,8 +31,176 @@ type PracticePlan = {
   status: string;
 };
 
+type ProgramRow = {
+  id: string;
+  school_id: string;
+};
+
+type SchoolLocationRow = {
+  latitude: number | null;
+  longitude: number | null;
+};
+
+type TeamRosterRow = {
+  id: string;
+  athlete_id: string;
+  event_group: string | null;
+};
+
+type AthleteRowForGroup = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  event_group: string | null;
+};
+
+type PracticeGroupUI = {
+  name: string;
+  athletes: { id: string; name: string }[];
+};
+
+async function getProgramLocationCoords(
+  programId: string
+): Promise<{ lat: number | null; lon: number | null }> {
+  const supabase = await supabaseServerComponent();
+
+  // 1) Look up the program to get its school_id
+  const { data: program, error: programError } = await supabase
+    .from("programs")
+    .select("id, school_id")
+    .eq("id", programId)
+    .single<ProgramRow>();
+
+  if (programError || !program) {
+    console.warn(
+      "[PracticePage] Failed to load program for location lookup:",
+      programError || "not found"
+    );
+    return { lat: null, lon: null };
+  }
+
+  // 2) Look up the school's stored latitude/longitude
+  const { data: school, error: schoolError } = await supabase
+    .from("schools")
+    .select("latitude, longitude")
+    .eq("id", program.school_id)
+    .single<SchoolLocationRow>();
+
+  if (schoolError || !school) {
+    console.warn(
+      "[PracticePage] Failed to load school location for program:",
+      schoolError || "not found"
+    );
+    return { lat: null, lon: null };
+  }
+
+  return {
+    lat: school.latitude,
+    lon: school.longitude,
+  };
+}
+
+function formatGroupLabel(key: string): string {
+  if (!key) return "Unassigned";
+  const cleaned = key.replace(/_/g, " ").toLowerCase();
+  return cleaned.replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+async function getRosterGroupsForSeason(
+  teamSeasonId: string
+): Promise<PracticeGroupUI[]> {
+  const supabase = await supabaseServerComponent();
+
+  const { data: roster, error: rosterError } = await supabase
+    .from("team_roster")
+    .select("id, athlete_id, event_group")
+    .eq("team_season_id", teamSeasonId);
+
+  if (rosterError) {
+    console.error(
+      "[PracticePage] team_roster query error for groups:",
+      rosterError.message || rosterError
+    );
+    return [];
+  }
+
+  const rosterRows = (roster ?? []) as TeamRosterRow[];
+
+  const athleteIds = Array.from(
+    new Set(
+      rosterRows
+        .map((row) => row.athlete_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  if (athleteIds.length === 0) {
+    return [];
+  }
+
+  const { data: athletes, error: athletesError } = await supabase
+    .from("athletes")
+    .select("id, first_name, last_name, event_group")
+    .in("id", athleteIds);
+
+  if (athletesError) {
+    console.error(
+      "[PracticePage] athletes query error for groups:",
+      athletesError.message || athletesError
+    );
+    return [];
+  }
+
+  const athleteRows = (athletes ?? []) as AthleteRowForGroup[];
+  const athleteById = new Map<string, AthleteRowForGroup>();
+  for (const a of athleteRows) {
+    athleteById.set(a.id, a);
+  }
+
+  const groupsMap = new Map<string, PracticeGroupUI>();
+
+  for (const row of rosterRows) {
+    const athlete = athleteById.get(row.athlete_id);
+    if (!athlete) continue;
+
+    const rawGroupKey =
+      row.event_group || athlete.event_group || "Unassigned";
+    const groupKey = rawGroupKey || "Unassigned";
+    const label = formatGroupLabel(groupKey);
+
+    if (!groupsMap.has(groupKey)) {
+      groupsMap.set(groupKey, { name: label, athletes: [] });
+    }
+
+    const group = groupsMap.get(groupKey)!;
+    group.athletes.push({
+      id: athlete.id,
+      name: `${athlete.first_name} ${athlete.last_name}`,
+    });
+  }
+
+  // Return groups sorted by name for stable UI.
+  return Array.from(groupsMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+}
+
 function formatISODate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Parse a YYYY-MM-DD string into a local Date (no UTC shift).
+ */
+function parseLocalISODate(isoDate: string): Date {
+  const [yearStr, monthStr, dayStr] = isoDate.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  return new Date(year, month - 1, day);
 }
 
 function formatDisplayDate(date: Date): string {
@@ -67,40 +239,71 @@ async function getPracticePlansForSeason(args: {
   return (data ?? []) as PracticePlan[];
 }
 
-export default async function PracticePage({ params }: PracticePageProps) {
+export default async function PracticePage({
+  params,
+  searchParams,
+}: PracticePageProps) {
   const { programId, teamId, seasonId } = await params; // 👈 seasonId here
 
-  const today = new Date();
+  // Determine startOfWeek from ?week=YYYY-MM-DD search param (from server props)
+  const resolvedSearchParams =
+    searchParams ? await searchParams : ({} as { [key: string]: string | string[] | undefined });
+
+  const rawWeek = resolvedSearchParams.week;
+  const weekParam =
+    typeof rawWeek === "string"
+      ? rawWeek
+      : Array.isArray(rawWeek)
+      ? rawWeek[0]
+      : null;
+
+  const baseDate = weekParam ? parseLocalISODate(weekParam) : new Date();
 
   // Monday–Sunday week range
-  const dayOfWeek = today.getDay(); // 0 = Sunday
+  const dayOfWeek = baseDate.getDay(); // 0 = Sunday
   const diffToMonday = (dayOfWeek + 6) % 7;
 
   const startOfWeek = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() - diffToMonday
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate() - diffToMonday
   );
+
   const endOfWeek = new Date(
     startOfWeek.getFullYear(),
     startOfWeek.getMonth(),
     startOfWeek.getDate() + 6
   );
 
+  const prevWeek = new Date(startOfWeek);
+  prevWeek.setDate(prevWeek.getDate() - 7);
+
+  const nextWeek = new Date(startOfWeek);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+
   const practicePlans = await getPracticePlansForSeason({
     teamSeasonId: seasonId, // 👈 map URL param into query param
     startDate: formatISODate(startOfWeek),
     endDate: formatISODate(endOfWeek),
   });
+  const rosterGroups = await getRosterGroupsForSeason(seasonId);
 
-  // TODO: Replace with real program location when available
-  const lat = 32.0;
-  const lon = -90.0;
+  const { lat: programLat, lon: programLon } = await getProgramLocationCoords(
+    programId
+  );
+
+  // Fallback to a generic location if we don't have coordinates stored yet
+  const lat = programLat ?? 32.0;
+  const lon = programLon ?? -90.0;
 
   const weeklyWeather = await getWeeklyWeatherFromTomorrowIo({
     lat,
     lon,
     startDateIso: formatISODate(startOfWeek),
+  });
+  const heatPolicy = await getHeatPolicyForTeamSeason({
+    teamSeasonId: seasonId,
+    autoAttachToSeason: false,
   });
 
   return (
@@ -143,19 +346,43 @@ export default async function PracticePage({ params }: PracticePageProps) {
                 component and live weather data next.
               </p>
             </div>
-            <div className="flex gap-2 text-[11px] text-slate-500">
-              <button
-                type="button"
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <Link
+                href={`/programs/${programId}/teams/${teamId}/seasons/${seasonId}/practice?week=${formatISODate(
+                  prevWeek
+                )}`}
+                className="rounded-lg border border-slate-700/80 px-2 py-1 text-xs hover:border-slate-500 hover:text-slate-200"
+              >
+                ‹ Prev
+              </Link>
+
+              <Link
+                href={`/programs/${programId}/teams/${teamId}/seasons/${seasonId}/practice?week=${formatISODate(
+                  (() => {
+                    const today = new Date();
+                    const day = today.getDay();
+                    const diffToMonday = (day + 6) % 7;
+                    const monday = new Date(
+                      today.getFullYear(),
+                      today.getMonth(),
+                      today.getDate() - diffToMonday
+                    );
+                    return monday;
+                  })()
+                )}`}
                 className="rounded-lg border border-slate-700/80 px-2 py-1 text-xs hover:border-slate-500 hover:text-slate-200"
               >
                 Today
-              </button>
-              <button
-                type="button"
+              </Link>
+
+              <Link
+                href={`/programs/${programId}/teams/${teamId}/seasons/${seasonId}/practice?week=${formatISODate(
+                  nextWeek
+                )}`}
                 className="rounded-lg border border-slate-700/80 px-2 py-1 text-xs hover:border-slate-500 hover:text-slate-200"
               >
-                This week
-              </button>
+                Next ›
+              </Link>
             </div>
           </div>
 
@@ -216,6 +443,7 @@ export default async function PracticePage({ params }: PracticePageProps) {
                           teamId={teamId}
                           seasonId={seasonId}
                           dateIso={dayKey}
+                          groups={rosterGroups}
                         />
 
                         {dayPlans.length === 0 ? (
@@ -337,20 +565,11 @@ export default async function PracticePage({ params }: PracticePageProps) {
                           {dayLabel}
                         </span>
                       </div>
-                      <span
-                        className="text-[10px] font-medium"
-                        title={
-                          day.heatRisk === "low"
-                            ? "Low heat risk: normal practice load is generally safe."
-                            : day.heatRisk === "moderate"
-                            ? "Moderate heat risk: consider extra hydration and brief shade breaks."
-                            : day.heatRisk === "high"
-                            ? "High heat risk: shorten intense sessions and add cooling/shade."
-                            : "Extreme heat risk: use extreme caution; consider rescheduling or significantly modifying practice."
-                        }
-                      >
-                        {riskLabel} heat risk
-                      </span>
+                      <HeatPolicyPopover
+                        riskLabel={`${riskLabel} heat risk`}
+                        riskLevel={day.heatRisk}
+                        policy={heatPolicy}
+                      />
                     </div>
                     <div className="space-y-0.5 text-[10px]">
                       <div>

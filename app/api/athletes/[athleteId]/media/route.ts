@@ -1,6 +1,8 @@
+// app/api/athletes/[athleteId]/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+// PATCH: update athlete profile
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ athleteId: string }> }
@@ -34,8 +36,11 @@ export async function PATCH(
 
   if (error) {
     console.error("[athlete-profile-patch] update error", error);
-    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update profile" },
+      { status: 500 }
+    );
   }
 
-  return NextResponse.json({ athlete: data });
+  return NextResponse.json({ success: true, athlete: data });
 }

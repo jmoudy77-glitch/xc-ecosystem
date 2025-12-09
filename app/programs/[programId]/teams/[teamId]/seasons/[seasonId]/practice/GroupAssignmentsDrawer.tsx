@@ -1,3 +1,4 @@
+//app/programs/[programId]/teams/[teamId]/seasons/[seasonId]/practice/GroupAssignmentsDrawer.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";

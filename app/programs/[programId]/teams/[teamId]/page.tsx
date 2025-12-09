@@ -181,6 +181,46 @@ export default async function TeamDetailPage({ params }: PageProps) {
         </div>
       </header>
 
+      <section className="border-b border-slate-900/80 bg-slate-950/80">
+        <div className="mx-auto max-w-6xl px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2 text-slate-500">
+              <span className="uppercase tracking-wide text-slate-400">
+                Season tools
+              </span>
+              {activeSeason ? (
+                <span className="rounded-full border border-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+                  Active season:{" "}
+                  <span className="font-medium text-slate-200">
+                    {activeSeason.season_label}
+                    {activeSeason.season_year
+                      ? ` ${activeSeason.season_year}`
+                      : ""}
+                  </span>
+                </span>
+              ) : (
+                <span className="rounded-full border border-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
+                  No active season selected
+                </span>
+              )}
+            </div>
+            {activeSeason && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/programs/${programId}/teams/${teamId}/seasons/${activeSeason.id}/practice`}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/60 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium text-emerald-100 hover:border-emerald-400 hover:bg-emerald-500/20"
+                >
+                  <span>Practice Scheduler</span>
+                  <span className="rounded-full border border-emerald-500/60 px-1.5 py-[1px] text-[9px] uppercase tracking-wide">
+                    New
+                  </span>
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <TeamManagementShell
         programId={programId}
         teamId={teamId}

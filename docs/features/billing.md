@@ -1,3 +1,7 @@
-# Billing
+# Billing & Plans
 
-Stripe scopes, plan codes, subscription logic...
+Document billing model:
+
+- Program vs athlete subscriptions
+- Plan codes and what they unlock
+- Stripe customers, subscriptions, and webhooks

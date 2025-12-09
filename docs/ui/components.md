@@ -1,3 +1,7 @@
-# Components
+# UI Components
 
-Buttons, inputs, cards, tables, navbars.
+Document shared UI components:
+
+- Buttons, cards, tables
+- Roster rows and athlete cells
+- Slide-out panels

@@ -1,3 +1,3 @@
 # UI Theme
 
-Color palette, typography, shadows, spacing, tokens.
+Document color palette, typography, spacing, and other design tokens.

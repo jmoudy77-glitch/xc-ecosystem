@@ -1,3 +1,0 @@
-# Recruiting Board
-
-Full recruiting board feature documentation...

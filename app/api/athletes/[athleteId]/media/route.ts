@@ -7,9 +7,9 @@ const BUCKET = "athlete-media";
 // POST: upload highlight or action shot
 export async function POST(
   req: NextRequest,
-  context: { params: { athleteId: string } }
+  context: { params: Promise<{ athleteId: string }> }
 ) {
-  const { athleteId } = context.params;
+  const { athleteId } = await context.params;
 
   if (!athleteId) {
     return NextResponse.json({ error: "Missing athleteId" }, { status: 400 });
@@ -136,9 +136,9 @@ export async function POST(
 // DELETE: remove a specific media item (action shot or highlight)
 export async function DELETE(
   req: NextRequest,
-  context: { params: { athleteId: string } }
+  context: { params: Promise<{ athleteId: string }> }
 ) {
-  const { athleteId } = context.params;
+  const { athleteId } = await context.params;
 
   const { mediaId } = (await req.json().catch(() => ({}))) as {
     mediaId?: string;

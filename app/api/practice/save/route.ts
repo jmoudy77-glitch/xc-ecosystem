@@ -130,12 +130,105 @@ export async function POST(req: NextRequest) {
 
     const practicePlanId = practicePlan.id as string;
 
-    // 2) practice_groups: still disabled until we finish the schema alignment.
-    //    The current table requires a non-null workout_id, which doesn't match
-    //    the UI flow yet (groups can exist without a workout).
+    // === 2) Insert practice_groups ===
+    // groups: PracticeGroupPayload[]   (name + athletes[])
+    // groupAssignments: Record<groupName, WorkoutPayload[]>
     //
-    // 3) group / individual workout assignments:
-    //    We'll wire these into practice_group_assignments once that table is finalized.
+    // Schema requirement: practice_groups.workout_id is NOT NULL.
+    // Therefore each group MUST have exactly one assigned workout.
+
+    const practiceGroupsToInsert: {
+      practice_plan_id: string;
+      label: string;
+      event_group: string | null;
+      workout_id: string;
+      notes: string | null;
+    }[] = [];
+
+    for (const g of groups) {
+      const groupName = g.name;
+      const workoutsForGroup = groupAssignments[groupName] || [];
+
+      if (!workoutsForGroup.length) {
+        console.error("[practice/save] Group missing workout assignment", { groupName });
+        return NextResponse.json(
+          { error: `Group '${groupName}' requires exactly one workout assignment.` },
+          { status: 400 }
+        );
+      }
+
+      // Pick the first workout — UI currently only supports one.
+      const workout = workoutsForGroup[0];
+      if (!workout?.id) {
+        console.error("[practice/save] Invalid workout payload", { groupName, workout });
+        return NextResponse.json(
+          { error: `Invalid workout for group '${groupName}'.` },
+          { status: 400 }
+        );
+      }
+
+      practiceGroupsToInsert.push({
+        practice_plan_id: practicePlanId,
+        label: groupName,
+        event_group: null,
+        workout_id: workout.id,
+        notes: null,
+      });
+    }
+
+    const { data: insertedGroups, error: groupsError } = await supabaseAdmin
+      .from("practice_groups")
+      .insert(practiceGroupsToInsert)
+      .select("id, label");
+
+    if (groupsError) {
+      console.error("[practice/save] failed to insert practice_groups", { groupsError });
+      return NextResponse.json(
+        { error: "Failed to create practice groups." },
+        { status: 500 }
+      );
+    }
+
+    // Map group name → inserted group id
+    const groupIdMap = new Map<string, string>();
+    for (const row of insertedGroups) {
+      groupIdMap.set(row.label, row.id);
+    }
+
+    // === 3) Insert practice_group_assignments ===
+    // assignments: from each groupName, list of athlete IDs from the modal.
+    // schema allows either athlete_id or team_roster_id. For now we use athlete_id.
+
+    const assignmentRows: {
+      practice_group_id: string;
+      athlete_id: string;
+    }[] = [];
+
+    for (const g of groups) {
+      const groupId = groupIdMap.get(g.name);
+      if (!groupId) continue;
+
+      for (const athlete of g.athletes) {
+        assignmentRows.push({
+          practice_group_id: groupId,
+          athlete_id: athlete.id,
+        });
+      }
+    }
+
+    if (assignmentRows.length > 0) {
+      const { error: assignError } = await supabaseAdmin
+        .from("practice_group_assignments")
+        .insert(assignmentRows);
+
+      if (assignError) {
+        console.error("[practice/save] failed to insert practice_group_assignments", { assignError });
+        return NextResponse.json(
+          { error: "Failed to assign athletes to groups." },
+          { status: 500 }
+        );
+      }
+    }
 
     return NextResponse.json(
       {

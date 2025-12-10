@@ -427,6 +427,19 @@ export default function PracticeBuilderModal({
     async function handleSave() {
     if (isSaving) return;
 
+    // Front-end validation: every group must have at least one workout
+    const groupsMissingWorkouts = groupsToRender.filter(
+      (g) => !(groupAssignments[g.name] && groupAssignments[g.name].length > 0)
+    );
+
+    if (groupsMissingWorkouts.length > 0) {
+      const missingNames = groupsMissingWorkouts.map((g) => g.name).join(", ");
+      window.alert(
+        `Each group must have at least one workout before saving.\n\nMissing assignments for: ${missingNames}`
+      );
+      return;
+    }
+
     setIsSaving(true);
     try {
       const payload = {

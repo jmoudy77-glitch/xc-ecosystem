@@ -85,12 +85,11 @@ export default function TeamListClient({
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-base font-semibold text-slate-100">
-            Teams &amp; rosters
-          </h1>
+          <h2 className="text-sm font-semibold text-slate-100">
+            Your teams
+          </h2>
           <p className="mt-1 text-[11px] text-slate-500">
-            Organize your program into teams and seasons. Rosters will attach to
-            each team&apos;s season.
+            Create and manage the teams that make up this program.
           </p>
         </div>
 

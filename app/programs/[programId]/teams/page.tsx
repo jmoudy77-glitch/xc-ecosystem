@@ -152,47 +152,32 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <header className="border-b border-slate-800 bg-slate-950">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                <Link
-                  href="/dashboard"
-                  className="hover:text-slate-200"
-                >
-                  Dashboard
-                </Link>
-                <span>›</span>
-                <Link
-                  href={`/programs/${programId}`}
-                  className="hover:text-slate-200"
-                >
-                  Program overview
-                </Link>
-                <span>›</span>
-                <span>Teams &amp; rosters</span>
-              </div>
-              <h1 className="mt-1 text-base font-semibold text-slate-100">
-                {programName}
-              </h1>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Structure this program into teams. Each team will eventually
-                have seasons and rosters attached.
-              </p>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-base font-semibold text-slate-100">
+            Teams &amp; rosters
+          </h1>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Structure this program into teams. Each team will have seasons, rosters,
+            and scholarship planning attached as your staff builds things out.
+          </p>
         </div>
-      </header>
+        {isManager && (
+          <Link
+            href="#"
+            className="rounded-md border border-emerald-500/70 bg-emerald-900/30 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 hover:border-emerald-400 hover:bg-emerald-800/50"
+          >
+            + Add team
+          </Link>
+        )}
+      </div>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <TeamListClient
-          programId={programId}
-          isManager={isManager}
-          teams={teams}
-        />
-      </main>
+      <TeamListClient
+        programId={programId}
+        isManager={isManager}
+        teams={teams}
+      />
     </div>
   );
 }

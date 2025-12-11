@@ -254,6 +254,15 @@ export default async function DashboardPage() {
     roleHint = "coach";
   }
 
+  // If this user is a coach (or coach+athlete) with exactly one program,
+  // treat that program's dashboard as their primary home.
+  if (hasProgramMemberships && programsBasic.length === 1 && roleHint !== "athlete") {
+    const soleProgramId = programsBasic[0]?.id;
+    if (soleProgramId) {
+      redirect(`/programs/${soleProgramId}/dashboard`);
+    }
+  }
+
   const me: MeResponse = {
     user: {
       id: userRow.id,
@@ -468,10 +477,10 @@ export default async function DashboardPage() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        href={`/programs/${p.programId}`}
+                        href={`/programs/${p.programId}/dashboard`}
                         className="rounded-full border border-slate-600 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400"
                       >
-                        Overview
+                        Open dashboard
                       </Link>
                       {/* 👉 This is your main entry to roles & permissions */}
                       <Link

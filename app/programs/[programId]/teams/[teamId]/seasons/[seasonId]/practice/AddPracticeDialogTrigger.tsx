@@ -1,7 +1,6 @@
-//app/programs/[programId]/teams/[teamId]/seasons/[seasonId]/practice/AddPracticeDialogTrigger.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import PracticeBuilderModal from "./PracticeBuilderModal";
 
 type AddPracticeDialogTriggerProps = {
@@ -13,6 +12,39 @@ type AddPracticeDialogTriggerProps = {
     name: string;
     athletes: { id: string; name: string }[];
   }[];
+  // Optional: when editing an existing practice
+  initialPractice?: {
+    id: string;
+    program_id: string;
+    team_season_id: string | null;
+    practice_date: string;
+    start_time: string | null;
+    end_time: string | null;
+    location: string | null;
+    label: string;
+    notes: string | null;
+    status: string;
+  } | null;
+  initialDetails?: {
+    groups: {
+      id: string;
+      label: string;
+      event_group: string | null;
+      athletes: {
+        id: string;
+        name: string;
+        event_group: string | null;
+      }[];
+    }[];
+    individualSessions: {
+      id: string;
+      athleteName: string;
+      event_group: string | null;
+      title: string | null;
+      workout_category: string | null;
+    }[];
+  } | null;
+  autoOpen?: boolean;
 };
 
 export default function AddPracticeDialogTrigger({
@@ -21,8 +53,18 @@ export default function AddPracticeDialogTrigger({
   seasonId,
   dateIso,
   groups,
+  initialPractice,
+  initialDetails,
+  autoOpen,
 }: AddPracticeDialogTriggerProps) {
   const [open, setOpen] = useState(false);
+
+  // If invoked in edit mode with autoOpen, open the modal on mount
+  useEffect(() => {
+    if (autoOpen) {
+      setOpen(true);
+    }
+  }, [autoOpen]);
 
   const dateObj = new Date(dateIso);
   const displayDate = isNaN(dateObj.getTime())
@@ -55,6 +97,8 @@ export default function AddPracticeDialogTrigger({
           dateIso={dateIso}
           displayDate={displayDate}
           groups={groups}
+          initialPractice={initialPractice ?? undefined}
+          initialDetails={initialDetails ?? undefined}
         />
       )}
     </>

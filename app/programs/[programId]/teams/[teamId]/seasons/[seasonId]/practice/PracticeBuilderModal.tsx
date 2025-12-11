@@ -14,6 +14,7 @@ import {
 
 type PracticeGroupUI = {
   name: string;
+  eventGroup?: string | null;
   athletes: { id: string; name: string }[];
 };
 
@@ -100,7 +101,7 @@ function AthleteChip({
         className="rounded-full border border-slate-600 px-1 text-[9px] leading-none text-slate-300 hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200"
         aria-label="Create individual assignment lane"
       >
-        Ind
+        →
       </button>
     </span>
   );
@@ -257,6 +258,38 @@ type PracticeBuilderModalProps = {
   dateIso: string;
   displayDate: string;
   groups: PracticeGroupUI[];
+  // When editing an existing practice, we can seed initial values
+  initialPractice?: {
+    id: string;
+    program_id: string;
+    team_season_id: string | null;
+    practice_date: string;
+    start_time: string | null;
+    end_time: string | null;
+    location: string | null;
+    label: string;
+    notes: string | null;
+    status: string;
+  };
+  initialDetails?: {
+    groups: {
+      id: string;
+      label: string;
+      event_group: string | null;
+      athletes: {
+        id: string;
+        name: string;
+        event_group: string | null;
+      }[];
+    }[];
+    individualSessions: {
+      id: string;
+      athleteName: string;
+      event_group: string | null;
+      title: string | null;
+      workout_category: string | null;
+    }[];
+  };
 };
 
 export default function PracticeBuilderModal({
@@ -268,20 +301,46 @@ export default function PracticeBuilderModal({
   dateIso,
   displayDate,
   groups,
+  initialPractice,
+  initialDetails,
 }: PracticeBuilderModalProps) {
+  // Helper to normalize DB timestamps or time strings into `HH:MM` for <input type="time">
+  const extractTime = (value: string | null | undefined): string => {
+    if (!value) return "";
+    // If already looks like HH:MM, return as-is
+    if (/^\d{2}:\d{2}$/.test(value)) return value;
+    // If it's an ISO-like string, grab the time portion
+    const tIndex = value.indexOf("T");
+    if (tIndex !== -1 && value.length >= tIndex + 5) {
+      return value.slice(tIndex + 1, tIndex + 6);
+    }
+    return "";
+  };
   if (!open) return null;
 
   const [showIndividualPanel, setShowIndividualPanel] = useState(false);
   const safeGroups = groups ?? [];
-  const groupsToRender =
-    safeGroups.length > 0
+
+  const initialGroups: PracticeGroupUI[] =
+    initialDetails && initialDetails.groups && initialDetails.groups.length > 0
+      ? initialDetails.groups.map((g) => ({
+          name: g.label,
+          eventGroup: g.event_group,
+          athletes: g.athletes.map((a) => ({
+            id: a.id,
+            name: a.name,
+          })),
+        }))
+      : safeGroups.length > 0
       ? safeGroups
       : [
-          { name: "Distance", athletes: [] },
-          { name: "Mid Distance", athletes: [] },
-          { name: "Sprints", athletes: [] },
-          { name: "Throws", athletes: [] },
+          { name: "Distance", eventGroup: "distance", athletes: [] },
+          { name: "Mid Distance", eventGroup: "mid_distance", athletes: [] },
+          { name: "Sprints", eventGroup: "sprints", athletes: [] },
+          { name: "Throws", eventGroup: "throws", athletes: [] },
         ];
+
+  const [uiGroups, setUiGroups] = useState<PracticeGroupUI[]>(initialGroups);
 
   const [groupAssignments, setGroupAssignments] = useState<
     Record<string, WorkoutUI[]>
@@ -311,16 +370,99 @@ export default function PracticeBuilderModal({
     | null
   >(null);
 
+  const [pendingMoveChoice, setPendingMoveChoice] = useState<
+    | {
+        athleteId: string;
+        athleteName: string;
+        fromGroupName: string;
+      }
+    | null
+  >(null);
+  function moveAthleteToGroup(
+    athleteId: string,
+    athleteName: string,
+    fromGroupName: string,
+    targetGroupName: string
+  ) {
+    setUiGroups((prev) => {
+      let movedAthlete: { id: string; name: string } | null = null;
+
+      const afterRemoval = prev.map((group) => {
+        if (group.name !== fromGroupName) return group;
+        const remainingAthletes = group.athletes.filter((ath) => {
+          if (ath.id === athleteId) {
+            movedAthlete = ath;
+            return false;
+          }
+          return true;
+        });
+        return { ...group, athletes: remainingAthletes };
+      });
+
+      if (!movedAthlete) {
+        movedAthlete = { id: athleteId, name: athleteName };
+      }
+
+      const afterAdd = afterRemoval.map((group) => {
+        if (group.name !== targetGroupName) return group;
+        if (group.athletes.some((ath) => ath.id === athleteId)) {
+          return group;
+        }
+        return { ...group, athletes: [...group.athletes, movedAthlete as { id: string; name: string }] };
+      });
+
+      return afterAdd;
+    });
+
+    // Clear any exclusions for this athlete on either group so they receive the new group's workouts.
+    setExcludedFromGroupWorkouts((prev) => {
+      const updated = { ...prev };
+      const fromList = updated[fromGroupName]?.filter((id) => id !== athleteId);
+      if (fromList && fromList.length > 0) {
+        updated[fromGroupName] = fromList;
+      } else {
+        delete updated[fromGroupName];
+      }
+      const targetList = updated[targetGroupName]?.filter((id) => id !== athleteId);
+      if (targetList && targetList.length > 0) {
+        updated[targetGroupName] = targetList;
+      } else {
+        delete updated[targetGroupName];
+      }
+      return updated;
+    });
+  }
+
+  function handleAthleteChipClick(
+    athleteId: string,
+    athleteName: string,
+    fromGroupName: string
+  ) {
+    setPendingMoveChoice({
+      athleteId,
+      athleteName,
+      fromGroupName,
+    });
+  }
+
   const [excludedFromGroupWorkouts, setExcludedFromGroupWorkouts] = useState<
     Record<string, string[]>
   >({});
 
-  const [practiceLabel, setPracticeLabel] = useState("");
-  const [practiceDate, setPracticeDate] = useState(dateIso);
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [location, setLocation] = useState("");
-  const [notes, setNotes] = useState("");
+  const [practiceLabel, setPracticeLabel] = useState(
+    initialPractice?.label ?? ""
+  );
+  const [practiceDate, setPracticeDate] = useState(
+    initialPractice?.practice_date ?? dateIso
+  );
+  const [startTime, setStartTime] = useState(
+    extractTime(initialPractice?.start_time ?? "")
+  );
+  const [endTime, setEndTime] = useState(
+    extractTime(initialPractice?.end_time ?? "")
+  );
+  const [location, setLocation] = useState(initialPractice?.location ?? "");
+  const [notes, setNotes] = useState(initialPractice?.notes ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
   function sendAthleteToIndividual(
@@ -427,15 +569,17 @@ export default function PracticeBuilderModal({
     async function handleSave() {
     if (isSaving) return;
 
-    // Front-end validation: every group must have at least one workout
-    const groupsMissingWorkouts = groupsToRender.filter(
-      (g) => !(groupAssignments[g.name] && groupAssignments[g.name].length > 0)
+    // Front-end validation: require at least one assigned workout (group or individual)
+    const hasGroupWorkout = uiGroups.some(
+      (g) => groupAssignments[g.name] && groupAssignments[g.name].length > 0
+    );
+    const hasIndividualWorkout = Object.values(individualAssignments).some(
+      (workouts) => workouts && workouts.length > 0
     );
 
-    if (groupsMissingWorkouts.length > 0) {
-      const missingNames = groupsMissingWorkouts.map((g) => g.name).join(", ");
+    if (!hasGroupWorkout && !hasIndividualWorkout) {
       window.alert(
-        `Each group must have at least one workout before saving.\n\nMissing assignments for: ${missingNames}`
+        "Assign at least one group workout or one individual workout before saving."
       );
       return;
     }
@@ -452,7 +596,7 @@ export default function PracticeBuilderModal({
         endTime,
         location,
         notes,
-        groups: groupsToRender,
+        groups: uiGroups,
         groupAssignments,
         individualLanes,
         individualAssignments,
@@ -491,14 +635,22 @@ export default function PracticeBuilderModal({
     0
   );
 
-  const totalAthletes = groupsToRender.reduce(
+  const totalAthletes = uiGroups.reduce(
     (sum, group) => sum + group.athletes.length,
     0
   );
 
+  const totalIndividualLanes = individualLanes.length;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-3 py-4">
-      <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-3 py-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
           <div className="space-y-1">
@@ -506,7 +658,9 @@ export default function PracticeBuilderModal({
               Practice builder
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-100">
-              <span className="font-semibold">New practice – {displayDate}</span>
+              <span className="font-semibold">
+                {initialPractice ? "Edit practice" : "New practice"} – {displayDate}
+              </span>
               <span className="rounded-full border border-slate-700/80 px-2 py-0.5 text-[11px] text-slate-300">
                 Program: {programId}
               </span>
@@ -616,8 +770,14 @@ export default function PracticeBuilderModal({
             {/* Group assignment section */}
             <div className="flex min-w-[40%] flex-[2] flex-col border-r border-slate-800">
               <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
-                <div className="text-sm font-semibold text-slate-100">
-                  Group assignments
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-sm font-semibold text-slate-100">
+                    Group assignments
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    {uiGroups.length} group{uiGroups.length === 1 ? "" : "s"} •{" "}
+                    {totalAthletes} athlete{totalAthletes === 1 ? "" : "s"}
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -632,7 +792,7 @@ export default function PracticeBuilderModal({
 
               <div className="flex-1 overflow-auto px-4 py-3 text-sm">
                 <div className="space-y-3">
-                  {groupsToRender.map((group) => (
+                  {uiGroups.map((group) => (
                     <GroupTile
                       key={group.name}
                       group={group}
@@ -651,7 +811,7 @@ export default function PracticeBuilderModal({
                           };
                         });
                       }}
-                      onSendToIndividual={sendAthleteToIndividual}
+                      onSendToIndividual={handleAthleteChipClick}
                     />
                   ))}
                 </div>
@@ -662,12 +822,20 @@ export default function PracticeBuilderModal({
             {showIndividualPanel && (
               <div className="flex w-72 flex-col border-r border-slate-800 bg-slate-950/95">
                 <div className="border-b border-slate-800 px-3 py-2.5">
-                  <div className="text-xs font-semibold text-slate-100">
-                    Individual assignments
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-slate-100">
+                      Individual assignments
+                    </div>
+                    {individualLanes.length > 0 && (
+                      <div className="text-[10px] text-slate-500">
+                        {individualLanes.length} lane
+                        {individualLanes.length === 1 ? "" : "s"}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Use the <span className="font-semibold">Ind</span> button on
-                    a group athlete to create an individual lane, then drop
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    Use the <span className="font-semibold">→</span> button on a
+                    group athlete to create an individual lane, then drop
                     workouts here to override the group plan.
                   </div>
                 </div>
@@ -675,7 +843,7 @@ export default function PracticeBuilderModal({
                   {individualLanes.length === 0 ? (
                     <div className="rounded-md border border-dashed border-slate-700 bg-slate-900/40 p-2 text-[11px] text-slate-400">
                       No individual lanes yet. Use the{" "}
-                      <span className="font-semibold">Ind</span> button on a
+                      <span className="font-semibold">→</span> button on a
                       group athlete to create one.
                     </div>
                   ) : (
@@ -787,6 +955,82 @@ export default function PracticeBuilderModal({
           </DragOverlay>
         </DndContext>
 
+        {pendingMoveChoice && (
+          <div className="fixed inset-0 z-[55] flex items-center justify-center bg-slate-950/70 px-3">
+            <div className="w-full max-w-sm rounded-lg border border-slate-700 bg-slate-900 p-4 text-xs shadow-xl">
+              <div className="mb-2 text-sm font-semibold text-slate-100">
+                Adjust athlete assignment
+              </div>
+              <div className="mb-3 text-slate-300">
+                What would you like to do with{" "}
+                <span className="font-semibold">
+                  {pendingMoveChoice.athleteName}
+                </span>
+                ?
+              </div>
+              <div className="space-y-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sendAthleteToIndividual(
+                      pendingMoveChoice.athleteId,
+                      pendingMoveChoice.athleteName,
+                      pendingMoveChoice.fromGroupName
+                    );
+                    setPendingMoveChoice(null);
+                  }}
+                  className="w-full rounded-md bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-emerald-50 hover:bg-emerald-500"
+                >
+                  Move to individual assignments
+                </button>
+                <div className="text-[11px] text-slate-400">
+                  Or move them into a different event group:
+                </div>
+                <div className="space-y-1">
+                  {uiGroups
+                    .filter(
+                      (g) => g.name !== pendingMoveChoice.fromGroupName
+                    )
+                    .map((g) => (
+                      <button
+                        key={g.name}
+                        type="button"
+                        onClick={() => {
+                          moveAthleteToGroup(
+                            pendingMoveChoice.athleteId,
+                            pendingMoveChoice.athleteName,
+                            pendingMoveChoice.fromGroupName,
+                            g.name
+                          );
+                          setPendingMoveChoice(null);
+                        }}
+                        className="w-full rounded-md border border-slate-700 px-3 py-1.5 text-[11px] text-slate-200 hover:border-emerald-500 hover:text-emerald-100"
+                      >
+                        Move to {g.name}
+                      </button>
+                    ))}
+                  {uiGroups.filter(
+                    (g) => g.name !== pendingMoveChoice.fromGroupName
+                  ).length === 0 && (
+                    <div className="text-[11px] text-slate-500">
+                      No other groups available to move into.
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPendingMoveChoice(null)}
+                  className="rounded-md border border-slate-700 px-3 py-1.5 text-[11px] text-slate-300 hover:border-slate-500 hover:text-slate-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {pendingIndividual && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 px-3">
             <div className="w-full max-w-sm rounded-lg border border-slate-700 bg-slate-900 p-4 text-xs shadow-xl">
@@ -850,7 +1094,15 @@ export default function PracticeBuilderModal({
                 {totalAssignedWorkouts} workout
                 {totalAssignedWorkouts === 1 ? "" : "s"} assigned across{" "}
                 {totalAthletes} athlete
-                {totalAthletes === 1 ? "" : "s"}.
+                {totalAthletes === 1 ? "" : "s"}
+                {totalIndividualLanes > 0 && (
+                  <>
+                    {" "}
+                    • {totalIndividualLanes} individual lane
+                    {totalIndividualLanes === 1 ? "" : "s"}
+                  </>
+                )}
+                .
               </>
             )}
           </div>
@@ -872,7 +1124,7 @@ export default function PracticeBuilderModal({
             </button>
           </div>
         </div>
-      </div>
+        </div>
     </div>
   );
 }

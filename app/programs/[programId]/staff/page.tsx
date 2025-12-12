@@ -23,16 +23,20 @@ type StaffMember = {
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
-export default async function ProgramStaffPage(props: PageProps) {
-  // 🔑 In your app, `params` is a Promise → await it
-  const { programId } = await props.params;
+export default async function ProgramStaffPage({ params }: PageProps) {
+  const { programId } = await params;
 
   const supabase = await supabaseServerComponent();
 
-  // Auth
+  // 1) Auth
   const {
     data: { user: authUser },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.warn("[ProgramStaff] auth.getUser error:", authError.message);
+  }
 
   if (!authUser) {
     redirect("/login");
@@ -40,25 +44,47 @@ export default async function ProgramStaffPage(props: PageProps) {
 
   const authId = authUser.id;
 
-  // Viewer user row
-  const { data: viewerRow, error: viewerError } = await supabaseAdmin
+  // 2) Ensure viewer user row exists (same pattern as other program pages)
+  const { data: existingUserRow, error: userSelectError } = await supabaseAdmin
     .from("users")
     .select("id, auth_id, email")
     .eq("auth_id", authId)
     .maybeSingle();
 
-  if (viewerError) {
-    console.error("[ProgramStaff] viewer users error:", viewerError);
-    throw new Error("Failed to load viewer user");
+  if (userSelectError) {
+    console.error("[ProgramStaff] users select error:", userSelectError);
+    throw new Error("Failed to load viewer user record");
   }
 
-  if (!viewerRow) {
-    redirect("/dashboard");
+  let viewerUserRow = existingUserRow;
+
+  if (!viewerUserRow) {
+    const {
+      data: insertedUser,
+      error: userInsertError,
+    } = await supabaseAdmin
+      .from("users")
+      .insert({
+        auth_id: authId,
+        email: authUser.email ?? null,
+      })
+      .select("id, auth_id, email")
+      .single();
+
+    if (userInsertError) {
+      console.error(
+        "[ProgramStaff] Failed to create viewer user row:",
+        userInsertError,
+      );
+      throw new Error("Failed to create user record");
+    }
+
+    viewerUserRow = insertedUser;
   }
 
-  const viewerUserId = viewerRow.id as string;
+  const viewerUserId = viewerUserRow.id as string;
 
-  // Viewer membership & role
+  // 3) Viewer membership & program basic info
   const { data: membershipRow, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select(
@@ -82,6 +108,7 @@ export default async function ProgramStaffPage(props: PageProps) {
   }
 
   if (!membershipRow || !membershipRow.programs) {
+    // Not a member of this program → bounce to dashboard
     redirect("/dashboard");
   }
 
@@ -97,7 +124,7 @@ export default async function ProgramStaffPage(props: PageProps) {
     actingRole !== null &&
     MANAGER_ROLES.includes(actingRole.toLowerCase() as any);
 
-  // Load staff for this program
+  // 4) Staff list for this program
   const { data: staffRows, error: staffError } = await supabaseAdmin
     .from("program_members")
     .select(
@@ -105,72 +132,105 @@ export default async function ProgramStaffPage(props: PageProps) {
       user_id,
       role,
       created_at,
-      user:users!inner (
+      users:users (
+        id,
         email,
+        name,
         avatar_url
       )
     `,
     )
-    .eq("program_id", programId);
+    .eq("program_id", programId)
+    .order("created_at", { ascending: true });
 
   if (staffError) {
-    console.error("[ProgramStaff] staff rows error:", staffError);
+    console.error("[ProgramStaff] staff list error:", staffError);
     throw new Error("Failed to load staff list");
   }
 
   const staff: StaffMember[] = (staffRows ?? []).map((row: any) => {
-  const userRel = row.user;
-  const userRecord = Array.isArray(userRel) ? userRel[0] : userRel;
+    const userRecord = row.users as
+      | {
+          email: string | null;
+          name: string | null;
+          avatar_url: string | null;
+        }
+      | null
+      | undefined;
 
-  const email = (userRecord?.email as string | null) ?? null;
-  const derivedName =
-    email?.split("@")[0] ??
-    "Staff member";
+    const email = (userRecord?.email as string | null) ?? null;
+    const explicitName = (userRecord?.name as string | null) ?? null;
+    const derivedName =
+      explicitName ??
+      email?.split("@")[0] ??
+      "Staff member";
 
-  return {
-    userId: row.user_id as string,
-    fullName: derivedName,
-    email,
-    avatarUrl: (userRecord?.avatar_url as string | null) ?? null,
-    role: (row.role as string | null) ?? null,
-    joinedAt: (row.created_at as string | null) ?? null,
-  };
-});
+    return {
+      userId: row.user_id as string,
+      fullName: derivedName,
+      email,
+      avatarUrl: (userRecord?.avatar_url as string | null) ?? null,
+      role: (row.role as string | null) ?? null,
+      joinedAt: (row.created_at as string | null) ?? null,
+    };
+  });
 
+  // 5) Themed layout: hero/header card + StaffListClient
+  // ProgramLayout already wraps this with hero + left nav; we just
+  // need local sections to respect the branding tokens.
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <header className="border-b border-slate-800 bg-slate-950">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                <Link
-                  href={`/programs/${programId}`}
-                  className="hover:text-slate-200"
-                >
-                  Program overview
-                </Link>
-                <span>›</span>
-                <span>Staff &amp; roles</span>
-              </div>
-              <h1 className="mt-1 text-base font-semibold text-slate-100">
+    <div className="space-y-4">
+      {/* Context / breadcrumb header */}
+      <section className="rounded-xl border border-subtle bg-brand-soft p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-[11px] text-muted">
+              <Link href="/dashboard" className="hover:underline">
+                Dashboard
+              </Link>
+              <span>›</span>
+              <Link
+                href={`/programs/${programId}`}
+                className="hover:underline"
+              >
                 {programName}
-              </h1>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Manage staff membership and access levels for this program.
-              </p>
+              </Link>
+              <span>›</span>
+              <span>Staff</span>
             </div>
+
+            <h1 className="mt-1 text-sm font-semibold text-slate-100">
+              Staff &amp; roles
+            </h1>
+            <p className="mt-1 text-[11px] text-muted">
+              Manage who has access to this program, what they can do, and how
+              they appear to athletes and other staff.
+            </p>
+          </div>
+
+          <div className="hidden text-right text-[11px] text-muted sm:block">
+            <p>
+              Your role:{" "}
+              <span className="font-mono text-[11px] text-slate-100">
+                {actingRole ?? "unknown"}
+              </span>
+            </p>
+            <p className="mt-1">
+              Manager privileges:{" "}
+              <span className="font-mono text-[11px] text-slate-100">
+                {isManager ? "yes" : "no"}
+              </span>
+            </p>
           </div>
         </div>
-      </header>
+      </section>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <StaffListClient
-          programId={programId}
-          isManager={isManager}
-          staff={staff}
-        />
-      </main>
+      {/* Main staff management client (already handles its own cards/controls) */}
+      <StaffListClient
+        programId={programId}
+        isManager={isManager}
+        staff={staff}
+      />
     </div>
   );
 }

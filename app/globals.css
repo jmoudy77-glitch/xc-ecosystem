@@ -3,6 +3,20 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Theme variables (new) */
+  --brand-primary: #0f172a;
+  --brand-secondary: #1e293b;
+  --accent: #22c55e;
+
+  --surface: #020617;
+  --border-subtle: #1f2937;
+
+  --muted-foreground: #9ca3af;
+  --link: #38bdf8;
+
+  --success: #22c55e;
+  --warning: #f97316;
+  --danger: #ef4444;
 }
 
 @theme inline {
@@ -43,6 +57,24 @@
   to {
     transform: translateX(16px);
     opacity: 0;
+  }
+}
+
+@layer utilities {
+  .bg-brand {
+    background-color: var(--brand-primary);
+  }
+  .bg-brand-soft {
+    background-color: var(--surface);
+  }
+  .border-subtle {
+    border-color: var(--border-subtle);
+  }
+  .text-muted {
+    color: var(--muted-foreground);
+  }
+  .text-link {
+    color: var(--link);
   }
 }
 

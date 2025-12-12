@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import SeasonBudgetControls from "./SeasonBudgetControls";
 import ScholarshipWhatIf from "./ScholarshipWhatIf";
 import { Avatar } from "@/components/Avatar";
+
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 type ScholarshipUnit = "percent" | "equivalency" | "amount";
 
@@ -169,6 +170,524 @@ export default function SeasonRosterClient({
   const [hoverSlotKey, setHoverSlotKey] = useState<string | null>(null);
   // Avatar upload state
   const [avatarUploadingId, setAvatarUploadingId] = useState<string | null>(null);
+
+    // Add-athlete modal state
+  const [showAddAthlete, setShowAddAthlete] = useState(false);
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newGradYear, setNewGradYear] = useState<string>("");
+  const [newEventGroup, setNewEventGroup] = useState<string>("");
+  const [newJerseyNumber, setNewJerseyNumber] = useState<string>("");
+  const [newStatus, setNewStatus] = useState<string>("active");
+  const [newScholarshipAmount, setNewScholarshipAmount] = useState<string>("");
+  const [newScholarshipUnit, setNewScholarshipUnit] =
+    useState<ScholarshipUnit>("percent");
+  const [newNotes, setNewNotes] = useState<string>("");
+  const [savingNewAthlete, setSavingNewAthlete] = useState(false);
+  const [addAthleteError, setAddAthleteError] = useState<string | null>(null);
+
+  // Bulk import (CSV) modal state
+  const [showImportRoster, setShowImportRoster] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importPreviewCount, setImportPreviewCount] = useState<number | null>(
+    null
+  );
+  const [importCsvText, setImportCsvText] = useState<string | null>(null);
+
+  const [suggestedMapping, setSuggestedMapping] = useState<
+    Record<string, string | null> | null
+  >(null);
+  const [mappingLoading, setMappingLoading] = useState(false);
+
+  const [isParsingImport, setIsParsingImport] = useState(false);
+
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+
+  type ImportRow = {
+    first_name: string;
+    last_name: string;
+    grad_year?: number | null;
+    event_group?: string | null;
+    jersey_number?: string | null;
+    status?: string | null;
+    scholarship_amount?: number | null;
+    scholarship_unit?: string | null;
+    notes?: string | null;
+    email?: string | null;
+  };
+  
+  type ImportFieldKey =
+  | "first_name"
+  | "last_name"
+  | "grad_year"
+  | "event_group"
+  | "jersey_number"
+  | "status"
+  | "scholarship_amount"
+  | "scholarship_unit"
+  | "notes"
+  | "email";
+
+  function detectDelimiter(line: string): "," | "\t" | ";" {
+    if (line.includes("\t")) return "\t";
+    if (line.includes(";")) return ";";
+    return ",";
+  }
+
+  function coerceGradYear(value: string | null): number | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (!v) return null;
+
+  // 1) Extract a 4-digit year anywhere in the string (best-case)
+  const four = v.match(/\b(19\d{2}|20\d{2})\b/);
+  if (four) return Number(four[1]);
+
+  // 2) Two-digit year like "25" -> 2025
+  const two = v.match(/\b(\d{2})\b/);
+  if (two) {
+    const yy = Number(two[1]);
+    // assume 2000-2049 for 00-49, else 1900s
+    return yy <= 49 ? 2000 + yy : 1900 + yy;
+  }
+
+  // 3) Common word pattern: "twenty twenty five"
+  const normalized = v.toLowerCase().replace(/\s+/g, " ").trim();
+  const wordMap: Record<string, number> = {
+    "twenty twenty four": 2024,
+    "twenty twenty five": 2025,
+    "twenty twenty six": 2026,
+    "twenty twenty seven": 2027,
+    "twenty twenty eight": 2028,
+    "twenty twenty nine": 2029,
+    "twenty thirty": 2030,
+  };
+  if (normalized in wordMap) return wordMap[normalized];
+
+  return null;
+}
+
+  function splitDelimitedLine(line: string, delimiter: string): string[] {
+    const out: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+
+      if (ch === '"') {
+        const next = line[i + 1];
+        if (inQuotes && next === '"') {
+          cur += '"';
+          i += 1;
+          continue;
+        }
+        inQuotes = !inQuotes;
+        continue;
+      }
+
+      if (!inQuotes && ch === delimiter) {
+        out.push(cur.trim());
+        cur = "";
+        continue;
+      }
+
+      cur += ch;
+    }
+
+    out.push(cur.trim());
+    return out;
+  }
+
+  function normalizeHeaderName(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[^a-z0-9 #/%_-]/g, "")
+      .trim();
+  }
+
+  function coerceSuggestedMapping(
+    raw: Record<string, string | null>
+  ): Record<ImportFieldKey, string | null> {
+    return {
+      first_name: raw.first_name ?? null,
+      last_name: raw.last_name ?? null,
+      grad_year: raw.grad_year ?? null,
+      event_group: raw.event_group ?? null,
+      jersey_number: raw.jersey_number ?? null,
+      status: raw.status ?? null,
+      scholarship_amount: raw.scholarship_amount ?? null,
+      scholarship_unit: raw.scholarship_unit ?? null,
+      notes: raw.notes ?? null,
+      email: raw.email ?? null,
+    };
+  }
+
+function parseCsvWithMapping(
+  csvText: string,
+  mapping: Record<ImportFieldKey, string | null>
+): ImportRow[] {
+  const lines = csvText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) return [];
+
+  const delimiter = detectDelimiter(lines[0]);
+  const headers = splitDelimitedLine(lines[0], delimiter).map((h) => h.trim());
+  const normalizedHeaders = headers.map((h) => normalizeHeaderName(h));
+
+  // Build field → column index map
+  const fieldIndexMap: Partial<Record<ImportFieldKey, number>> = {};
+
+  (Object.keys(mapping) as ImportFieldKey[]).forEach((field) => {
+    const headerName = mapping[field];
+    if (!headerName) return;
+
+    const target = normalizeHeaderName(headerName);
+    const idx = normalizedHeaders.findIndex((h) => h === target);
+
+    if (idx !== -1) {
+      fieldIndexMap[field] = idx;
+    }
+  });
+
+  const dataLines = lines.slice(1);
+  const out: ImportRow[] = [];
+
+  for (const line of dataLines) {
+    const cells = splitDelimitedLine(line, delimiter).map((c) => c.trim());
+
+    const get = (field: ImportFieldKey): string | null => {
+      const idx = fieldIndexMap[field];
+      if (idx === undefined) return null;
+      const raw = cells[idx] ?? "";
+      const trimmed = raw.trim();
+      return trimmed === "" ? null : trimmed;
+    };
+
+    const firstName = (get("first_name") ?? "").trim();
+    const lastName = (get("last_name") ?? "").trim();
+
+    // Match existing importer behavior: skip rows with no clear name
+    if (!firstName || !lastName) continue;
+
+    const gradYear = coerceGradYear(get("grad_year"));
+
+    const scholarshipAmount = (() => {
+      const v = get("scholarship_amount");
+      if (!v) return null;
+      const cleaned = v.replace("%", "");
+      const n = Number(cleaned);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    })();
+
+    const row: ImportRow = {
+      first_name: firstName,
+      last_name: lastName,
+      grad_year: gradYear,
+      event_group: get("event_group"),
+      jersey_number: get("jersey_number"),
+      status: get("status") || "active",
+      scholarship_amount: scholarshipAmount,
+      scholarship_unit: get("scholarship_unit") || "percent",
+      notes: get("notes"),
+      email: get("email"),
+    };
+
+    out.push(row);
+  }
+
+  return out;
+}
+
+  function parseCsvToNormalizedRows(text: string): ImportRow[] {
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    if (lines.length < 2) {
+      throw new Error("File must contain a header row and at least one data row.");
+    }
+
+    const headerLine = lines[0];
+    const delimiter = detectDelimiter(headerLine);
+    const headers = splitDelimitedLine(headerLine, delimiter)
+      .map((h) => normalizeHeaderName(h));
+
+    function getValue(rowCols: string[], key: string): string | null {
+      const idx = headers.indexOf(normalizeHeaderName(key));
+      if (idx === -1) return null;
+      const raw = rowCols[idx] ?? "";
+      const trimmed = raw.trim();
+      return trimmed === "" ? null : trimmed;
+    }
+
+    const rows: ImportRow[] = [];
+
+    for (let i = 1; i < lines.length; i += 1) {
+      const line = lines[i];
+      if (!line) continue;
+
+      const cols = splitDelimitedLine(line, delimiter);
+      const firstName = getValue(cols, "first_name") ?? getValue(cols, "first") ?? "";
+      const lastName = getValue(cols, "last_name") ?? getValue(cols, "last") ?? "";
+
+      if (!firstName || !lastName) {
+        // Skip rows with no clear name; we can add better diagnostics later
+        continue;
+      }
+
+      const gradYear = coerceGradYear(
+        getValue(cols, "grad_year") ??
+          getValue(cols, "gradyear") ??
+          getValue(cols, "class_year") ??
+          null
+      );
+
+      const scholarshipStr =
+        getValue(cols, "scholarship_amount") ??
+        getValue(cols, "scholarship") ??
+        getValue(cols, "award") ??
+        null;
+      let scholarshipAmount: number | null = null;
+      if (scholarshipStr) {
+        const parsed = Number(scholarshipStr);
+        if (Number.isFinite(parsed) && parsed >= 0) {
+          scholarshipAmount = parsed;
+        }
+      }
+
+      const row: ImportRow = {
+        first_name: firstName,
+        last_name: lastName,
+        grad_year: gradYear,
+        event_group:
+          getValue(cols, "event_group") ?? getValue(cols, "group") ?? null,
+        jersey_number:
+          getValue(cols, "jersey_number") ?? getValue(cols, "jersey") ?? null,
+        status: getValue(cols, "status") ?? null,
+        scholarship_amount: scholarshipAmount,
+        scholarship_unit:
+          getValue(cols, "scholarship_unit") ??
+          getValue(cols, "unit") ??
+          "percent",
+        notes: getValue(cols, "notes"),
+        email: getValue(cols, "email"),
+      };
+
+      rows.push(row);
+    }
+
+    return rows;
+  }
+
+    async function requestSuggestedMappingFromServer(
+    headers: string[],
+    sampleRows: string[][]
+  ) {
+    setMappingLoading(true);
+    setSuggestedMapping(null);
+
+    try {
+      const res = await fetch(
+        `/api/programs/${programId}/teams/${teamId}/seasons/${seasonId}/roster/import/suggest-mapping`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ headers, sampleRows }),
+        }
+      );
+
+      const body = await res.json();
+
+      if (!res.ok) {
+        console.error(
+          "[SeasonRosterClient] suggest-mapping error:",
+          body
+        );
+        return;
+      }
+
+      console.log(
+        "[SeasonRosterClient] suggested mapping:",
+        body.mapping
+      );
+      setSuggestedMapping(body.mapping as Record<string, string | null>);
+    } catch (err) {
+      console.error("[SeasonRosterClient] suggest-mapping error:", err);
+    } finally {
+      setMappingLoading(false);
+    }
+  }
+
+    function handleImportFileChange(e: ChangeEvent<HTMLInputElement>) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsParsingImport(true);
+      setImportError(null);
+      setImportPreviewCount(null);
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const text = event.target?.result;
+          if (typeof text !== "string") {
+            throw new Error("Could not read file as text.");
+          }
+          setImportCsvText(text);
+
+          // --- NEW: extract headers + a few sample rows for mapping ---
+          const allLines = text
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0);
+
+          if (allLines.length >= 1) {
+            const headerLine = allLines[0];
+            const delimiter = detectDelimiter(headerLine);
+            const headers = splitDelimitedLine(headerLine, delimiter).map((h) => h.trim());
+
+            const sampleLines = allLines.slice(1, Math.min(allLines.length, 6));
+            const sampleRows = sampleLines.map((line) =>
+              splitDelimitedLine(line, delimiter).map((c) => c.trim())
+            );
+
+            // Fire-and-forget: get suggested mapping based on this file
+            void requestSuggestedMappingFromServer(headers, sampleRows);
+          }
+
+          // --- EXISTING behavior: normalize rows using current heuristic ---
+          const normalized = parseCsvToNormalizedRows(text);
+
+          setImportRows(normalized);
+          setImportPreviewCount(normalized.length);
+
+          console.log(
+            "[SeasonRosterClient] Normalized roster import rows:",
+            normalized
+          );
+        } catch (err: any) {
+          console.error("[SeasonRosterClient] Import parse error:", err);
+          setImportError(err?.message || "Failed to parse CSV file.");
+        } finally {
+          setIsParsingImport(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setIsParsingImport(false);
+        setImportError("Failed to read file.");
+      };
+
+      reader.readAsText(file);
+    }
+
+    useEffect(() => {
+      if (!importCsvText) return;
+      if (!suggestedMapping) return;
+
+      try {
+        const coerced = coerceSuggestedMapping(suggestedMapping);
+        const normalized = parseCsvWithMapping(importCsvText, coerced);
+        setImportRows(normalized);
+        setImportPreviewCount(normalized.length);
+
+        console.log(
+          "[SeasonRosterClient] Normalized roster import rows (mapped):",
+          normalized
+        );
+      } catch (err) {
+        console.error("[SeasonRosterClient] Import re-parse (mapped) error:", err);
+      }
+    }, [importCsvText, suggestedMapping]);
+
+    async function handleConfirmImport() {
+    if (!importRows.length) {
+      setImportError("No rows to import. Please upload a CSV first.");
+      return;
+    }
+
+    if (!isManager || isLocked) {
+      setImportError("You do not have permission to modify this roster.");
+      return;
+    }
+
+    setIsImporting(true);
+    setImportError(null);
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const row of importRows) {
+      try {
+        const res = await fetch(
+          `/api/programs/${programId}/teams/${teamId}/seasons/${seasonId}/roster/add-athlete`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              first_name: row.first_name,
+              last_name: row.last_name,
+              grad_year: row.grad_year ?? null,
+              event_group: row.event_group ?? null,
+              jersey_number: row.jersey_number ?? null,
+              status: row.status || "active",
+              scholarship_amount: row.scholarship_amount ?? null,
+              scholarship_unit:
+                (row.scholarship_unit as ScholarshipUnit | null) ?? "percent",
+              notes: row.notes ?? null,
+              // We’re ignoring row.email for now, since the add-athlete API
+              // doesn’t accept an email field yet.
+            }),
+          }
+        );
+
+        if (!res.ok) {
+          // Optional: log detailed error
+          try {
+            const body = await res.json();
+            console.error(
+              "[SeasonRosterClient] Import row failed:",
+              row,
+              body
+            );
+          } catch {
+            console.error("[SeasonRosterClient] Import row failed:", row);
+          }
+          failureCount += 1;
+          continue;
+        }
+
+        successCount += 1;
+      } catch (err) {
+        console.error("[SeasonRosterClient] Import row error:", row, err);
+        failureCount += 1;
+      }
+    }
+
+    setIsImporting(false);
+
+    if (failureCount > 0) {
+      setImportError(
+        `Imported ${successCount} rows, ${failureCount} failed. Check console for details.`
+      );
+    } else {
+      // Clean up and close modal
+      setShowImportRoster(false);
+      setImportPreviewCount(null);
+      setImportRows([]);
+      setImportError(null);
+    }
+
+    // In all cases, refresh so server recomputes roster + scholarship summary
+    router.refresh();
+  }
 
   // Per-athlete scholarship edit state
   const [editingScholarshipRosterId, setEditingScholarshipRosterId] =
@@ -338,6 +857,104 @@ export default function SeasonRosterClient({
     loadRecruits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+    async function handleAddAthleteSubmit() {
+    if (!isManager || isLocked) return;
+
+    const firstName = newFirstName.trim();
+    const lastName = newLastName.trim();
+    const gradYearStr = newGradYear.trim();
+
+    if (!firstName || !lastName) {
+      setAddAthleteError("First and last name are required.");
+      return;
+    }
+
+    let gradYear: number | null = null;
+    if (gradYearStr) {
+      const parsed = Number(gradYearStr);
+      if (!Number.isFinite(parsed) || parsed < 1900 || parsed > 2100) {
+        setAddAthleteError("Grad year must be a valid year (e.g. 2027).");
+        return;
+      }
+      gradYear = parsed;
+    }
+
+    const scholarshipStr = newScholarshipAmount.trim();
+    let scholarshipAmount: number | null = null;
+    if (scholarshipStr) {
+      const parsed = Number(scholarshipStr);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        setAddAthleteError(
+          "Scholarship amount must be a non-negative number, or leave blank."
+        );
+        return;
+      }
+      scholarshipAmount = parsed;
+    }
+
+    setSavingNewAthlete(true);
+    setAddAthleteError(null);
+
+    try {
+      const res = await fetch(
+        `/api/programs/${programId}/teams/${teamId}/seasons/${seasonId}/roster/add-athlete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            grad_year: gradYear,
+            event_group: newEventGroup.trim() || null,
+            jersey_number: newJerseyNumber.trim() || null,
+            status: newStatus || "active",
+            scholarship_amount: scholarshipAmount,
+            scholarship_unit: newScholarshipUnit,
+            notes: newNotes.trim() || null,
+          }),
+        }
+      );
+
+      let body: any = null;
+      try {
+        body = await res.json();
+      } catch {
+        // ignore parse error on empty body
+      }
+
+      if (!res.ok) {
+        const msg =
+          body?.error ||
+          body?.message ||
+          "Failed to add athlete to roster – please try again.";
+        setAddAthleteError(msg);
+        return;
+      }
+
+      // Reset + close modal
+      setShowAddAthlete(false);
+      setNewFirstName("");
+      setNewLastName("");
+      setNewGradYear("");
+      setNewEventGroup("");
+      setNewJerseyNumber("");
+      setNewStatus("active");
+      setNewScholarshipAmount("");
+      setNewScholarshipUnit("percent");
+      setNewNotes("");
+      setAddAthleteError(null);
+
+      // Let the server recompute roster + scholarship summary
+      router.refresh();
+    } catch (err: any) {
+      setAddAthleteError(
+        err?.message || "Unexpected error while adding athlete."
+      );
+    } finally {
+      setSavingNewAthlete(false);
+    }
+  }
 
   // --- Scholarship focus for edit modal ---
   function handleFocusScholarship(rosterId: string) {
@@ -675,8 +1292,35 @@ export default function SeasonRosterClient({
             )}
           </div>
 
-          {/* Right side: tools */}
+                    {/* Right side: tools */}
           <div className="mt-2 flex flex-wrap items-center gap-2 md:mt-0">
+            {isManager && !isLocked && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddAthlete(true);
+                    setAddAthleteError(null);
+                  }}
+                  className="rounded-full bg-brand px-3 py-1 text-[11px] font-semibold text-slate-950 hover:bg-brand-soft"
+                >
+                  Add athlete
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImportRoster(true);
+                    setImportError(null);
+                    setImportPreviewCount(null);
+                  }}
+                  className="rounded-full border border-subtle bg-surface/80 px-3 py-1 text-[11px] font-semibold text-muted hover:border-brand-soft hover:text-foreground"
+                >
+                  Import roster
+                </button>
+              </>
+            )}
+
             <span className="text-[10px] uppercase tracking-wide text-slate-500">
               Tools:
             </span>
@@ -792,7 +1436,7 @@ export default function SeasonRosterClient({
                         return (
                           <div
                             key={entry.id}
-                            className="flex w-72 max-w-full flex-col rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2"
+                            className="flex w-45 max-w-full flex-col rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2"
                             style={{
                               aspectRatio: "2 / 3.75", // width / height; ~1.875:1 height/width
                             }}
@@ -1559,6 +2203,242 @@ export default function SeasonRosterClient({
           </>
         )}
       </aside>
+
+        {showAddAthlete && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70">
+          <div className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100">
+            <p className="text-sm font-semibold">Add athlete to roster</p>
+            <p className="mt-1 text-[11px] text-slate-300">
+              This creates a program athlete and places them directly on this
+              season&apos;s roster. No user account is required.
+            </p>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] md:grid-cols-2">
+              <div className="md:col-span-1">
+                <label className="mb-1 block text-slate-400">
+                  First name<span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newFirstName}
+                  onChange={(e) => setNewFirstName(e.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="mb-1 block text-slate-400">
+                  Last name<span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newLastName}
+                  onChange={(e) => setNewLastName(e.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-slate-400">Grad year</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={newGradYear}
+                  onChange={(e) => setNewGradYear(e.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                  placeholder="e.g. 2027"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-slate-400">Event group</label>
+                <input
+                  type="text"
+                  value={newEventGroup}
+                  onChange={(e) => setNewEventGroup(e.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                  placeholder="e.g. Distance, Sprints"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-slate-400">
+                  Jersey number
+                </label>
+                <input
+                  type="text"
+                  value={newJerseyNumber}
+                  onChange={(e) => setNewJerseyNumber(e.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-slate-400">Roster status</label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="redshirt">Redshirt</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-slate-400">
+                  Scholarship amount
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={newScholarshipAmount}
+                  onChange={(e) => setNewScholarshipAmount(e.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                  placeholder="Leave blank for none"
+                />
+                <p className="mt-0.5 text-[10px] text-slate-500">
+                  Interpreted based on unit below.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-slate-400">Unit</label>
+                <select
+                  value={newScholarshipUnit}
+                  onChange={(e) =>
+                    setNewScholarshipUnit(e.target.value as ScholarshipUnit)
+                  }
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                >
+                  <option value="percent">Percent of full</option>
+                  <option value="equivalency">Equivalency</option>
+                  <option value="amount">Dollar amount</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-slate-400">Notes</label>
+                <textarea
+                  rows={3}
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  className="w-full resize-none rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none focus:border-sky-500"
+                  placeholder="Optional coach notes about this athlete or award."
+                />
+              </div>
+            </div>
+
+            {addAthleteError && (
+              <p className="mt-2 text-[10px] text-rose-400">{addAthleteError}</p>
+            )}
+
+            <div className="mt-3 flex justify-end gap-2 text-[11px]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (savingNewAthlete) return;
+                  setShowAddAthlete(false);
+                  setAddAthleteError(null);
+                }}
+                className="rounded-md border border-slate-600 px-3 py-1 text-slate-200 hover:bg-slate-800"
+                disabled={savingNewAthlete}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddAthleteSubmit}
+                disabled={savingNewAthlete || isLocked || !isManager}
+                className="rounded-md bg-emerald-600 px-3 py-1 font-semibold text-slate-950 hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {savingNewAthlete ? "Adding…" : "Add to roster"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImportRoster && (
+              <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70">
+                <div className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100">
+                  <p className="text-sm font-semibold">Import roster from CSV</p>
+                  <p className="mt-1 text-[11px] text-slate-300">
+                    Upload a CSV export of your roster. We&apos;ll parse it into a normalized
+                    format and (for now) log the rows to the console so we can finalize
+                    mapping before writing to the database.
+                  </p>
+
+                  <div className="mt-3 space-y-2 text-[11px]">
+                    <div>
+                      <label className="mb-1 block text-slate-400">
+                        CSV file
+                      </label>
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={handleImportFileChange}
+                        className="block w-full text-[11px] text-slate-200 file:mr-2 file:rounded-md file:border-0 file:bg-slate-800 file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-slate-100 hover:file:bg-slate-700"
+                      />
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Expected columns can include: first_name, last_name, grad_year,
+                        event_group, jersey_number, status, scholarship_amount,
+                        scholarship_unit, notes, email. We&apos;ll make reasonable guesses
+                        for similar names.
+                      </p>
+                    </div>
+
+                    {isParsingImport && (
+                      <p className="text-[11px] text-slate-400">
+                        Parsing file…
+                      </p>
+                    )}
+
+                    {importPreviewCount != null && !isParsingImport && (
+                      <p className="text-[11px] text-emerald-300">
+                        Parsed <span className="font-semibold">{importPreviewCount}</span>{" "}
+                        rows. Check the browser console for the normalized output.
+                      </p>
+                    )}
+
+                    {importError && (
+                      <p className="text-[10px] text-rose-400">
+                        {importError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex justify-end gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isParsingImport || isImporting) return;
+                        setShowImportRoster(false);
+                        setImportError(null);
+                        setImportPreviewCount(null);
+                        setImportRows([]);
+                      }}
+                      className="rounded-md border border-slate-600 px-3 py-1 text-slate-200 hover:bg-slate-800"
+                      disabled={isParsingImport}
+                    >
+                      Close
+                    </button>
+                    {/* Future: when we wire the API, this becomes "Import to roster" */}
+                    <button
+                      type="button"
+                      onClick={handleConfirmImport}
+                      disabled={
+                        isParsingImport || isImporting || !importPreviewCount || importPreviewCount === 0
+                      }
+                      className="rounded-md bg-emerald-600 px-3 py-1 font-semibold text-slate-950 hover:bg-emerald-500 disabled:opacity-60"
+                    >
+                      {isImporting ? "Importing…" : "Import to roster"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
        
       {editingScholarshipRosterId && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70">

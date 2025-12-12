@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { loadProgramTheme } from "@/lib/branding";
 
 export const metadata: Metadata = {
   title: "XC Ecosystem",
@@ -18,33 +19,55 @@ function NavLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-[11px] font-medium text-slate-100 hover:border-slate-400 hover:bg-slate-900/90"
+      className="inline-flex items-center rounded-full border border-subtle bg-brand-soft px-3 py-1.5 text-[11px] font-medium hover:bg-brand-soft/80"
     >
       {label}
     </Link>
   );
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const theme = await loadProgramTheme(null);
+
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-950 text-slate-50 antialiased">
+      <body
+        className="min-h-screen antialiased"
+        style={{
+          ["--background" as any]: theme.background,
+          ["--foreground" as any]: theme.foreground,
+
+          ["--brand-primary" as any]: theme.brandPrimary,
+          ["--brand-secondary" as any]: theme.brandSecondary,
+          ["--accent" as any]: theme.accent,
+
+          ["--surface" as any]: theme.surface,
+          ["--border-subtle" as any]: theme.borderSubtle,
+
+          ["--muted-foreground" as any]: theme.mutedForeground,
+          ["--link" as any]: theme.link,
+
+          ["--success" as any]: theme.success,
+          ["--warning" as any]: theme.warning,
+          ["--danger" as any]: theme.danger,
+        }}
+      >
         {/* Global top nav */}
-        <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+        <header className="border-b border-subtle bg-brand-soft/80 backdrop-blur">
           <div className="mx-auto flex max-w-[6xl] items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-950 flex items-center justify-center text-xs font-semibold">
+              <div className="h-8 w-8 rounded-lg bg-brand flex items-center justify-center text-xs font-semibold">
                 XC
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-50">
+                <p className="text-sm font-semibold">
                   XC Ecosystem
                 </p>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted">
                   Recruiting, roster & AI assistant
                 </p>
               </div>

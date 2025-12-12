@@ -1,5 +1,4 @@
 // app/programs/[programId]/teams/page.tsx
-// Program Teams page (server component)
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -22,7 +21,9 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
 
   const supabase = await supabaseServerComponent();
 
+  //
   // 1) Auth
+  //
   const {
     data: { user: authUser },
     error: authError,
@@ -38,7 +39,9 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
 
   const authId = authUser.id;
 
-  // 2) Ensure viewer has a row in public.users
+  //
+  // 2) Ensure viewer user row exists (same pattern as overview/staff)
+  //
   const { data: existingUserRow, error: userSelectError } = await supabaseAdmin
     .from("users")
     .select("id, auth_id, email")
@@ -68,7 +71,7 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
     if (userInsertError) {
       console.error(
         "[ProgramTeams] Failed to create viewer user row:",
-        userInsertError
+        userInsertError,
       );
       throw new Error("Failed to create user record");
     }
@@ -78,7 +81,9 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
 
   const viewerUserId = viewerUserRow.id as string;
 
-  // 3) Viewer membership & program basic info
+  //
+  // 3) Membership & program basic info
+  //
   const { data: membershipRow, error: membershipError } = await supabaseAdmin
     .from("program_members")
     .select(
@@ -90,7 +95,7 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
         id,
         name
       )
-    `
+    `,
     )
     .eq("program_id", programId)
     .eq("user_id", viewerUserId)
@@ -102,6 +107,7 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
   }
 
   if (!membershipRow || !membershipRow.programs) {
+    // Not a member of this program → bounce to dashboard
     redirect("/dashboard");
   }
 
@@ -117,8 +123,10 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
     actingRole !== null &&
     MANAGER_ROLES.includes(actingRole.toLowerCase() as any);
 
+  //
   // 4) Load teams for this program
-  const { data: teamRows, error: teamsError } = await supabaseAdmin
+  //
+  const { data: teamRows, error: teamError } = await supabaseAdmin
     .from("teams")
     .select(
       `
@@ -130,13 +138,13 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
       gender,
       level,
       season
-    `
+    `,
     )
     .eq("program_id", programId)
     .order("name", { ascending: true });
 
-  if (teamsError) {
-    console.error("[ProgramTeams] teams error:", teamsError);
+  if (teamError) {
+    console.error("[ProgramTeams] teams error:", teamError);
     throw new Error("Failed to load teams");
   }
 
@@ -151,33 +159,65 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
     season: (row.season as string | null) ?? null,
   }));
 
+  //
+  // 5) Render inside ProgramLayout shell
+  //
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-base font-semibold text-slate-100">
-            Teams &amp; rosters
-          </h1>
-          <p className="mt-1 text-[11px] text-slate-400">
-            Structure this program into teams. Each team will have seasons, rosters,
-            and scholarship planning attached as your staff builds things out.
-          </p>
-        </div>
-        {isManager && (
-          <Link
-            href="#"
-            className="rounded-md border border-emerald-500/70 bg-emerald-900/30 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 hover:border-emerald-400 hover:bg-emerald-800/50"
-          >
-            + Add team
-          </Link>
-        )}
-      </div>
+      {/* Context / breadcrumb header */}
+      <section className="rounded-xl border border-subtle bg-brand-soft p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-[11px] text-muted">
+              <Link href="/dashboard" className="hover:underline">
+                Dashboard
+              </Link>
+              <span>›</span>
+              <Link
+                href={`/programs/${programId}`}
+                className="hover:underline"
+              >
+                {programName}
+              </Link>
+              <span>›</span>
+              <span>Teams</span>
+            </div>
 
-      <TeamListClient
-        programId={programId}
-        isManager={isManager}
-        teams={teams}
-      />
+            <h1 className="mt-1 text-sm font-semibold text-slate-100">
+              Teams &amp; rosters
+            </h1>
+            <p className="mt-1 text-[11px] text-muted">
+              Define the teams inside this program (e.g. Men&apos;s XC,
+              Women&apos;s Track &amp; Field), and manage their seasons,
+              rosters, and scholarship budgets.
+            </p>
+          </div>
+
+          <div className="hidden text-right text-[11px] text-muted sm:block">
+            <p>
+              Your role:{" "}
+              <span className="font-mono text-[11px] text-slate-100">
+                {actingRole ?? "unknown"}
+              </span>
+            </p>
+            <p className="mt-1">
+              Manager privileges:{" "}
+              <span className="font-mono text-[11px] text-slate-100">
+                {isManager ? "yes" : "no"}
+              </span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Teams list panel */}
+      <section className="rounded-xl border border-subtle bg-surface p-4">
+        <TeamListClient
+          programId={programId}
+          isManager={isManager}
+          teams={teams}
+        />
+      </section>
     </div>
   );
 }

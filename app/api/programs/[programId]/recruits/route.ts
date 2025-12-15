@@ -114,7 +114,8 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
           id,
           first_name,
           last_name,
-          grad_year
+          grad_year,
+          event_group
         )
       )
     `
@@ -155,6 +156,16 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
       return {
         program_recruit_id: row.id as string,
         athlete_id: (athleteRecord?.id as string | undefined) ?? null,
+
+        // Normalized flat fields (for Quick-add and other UIs)
+        first_name:
+          (athleteRecord?.first_name as string | null | undefined) ?? "",
+        last_name:
+          (athleteRecord?.last_name as string | null | undefined) ?? "",
+        event_group:
+          (athleteRecord?.event_group as string | null | undefined) ?? null,
+
+        // Backward-compatible fields
         full_name: fullName,
         grad_year:
           (athleteRecord?.grad_year as number | null | undefined) ?? null,

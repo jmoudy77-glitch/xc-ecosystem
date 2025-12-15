@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import crypto from "crypto";
 
 type RouteParams = {
   params: Promise<{
@@ -104,54 +105,134 @@ export async function POST(req: Request, { params }: RouteParams) {
       );
     }
 
-    // Duplicate protection (season-level): if an athlete with the same identity fields is already
-    // on this team season roster, treat this request as idempotent and skip creating anything new.
-    // NOTE: We intentionally scope duplicates to the roster (team_season) rather than trying to
-    // globally de-dupe athletes without a stable unique identifier.
-    const { data: existingAthletes, error: existingAthletesError } = await supabaseAdmin
-      .from("athletes")
-      .select("id")
-      .ilike("first_name", firstName)
-      .ilike("last_name", lastName)
-      .eq("grad_year", gradYear as number)
-      .ilike("event_group", eventGroup);
+    // Duplicate identity soft-check (DB-outward):
+    // Coach-input model uses a WEAK identity (first+last+grad_year) and returns 409 with candidates
+    // for side-by-side resolution when a possible match is found.
+    //
+    // NOTE: We intentionally do NOT include school or event_group in the identity key (both can change).
+    // Event group is still required for insertion, but not for identity.
+    let weakKey: string | null = null;
+
+    // Prefer the DB function (created by the identity migration) to ensure the API matches DB logic.
+    // Fallback to a deterministic local computation if the function is unavailable (e.g., local dev mismatch).
+    const { data: weakKeyData, error: weakKeyError } = await supabaseAdmin.rpc(
+      "athlete_identity_key_weak",
+      {
+        first_name: firstName,
+        last_name: lastName,
+        grad_year: gradYear as number,
+      }
+    );
+
+    if (!weakKeyError && typeof (weakKeyData as any) === "string") {
+      weakKey = weakKeyData as any as string;
+    } else {
+      if (weakKeyError) {
+        console.warn(
+          "[add-athlete] athlete_identity_key_weak RPC unavailable; falling back to local key computation:",
+          weakKeyError
+        );
+      }
+
+      // Fallback: normalize by trimming/lowercasing and hashing.
+      // This is only used if the DB helper function is not available.
+      const normalized = `${firstName.trim().toLowerCase()}|${lastName
+        .trim()
+        .toLowerCase()}|${String(gradYear)}`;
+      weakKey = crypto.createHash("sha256").update(normalized).digest("hex");
+    }
+
+    const { data: existingAthletes, error: existingAthletesError } =
+      await supabaseAdmin
+        .from("athletes")
+        .select(
+          "id, first_name, last_name, grad_year, event_group, is_claimed, avatar_url, date_of_birth, created_at"
+        )
+        .eq("identity_key_weak", weakKey)
+        .limit(25);
 
     if (existingAthletesError) {
       console.error(
-        "[add-athlete] athletes precheck select error:",
+        "[add-athlete] athletes weak-identity precheck select error:",
         existingAthletesError
       );
+      // If we can't precheck, continue with insertion and let DB constraints/triggers be authoritative.
     }
 
-    const existingAthleteIds = (existingAthletes ?? []).map((a: any) => a.id as string);
+    const candidates = (existingAthletes ?? []) as any[];
 
-    if (existingAthleteIds.length > 0) {
-      const { data: existingRoster, error: existingRosterError } = await supabaseAdmin
-        .from("team_roster")
-        .select("id, athlete_id")
-        .eq("team_season_id", seasonId)
-        .in("athlete_id", existingAthleteIds)
-        .limit(1)
-        .maybeSingle();
+    if (candidates.length > 0) {
+      const candidateIds = candidates.map((a) => a.id as string);
+
+      // Check if any candidate is already on this season roster (idempotent "skipped")
+      const { data: existingRosterRows, error: existingRosterError } =
+        await supabaseAdmin
+          .from("team_roster")
+          .select("id, athlete_id")
+          .eq("team_season_id", seasonId)
+          .in("athlete_id", candidateIds);
 
       if (existingRosterError) {
         console.error(
-          "[add-athlete] team_roster precheck select error:",
+          "[add-athlete] team_roster weak-identity precheck select error:",
           existingRosterError
         );
       }
 
-      if (existingRoster) {
+      const rosterByAthleteId = new Map<string, string>();
+      (existingRosterRows ?? []).forEach((r: any) => {
+        rosterByAthleteId.set(r.athlete_id as string, r.id as string);
+      });
+
+      // If any existing athlete is already on the roster, treat this as idempotent.
+      const firstRosterHit = (existingRosterRows ?? [])[0] as any | undefined;
+      if (firstRosterHit) {
         return NextResponse.json(
           {
             status: "skipped",
             reason: "duplicate",
-            roster_id: existingRoster.id,
-            athlete_id: existingRoster.athlete_id,
+            roster_id: firstRosterHit.id,
+            athlete_id: firstRosterHit.athlete_id,
           },
           { status: 200 }
         );
       }
+
+      // Otherwise, return a standardized 409 duplicate payload for side-by-side resolution.
+      const candidatesForClient = candidates.map((a) => ({
+        athlete_id: a.id,
+        first_name: a.first_name,
+        last_name: a.last_name,
+        grad_year: a.grad_year,
+        event_group: a.event_group,
+        is_claimed: a.is_claimed,
+        avatar_url: a.avatar_url,
+        date_of_birth: a.date_of_birth ?? null,
+        created_at: a.created_at ?? null,
+        already_on_roster: rosterByAthleteId.has(a.id as string),
+        match_reason: ["name+grad_year"],
+      }));
+
+      return NextResponse.json(
+        {
+          error: "duplicate_identity",
+          message: "Possible existing athlete match found.",
+          identity: {
+            mode: "weak",
+            key: weakKey,
+            input: {
+              first_name: firstName,
+              last_name: lastName,
+              grad_year: gradYear as number,
+            },
+          },
+          candidates: candidatesForClient,
+          resolver: {
+            actions: ["use_existing", "create_new_anyway"],
+          },
+        },
+        { status: 409 }
+      );
     }
 
     // 1) Create athlete (no user_id, unclaimed)

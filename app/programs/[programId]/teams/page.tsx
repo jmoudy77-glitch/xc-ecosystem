@@ -12,12 +12,16 @@ type PageProps = {
   params: Promise<{
     programId: string;
   }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
-export default async function ProgramTeamsPage({ params }: PageProps) {
+export default async function ProgramTeamsPage({ params, searchParams }: PageProps) {
   const { programId } = await params;
+  const sp = (await searchParams) ?? {};
+  const manage = Array.isArray(sp.manage) ? sp.manage[0] : sp.manage;
+  const forceManage = manage === "1" || manage === "true";
 
   const supabase = await supabaseServerComponent();
 
@@ -159,13 +163,19 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
     season: (row.season as string | null) ?? null,
   }));
 
+  // Minimal-touch: If there is exactly one team, jump straight into it.
+  // Use `?manage=1` to force the list view (e.g., to add/manage multiple teams).
+  if (!forceManage && teams.length === 1) {
+    redirect(`/programs/${programId}/teams/${teams[0].id}`);
+  }
+
   //
   // 5) Render inside ProgramLayout shell
   //
   return (
-    <div className="space-y-4">
-      {/* Context / breadcrumb header */}
-      <section className="rounded-xl border border-subtle bg-brand-soft p-5">
+    <div className="flex flex-col gap-4 md:h-[calc(100vh-220px)] md:overflow-hidden">
+      {/* Context (lightweight; avoids competing with the program hero) */}
+      <section className="shrink-0 rounded-xl border border-subtle bg-surface/40 p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-[11px] text-muted">
@@ -184,34 +194,43 @@ export default async function ProgramTeamsPage({ params }: PageProps) {
             </div>
 
             <h1 className="mt-1 text-sm font-semibold text-slate-100">
-              Teams &amp; rosters
+              Teams
             </h1>
             <p className="mt-1 text-[11px] text-muted">
-              Define the teams inside this program (e.g. Men&apos;s XC,
-              Women&apos;s Track &amp; Field), and manage their seasons,
-              rosters, and scholarship budgets.
+              Manage teams and jump into their seasons, roster builder, and active roster. If you only have one team, you’ll be taken directly into it (use <span className="font-mono">?manage=1</span> to view this list).
             </p>
           </div>
 
-          <div className="hidden text-right text-[11px] text-muted sm:block">
-            <p>
-              Your role:{" "}
-              <span className="font-mono text-[11px] text-slate-100">
-                {actingRole ?? "unknown"}
-              </span>
-            </p>
-            <p className="mt-1">
-              Manager privileges:{" "}
-              <span className="font-mono text-[11px] text-slate-100">
-                {isManager ? "yes" : "no"}
-              </span>
-            </p>
+          <div className="flex flex-col items-end gap-2 text-right text-[11px] text-muted">
+            {isManager ? (
+              <Link
+                href={`/programs/${programId}/teams?manage=1`}
+                className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 shadow-sm transition hover:bg-sky-400"
+              >
+                Add Team
+              </Link>
+            ) : null}
+
+            <div className="hidden sm:block">
+              <p>
+                Your role:{" "}
+                <span className="font-mono text-[11px] text-slate-100">
+                  {actingRole ?? "unknown"}
+                </span>
+              </p>
+              <p className="mt-1">
+                Manager privileges:{" "}
+                <span className="font-mono text-[11px] text-slate-100">
+                  {isManager ? "yes" : "no"}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Teams list panel */}
-      <section className="rounded-xl border border-subtle bg-surface p-4">
+      {/* Teams list panel (scrolls on desktop) */}
+      <section className="flex-1 overflow-y-auto rounded-xl border border-subtle bg-surface p-4">
         <TeamListClient
           programId={programId}
           isManager={isManager}

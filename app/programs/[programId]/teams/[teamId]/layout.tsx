@@ -1,11 +1,14 @@
-// app/programs/[programId]/teams/[teamId]/page.tsx
+// app/programs/[programId]/teams/[teamId]/layout.tsx
 
+import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import TeamManagementShell from "./TeamManagementShell";
 import type { TeamSeasonSummary } from "./TeamSeasonsClient";
 
-type PageProps = {
+type LayoutProps = {
+  children: ReactNode;
   params: Promise<{
     programId: string;
     teamId: string;
@@ -14,8 +17,7 @@ type PageProps = {
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
 
-export default async function TeamDetailPage({ params }: PageProps) {
-  // Next 16: params is a Promise, so we await it
+export default async function TeamLayout({ children, params }: LayoutProps) {
   const { programId, teamId } = await params;
 
   const supabase = await supabaseServerComponent();
@@ -25,9 +27,7 @@ export default async function TeamDetailPage({ params }: PageProps) {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
-  if (!authUser) {
-    redirect("/login");
-  }
+  if (!authUser) redirect("/login");
 
   const authId = authUser.id;
 
@@ -38,9 +38,7 @@ export default async function TeamDetailPage({ params }: PageProps) {
     .eq("auth_id", authId)
     .maybeSingle();
 
-  if (!userRow) {
-    redirect("/dashboard");
-  }
+  if (!userRow) redirect("/dashboard");
 
   const viewerUserId = userRow.id as string;
 
@@ -56,21 +54,16 @@ export default async function TeamDetailPage({ params }: PageProps) {
         id,
         name
       )
-    `,
+    `
     )
     .eq("program_id", programId)
     .eq("user_id", viewerUserId)
     .maybeSingle();
 
-  if (!membership || !membership.programs) {
-    redirect("/dashboard");
-  }
+  if (!membership || !(membership as any).programs) redirect("/dashboard");
 
   const programsRel = (membership as any).programs;
-  const programRecord = Array.isArray(programsRel)
-    ? programsRel[0]
-    : programsRel;
-  const programName = (programRecord?.name as string) ?? "Program";
+  const programRecord = Array.isArray(programsRel) ? programsRel[0] : programsRel;
 
   const actingRole: string | null = (membership.role as string) ?? null;
   const isManager =
@@ -86,13 +79,11 @@ export default async function TeamDetailPage({ params }: PageProps) {
     .maybeSingle();
 
   if (teamError) {
-    console.error("[TeamDetail] team error:", teamError);
+    console.error("[TeamLayout] team error:", teamError);
     throw new Error("Failed to load team");
   }
 
-  if (!teamRow) {
-    redirect(`/programs/${programId}/teams`);
-  }
+  if (!teamRow) redirect(`/programs/${programId}/teams`);
 
   const teamName = (teamRow.name as string) ?? "Team";
 
@@ -114,13 +105,13 @@ export default async function TeamDetailPage({ params }: PageProps) {
       is_current,
       is_active,
       created_at
-    `,
+    `
     )
     .eq("team_id", teamId)
     .order("created_at", { ascending: false });
 
   if (seasonsError) {
-    console.error("[TeamDetail] seasons error:", seasonsError);
+    console.error("[TeamLayout] seasons error:", seasonsError);
     throw new Error("Failed to load seasons");
   }
 
@@ -139,28 +130,29 @@ export default async function TeamDetailPage({ params }: PageProps) {
     is_active: (row.is_active as boolean) ?? true,
   }));
 
-  // Determine the active or next-up season for display
+  // Determine active season (passed to shell for setup gating)
   const todayIso = new Date().toISOString().slice(0, 10);
   const activeSeason =
     seasons.find((s) => s.is_current) ??
     seasons.find((s) => s.is_active) ??
     seasons
       .filter((s) => !s.start_date || s.start_date <= todayIso)
-      .sort((a, b) => {
-        const ay = a.season_year ?? 0;
-        const by = b.season_year ?? 0;
-        return by - ay;
-      })[0];
+      .sort((a, b) => (b.season_year ?? 0) - (a.season_year ?? 0))[0] ??
+    null;
 
-  // Base team route is a resolver only.
-  // We keep context switching inside the TeamManagementShell tab switcher, not in the center work surface.
-  // So this page redirects to the appropriate default work surface.
-
-  if (!activeSeason) {
-    // No current/active season yet: send the coach to the Seasons surface to set one up.
-    redirect(`/programs/${programId}/teams/${teamId}/seasons`);
-  }
-
-  // Default landing surface for an initialized team.
-  redirect(`/programs/${programId}/teams/${teamId}/active-roster`);
+  return (
+    <TeamManagementShell
+          programId={programId}
+          teamId={teamId}
+          teamName={teamName}
+          isManager={isManager}
+          seasons={seasons}
+          activeSeason={activeSeason} programName={""} teamMeta={{
+              sport: "",
+              gender: null,
+              level: null
+          }}    >
+      {children}
+    </TeamManagementShell>
+  );
 }

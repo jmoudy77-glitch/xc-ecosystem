@@ -1,5 +1,6 @@
+// app/athletes/[athleteId]/page.tsx
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 // ⬇️ Adjust this import path to match your project’s Supabase helper
@@ -28,6 +29,7 @@ type Athlete = {
   avatar_url: string | null;
   gender: string | null;
   user_id: string | null;
+  is_claimed: boolean;
   bio: string | null;
   gpa: number | null;
   test_scores: any | null;
@@ -100,6 +102,20 @@ export default async function AthletePage({ params, searchParams }: PageProps) {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
+  // Map the logged-in Supabase Auth user to our app-level `public.users` row.
+  // NOTE: `athletes.user_id` references `public.users.id` (NOT `auth.users.id`).
+  const { data: appUser, error: appUserError } = authUser?.id
+    ? await supabase
+        .from("users")
+        .select("id, auth_id")
+        .eq("auth_id", authUser.id)
+        .maybeSingle<{ id: string; auth_id: string }>()
+    : { data: null, error: null };
+
+  if (appUserError) {
+    console.error("[AthletePage] appUserError", appUserError);
+  }
+
   const [
     { data: athlete, error: athleteError },
     { data: score, error: scoreError },
@@ -109,7 +125,7 @@ export default async function AthletePage({ params, searchParams }: PageProps) {
     supabase
       .from("athletes")
       .select(
-        "id, first_name, last_name, grad_year, event_group, hs_school_name, hs_city, hs_state, avatar_url, gender, user_id, bio, gpa, test_scores"
+        "id, first_name, last_name, grad_year, event_group, hs_school_name, hs_city, hs_state, avatar_url, gender, user_id, is_claimed, bio, gpa, test_scores"
       )
       .eq("id", athleteId)
       .maybeSingle<Athlete>(),
@@ -200,8 +216,11 @@ export default async function AthletePage({ params, searchParams }: PageProps) {
     notFound();
   }
 
-  const canEditMedia =
-    !!authUser && !!athlete.user_id && athlete.user_id === authUser.id;
+  const isSelfView = !!authUser && !!appUser && !!athlete.user_id && athlete.user_id === appUser.id;
+
+  const needsClaimCompletion = isSelfView && !athlete.is_claimed;
+
+  const canEditMedia = isSelfView;
 
   const scores: AthleteScore | null = score ?? null;
   const mediaItems: AthleteMedia[] = (media ?? []) as AthleteMedia[];

@@ -19,7 +19,8 @@ export default async function LoginPage() {
   }
 
   if (user) {
-    redirect("/dashboard");
+    // Post-login routing is resolved centrally
+    redirect("/home");
   }
 
   return <LoginPageClient />;

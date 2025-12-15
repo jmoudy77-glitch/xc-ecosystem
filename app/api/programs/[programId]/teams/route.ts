@@ -27,6 +27,11 @@ async function assertProgramMembership(
 > {
   const { supabase } = supabaseServer(req);
 
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : null;
+
   const {
     data: { user: authUser },
     error: authError,
@@ -39,11 +44,23 @@ async function assertProgramMembership(
     );
   }
 
-  if (!authUser) {
-    return { ok: false, status: 401, error: "Not authenticated" };
+  let authId: string | null = authUser?.id ?? null;
+
+  if (!authId && bearerToken) {
+    const { data: tokenUserData, error: tokenUserError } = await supabaseAdmin.auth.getUser(bearerToken);
+    if (tokenUserError) {
+      console.warn(
+        "[/api/programs/[programId]/teams] bearer auth error:",
+        tokenUserError.message,
+      );
+    } else {
+      authId = tokenUserData?.user?.id ?? null;
+    }
   }
 
-  const authId = authUser.id;
+  if (!authId) {
+    return { ok: false, status: 401, error: "Not authenticated" };
+  }
 
   // Map auth user -> public.users row
   const { data: userRow, error: userError } = await supabaseAdmin
@@ -151,7 +168,8 @@ export async function GET(req: NextRequest) {
         sport,
         gender,
         level,
-        season
+        season,
+        is_primary
       `
       )
       .eq("program_id", programId)
@@ -225,6 +243,7 @@ export async function POST(req: NextRequest) {
   const gender = (body?.gender as string | undefined)?.trim() || null;
   const level = (body?.level as string | undefined)?.trim() || null;
   const season = (body?.season as string | undefined)?.trim() || null;
+  const isPrimary = Boolean(body?.isPrimary);
 
   if (!name) {
     return NextResponse.json(
@@ -234,6 +253,99 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Duplicate protection: same program_id + name + sport + gender + level + season
+    let teamQuery = supabaseAdmin
+      .from("teams")
+      .select("id, program_id, name, code, sport, gender, level, season, is_primary")
+      .eq("program_id", programId)
+      .eq("name", name);
+
+    if (sport === null) teamQuery = teamQuery.is("sport", null);
+    else teamQuery = teamQuery.eq("sport", sport);
+
+    if (gender === null) teamQuery = teamQuery.is("gender", null);
+    else teamQuery = teamQuery.eq("gender", gender);
+
+    if (level === null) teamQuery = teamQuery.is("level", null);
+    else teamQuery = teamQuery.eq("level", level);
+
+    if (season === null) teamQuery = teamQuery.is("season", null);
+    else teamQuery = teamQuery.eq("season", season);
+
+    const { data: existingTeam, error: existingTeamError } = await teamQuery.maybeSingle();
+
+    if (existingTeamError) {
+      console.error(
+        "[/api/programs/[programId]/teams] teams duplicate check error:",
+        existingTeamError,
+      );
+      return NextResponse.json(
+        { error: "Failed to check existing teams" },
+        { status: 500 },
+      );
+    }
+
+    if (existingTeam) {
+      // If requested primary, promote this team and demote others.
+      if (isPrimary && !existingTeam.is_primary) {
+        const { error: demoteError } = await supabaseAdmin
+          .from("teams")
+          .update({ is_primary: false })
+          .eq("program_id", programId);
+
+        if (demoteError) {
+          console.error(
+            "[/api/programs/[programId]/teams] teams demote error:",
+            demoteError,
+          );
+          return NextResponse.json(
+            { error: "Failed to update primary team" },
+            { status: 500 },
+          );
+        }
+
+        const { data: promotedTeam, error: promoteError } = await supabaseAdmin
+          .from("teams")
+          .update({ is_primary: true })
+          .eq("id", existingTeam.id)
+          .select(
+            `
+            id,
+            program_id,
+            name,
+            code,
+            sport,
+            gender,
+            level,
+            season,
+            is_primary
+          `,
+          )
+          .single();
+
+        if (promoteError) {
+          console.error(
+            "[/api/programs/[programId]/teams] teams promote error:",
+            promoteError,
+          );
+          return NextResponse.json(
+            { error: "Failed to update primary team" },
+            { status: 500 },
+          );
+        }
+
+        return NextResponse.json(
+          { ok: true, existing: true, team: promotedTeam },
+          { status: 200 },
+        );
+      }
+
+      return NextResponse.json(
+        { ok: true, existing: true, team: existingTeam },
+        { status: 200 },
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("teams")
       .insert({
@@ -244,6 +356,7 @@ export async function POST(req: NextRequest) {
         gender,
         level,
         season,
+        is_primary: isPrimary,
       })
       .select(
         `
@@ -254,7 +367,8 @@ export async function POST(req: NextRequest) {
         sport,
         gender,
         level,
-        season
+        season,
+        is_primary
       `
       )
       .single();
@@ -270,8 +384,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (isPrimary) {
+      const { error: demoteError } = await supabaseAdmin
+        .from("teams")
+        .update({ is_primary: false })
+        .eq("program_id", programId)
+        .neq("id", data.id);
+
+      if (demoteError) {
+        console.error(
+          "[/api/programs/[programId]/teams] teams demote error:",
+          demoteError,
+        );
+        return NextResponse.json(
+          { error: "Team created, but failed to update primary team" },
+          { status: 500 },
+        );
+      }
+    }
+
     return NextResponse.json(
-      { ok: true, team: data },
+      { ok: true, existing: false, team: data },
       { status: 201 }
     );
   } catch (err) {

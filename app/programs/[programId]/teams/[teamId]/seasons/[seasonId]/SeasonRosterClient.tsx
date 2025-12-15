@@ -1,3 +1,4 @@
+// app/programs/[programId]/teams/[teamId]/seasons/[seasonId]/SeasonRosterClient.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -203,6 +204,44 @@ export default function SeasonRosterClient({
 
   const [importRows, setImportRows] = useState<ImportRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  // Duplicate identity detection (DB-outward)
+  type DuplicateIdentityAction = {
+    id: string;
+    label: string;
+    method?: string;
+    url?: string;
+    body?: any;
+  };
+
+  type DuplicateIdentityPayload = {
+    error?: string;
+    message?: string;
+    identity?: {
+      mode?: "weak" | "strong" | string;
+      key?: string;
+      input?: any;
+    };
+    candidates?: any[];
+    resolver?: {
+      actions?: DuplicateIdentityAction[];
+    };
+  };
+
+  type DuplicateQueueItem =
+    | {
+        source: "import";
+        row: ImportRow;
+        response: DuplicateIdentityPayload | null;
+      }
+    | {
+        source: "manual";
+        input: { firstName: string; lastName: string; gradYear: number | null };
+        response: DuplicateIdentityPayload | null;
+      };
+
+  const [duplicateQueue, setDuplicateQueue] = useState<DuplicateQueueItem[]>([]);
+  const [pendingImportCursor, setPendingImportCursor] = useState<number | null>(null);
+  const [pendingImportRow, setPendingImportRow] = useState<ImportRow | null>(null);
 
   type ImportRow = {
     first_name: string;
@@ -607,87 +646,233 @@ function parseCsvWithMapping(
       }
     }, [importCsvText, suggestedMapping]);
 
-    async function handleConfirmImport() {
-    if (!importRows.length) {
-      setImportError("No rows to import. Please upload a CSV first.");
+    const activeDuplicate = duplicateQueue.length ? duplicateQueue[0] : null;
+
+  // --- State and helpers for missing grad year during import ---
+  const [missingGradYearValue, setMissingGradYearValue] = useState<string>("");
+  const [applyGradYearToAllMissing, setApplyGradYearToAllMissing] = useState<boolean>(true);
+
+  function isMissingGradYearModal(item: DuplicateQueueItem | null): boolean {
+    if (!item) return false;
+    const msg = (item as any)?.response?.message;
+    const err = (item as any)?.response?.error;
+    return err === "MISSING_GRAD_YEAR" || msg === "Missing grad year";
+  }
+
+  function getMissingGradYearRow(item: DuplicateQueueItem | null): ImportRow | null {
+    if (!item) return null;
+    if (item.source !== "import") return null;
+    return item.row;
+  }
+
+  function handleResolveMissingGradYearSkip() {
+    const cursor = pendingImportCursor;
+    // drop this modal/queue item
+    closeDuplicateModal();
+    router.refresh();
+    if (cursor != null) {
+      void runImportFrom(cursor + 1);
+    }
+  }
+
+  function handleResolveMissingGradYearApply() {
+    const cursor = pendingImportCursor;
+    if (cursor == null) return;
+
+    const raw = missingGradYearValue.trim();
+    if (!raw) {
+      alert("Please enter a grad year.");
       return;
     }
 
-    if (!isManager || isLocked) {
-      setImportError("You do not have permission to modify this roster.");
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 1900 || parsed > 2100) {
+      alert("Grad year must be a valid year (e.g. 2027). ");
       return;
     }
 
-    setIsImporting(true);
-    setImportError(null);
+    setImportRows((prev) => {
+      const next = [...prev];
 
-    let successCount = 0;
-    let failureCount = 0;
+      if (applyGradYearToAllMissing) {
+        for (let i = cursor; i < next.length; i += 1) {
+          if (next[i].grad_year == null) next[i] = { ...next[i], grad_year: parsed };
+        }
+      } else {
+        const current = next[cursor];
+        if (current) next[cursor] = { ...current, grad_year: parsed };
+      }
 
-    for (const row of importRows) {
-      try {
-        const res = await fetch(
-          `/api/programs/${programId}/teams/${teamId}/seasons/${seasonId}/roster/add-athlete`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              first_name: row.first_name,
-              last_name: row.last_name,
-              grad_year: row.grad_year ?? null,
-              event_group: row.event_group ?? null,
-              jersey_number: row.jersey_number ?? null,
-              status: row.status || "active",
-              scholarship_amount: row.scholarship_amount ?? null,
-              scholarship_unit:
-                (row.scholarship_unit as ScholarshipUnit | null) ?? "percent",
-              notes: row.notes ?? null,
-              // We’re ignoring row.email for now, since the add-athlete API
-              // doesn’t accept an email field yet.
-            }),
-          }
-        );
+      return next;
+    });
 
-        if (!res.ok) {
-          // Optional: log detailed error
+    // close modal and resume import at SAME cursor (now fixed)
+    closeDuplicateModal();
+    router.refresh();
+    void runImportFrom(cursor);
+  }
+
+function closeDuplicateModal() {
+  setDuplicateQueue((prev) => prev.slice(1));
+  setPendingImportCursor(null);
+  setPendingImportRow(null);
+}
+
+async function runImportFrom(startIndex: number) {
+  if (!importRows.length) {
+    setImportError("No rows to import. Please upload a CSV first.");
+    return;
+  }
+
+  if (!isManager || isLocked) {
+    setImportError("You do not have permission to modify this roster.");
+    return;
+  }
+
+  setIsImporting(true);
+  setImportError(null);
+
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (let i = startIndex; i < importRows.length; i += 1) {
+    const row = importRows[i];
+
+    // --- Intercept missing grad year BEFORE API call ---
+    if (row.grad_year == null) {
+      console.warn("[SeasonRosterClient] Import row missing grad_year; pausing for resolution:", row);
+      setPendingImportCursor(i);
+      setPendingImportRow(row);
+      setMissingGradYearValue("");
+      setApplyGradYearToAllMissing(true);
+      setDuplicateQueue((prev) => [
+        ...prev,
+        { source: "import", row, response: { error: "MISSING_GRAD_YEAR", message: "Missing grad year" } },
+      ]);
+      setImportError(
+        "One or more athletes are missing a required grad year. Resolve the row to continue."
+      );
+      setIsImporting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `/api/programs/${programId}/teams/${teamId}/seasons/${seasonId}/roster/add-athlete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            first_name: row.first_name,
+            last_name: row.last_name,
+            grad_year: row.grad_year ?? null,
+            event_group: row.event_group ?? null,
+            jersey_number: row.jersey_number ?? null,
+            status: row.status || "active",
+            scholarship_amount: row.scholarship_amount ?? null,
+            scholarship_unit: (row.scholarship_unit as ScholarshipUnit | null) ?? "percent",
+            notes: row.notes ?? null,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          let body: any = null;
           try {
-            const body = await res.json();
-            console.error(
-              "[SeasonRosterClient] Import row failed:",
-              row,
-              body
-            );
+            body = await res.json();
           } catch {
-            console.error("[SeasonRosterClient] Import row failed:", row);
+            body = null;
           }
-          failureCount += 1;
-          continue;
+
+          console.warn("[SeasonRosterClient] Duplicate identity detected during import:", row, body);
+
+          setPendingImportCursor(i);
+          setPendingImportRow(row);
+          setDuplicateQueue((prev) => [...prev, { source: "import", row, response: body }]);
+
+          setImportError(
+            "One or more athletes appear to already exist. Resolve duplicates before continuing."
+          );
+
+          setIsImporting(false);
+          return;
         }
 
-        successCount += 1;
-      } catch (err) {
-        console.error("[SeasonRosterClient] Import row error:", row, err);
+        try {
+          const body = await res.json();
+          console.error("[SeasonRosterClient] Import row failed:", row, body);
+        } catch {
+          console.error("[SeasonRosterClient] Import row failed:", row);
+        }
         failureCount += 1;
+        continue;
       }
+
+      successCount += 1;
+    } catch (err) {
+      console.error("[SeasonRosterClient] Import row error:", row, err);
+      failureCount += 1;
     }
-
-    setIsImporting(false);
-
-    if (failureCount > 0) {
-      setImportError(
-        `Imported ${successCount} rows, ${failureCount} failed. Check console for details.`
-      );
-    } else {
-      // Clean up and close modal
-      setShowImportRoster(false);
-      setImportPreviewCount(null);
-      setImportRows([]);
-      setImportError(null);
-    }
-
-    // In all cases, refresh so server recomputes roster + scholarship summary
-    router.refresh();
   }
+
+  setIsImporting(false);
+
+  if (failureCount > 0) {
+    setImportError(`Imported ${successCount} rows, ${failureCount} failed. Check console for details.`);
+  } else {
+    setShowImportRoster(false);
+    setImportPreviewCount(null);
+    setImportRows([]);
+    setImportError(null);
+  }
+
+  router.refresh();
+}
+
+async function executeDuplicateAction(action: DuplicateIdentityAction) {
+  if (!action?.url) {
+    alert("This resolution action is not yet wired on the server.");
+    return;
+  }
+
+  try {
+    const method = (action.method || "POST").toUpperCase();
+    const res = await fetch(action.url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: action.body ? JSON.stringify(action.body) : undefined,
+    });
+
+    let body: any = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+
+    if (!res.ok) {
+      console.error("[SeasonRosterClient] Duplicate resolver action failed", action, body);
+      alert(body?.error || body?.message || "Failed to resolve duplicate.");
+      return;
+    }
+
+    const cursor = pendingImportCursor;
+    closeDuplicateModal();
+    router.refresh();
+
+    if (cursor != null) {
+      void runImportFrom(cursor + 1);
+    }
+  } catch (err) {
+    console.error("[SeasonRosterClient] Duplicate resolver action error", err);
+    alert("Unexpected error resolving duplicate – check console for details.");
+  }
+}
+
+   async function handleConfirmImport() {
+      void runImportFrom(0);
+    }
 
   // Per-athlete scholarship edit state
   const [editingScholarshipRosterId, setEditingScholarshipRosterId] =
@@ -870,15 +1055,19 @@ function parseCsvWithMapping(
       return;
     }
 
+    // --- Require grad year; must be provided and valid ---
     let gradYear: number | null = null;
-    if (gradYearStr) {
-      const parsed = Number(gradYearStr);
-      if (!Number.isFinite(parsed) || parsed < 1900 || parsed > 2100) {
-        setAddAthleteError("Grad year must be a valid year (e.g. 2027).");
-        return;
-      }
-      gradYear = parsed;
+    if (!gradYearStr) {
+      setAddAthleteError("Grad year is required.");
+      return;
     }
+
+    const parsed = Number(gradYearStr);
+    if (!Number.isFinite(parsed) || parsed < 1900 || parsed > 2100) {
+      setAddAthleteError("Grad year must be a valid year (e.g. 2027). ");
+      return;
+    }
+    gradYear = parsed;
 
     const scholarshipStr = newScholarshipAmount.trim();
     let scholarshipAmount: number | null = null;
@@ -924,6 +1113,24 @@ function parseCsvWithMapping(
       }
 
       if (!res.ok) {
+        if (res.status === 409) {
+          console.warn("[SeasonRosterClient] Duplicate identity detected on add-athlete", body);
+
+          setAddAthleteError(
+            "This athlete may already exist in the system. Review the match candidates to continue."
+          );
+
+          setDuplicateQueue([
+            {
+              source: "manual",
+              input: { firstName, lastName, gradYear },
+              response: body,
+            },
+          ]);
+
+          return;
+        }
+
         const msg =
           body?.error ||
           body?.message ||
@@ -1273,7 +1480,126 @@ function parseCsvWithMapping(
   }
 
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
+    <>
+      {activeDuplicate && isMissingGradYearModal(activeDuplicate) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-xl rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
+            <div className="border-b border-slate-800 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Import needs attention
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-100">
+                Missing required grad year
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Grad year is required for identity + duplicate prevention. Enter a grad year to continue, or skip this row.
+              </p>
+            </div>
+
+            <div className="px-4 py-3">
+              {(() => {
+                const row = getMissingGradYearRow(activeDuplicate);
+                if (!row) return null;
+                return (
+                  <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                    <p className="text-sm font-semibold text-slate-100">
+                      {row.first_name} {row.last_name}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-slate-400">
+                      {row.event_group && (
+                        <span className="rounded-full border border-sky-400/40 bg-sky-900/40 px-2 py-0.5 text-sky-100">
+                          {row.event_group}
+                        </span>
+                      )}
+                      {row.jersey_number && (
+                        <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
+                          Jersey {row.jersey_number}
+                        </span>
+                      )}
+                      {row.status && (
+                        <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
+                          {row.status}
+                        </span>
+                      )}
+                      {row.email && (
+                        <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
+                          {row.email}
+                        </span>
+                      )}
+                    </div>
+                    {row.notes && (
+                      <p className="mt-2 text-[11px] text-slate-400">Notes: {row.notes}</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    Grad year
+                  </label>
+                  <input
+                    value={missingGradYearValue}
+                    onChange={(e) => setMissingGradYearValue(e.target.value)}
+                    placeholder="e.g. 2027"
+                    inputMode="numeric"
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                  <input
+                    id="apply-all-missing-grad"
+                    type="checkbox"
+                    checked={applyGradYearToAllMissing}
+                    onChange={(e) => setApplyGradYearToAllMissing(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <label
+                    htmlFor="apply-all-missing-grad"
+                    className="text-[11px] text-slate-300"
+                  >
+                    Apply this grad year to all remaining rows missing grad year
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-slate-800 px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <button
+                type="button"
+                onClick={handleResolveMissingGradYearSkip}
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] font-semibold text-slate-200 hover:border-rose-400/60 hover:text-rose-100"
+              >
+                Skip this row
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeDuplicateModal();
+                    setImportError("Import paused. Resolve missing grad year to continue.");
+                  }}
+                  className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] font-semibold text-slate-200 hover:border-slate-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResolveMissingGradYearApply}
+                  className="rounded-md bg-sky-500 px-3 py-2 text-[11px] font-semibold text-slate-950 hover:bg-sky-400"
+                >
+                  Apply & continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
       {/* Main content: tools bar + roster + audit */}
       <div className="w-full md:flex-1">
         {/* Header + lock status removed, now handled below */}
@@ -2203,6 +2529,137 @@ function parseCsvWithMapping(
           </>
         )}
       </aside>
+      
+       
+      {activeDuplicate && !isMissingGradYearModal(activeDuplicate) && (
+      // generic duplicate modal
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-3xl rounded-xl border border-slate-700 bg-slate-950 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Potential duplicate detected
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-100">
+                  Review matches before continuing
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  We detected an existing athlete with similar identity details. Choose an action to prevent duplicate identities.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDuplicateModal}
+                className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] font-semibold text-slate-200 hover:border-slate-500"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 px-4 py-4 md:grid-cols-2">
+              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Incoming athlete
+                </p>
+
+                {activeDuplicate.source === "import" ? (
+                  <div className="mt-2 text-[12px] text-slate-200">
+                    <p className="font-semibold">
+                      {activeDuplicate.row.first_name} {activeDuplicate.row.last_name}
+                      {activeDuplicate.row.grad_year ? (
+                        <span className="ml-2 text-[11px] text-slate-500">• {activeDuplicate.row.grad_year}</span>
+                      ) : null}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-500">Source: CSV import</p>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[12px] text-slate-200">
+                    <p className="font-semibold">
+                      {activeDuplicate.input.firstName} {activeDuplicate.input.lastName}
+                      {activeDuplicate.input.gradYear ? (
+                        <span className="ml-2 text-[11px] text-slate-500">• {activeDuplicate.input.gradYear}</span>
+                      ) : null}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-500">Source: manual add</p>
+                  </div>
+                )}
+
+                <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/40 p-2">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500">Identity mode</p>
+                  <p className="mt-1 text-[11px] text-slate-200">
+                    {(activeDuplicate.response?.identity?.mode as string) || "unknown"}
+                  </p>
+                  {activeDuplicate.response?.identity?.key ? (
+                    <p className="mt-1 break-all text-[10px] text-slate-500">
+                      Key: {activeDuplicate.response.identity.key}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Match candidates
+                </p>
+
+                {!activeDuplicate.response?.candidates?.length ? (
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    No candidate details were provided by the server.
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {activeDuplicate.response.candidates.map((c, idx) => (
+                      <div
+                        key={`${idx}-${c?.athlete_id ?? "candidate"}`}
+                        className="rounded-lg border border-slate-800 bg-slate-900/40 p-2"
+                      >
+                        <p className="text-[12px] font-semibold text-slate-100">
+                          {(c?.first_name || "?") + " " + (c?.last_name || "?")}
+                          {c?.grad_year ? (
+                            <span className="ml-2 text-[11px] text-slate-500">• {c.grad_year}</span>
+                          ) : null}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-slate-500">
+                          Athlete ID: {c?.athlete_id ?? "—"}
+                        </p>
+                        {c?.reason ? (
+                          <p className="mt-1 text-[10px] text-slate-400">Match: {c.reason}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(activeDuplicate.response?.resolver?.actions?.length
+                    ? activeDuplicate.response.resolver.actions
+                    : [{ id: "close", label: "Close" }]
+                  ).map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => {
+                        if (action.id === "close") {
+                          closeDuplicateModal();
+                          return;
+                        }
+                        void executeDuplicateAction(action);
+                      }}
+                      className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-slate-200 hover:border-slate-500"
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+
+                {activeDuplicate.response?.message ? (
+                  <p className="mt-2 text-[10px] text-slate-500">{activeDuplicate.response.message}</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
         {showAddAthlete && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70">
@@ -2565,5 +3022,7 @@ function parseCsvWithMapping(
         </div>
       )}
     </div>
+      
+    </>
   );
 }

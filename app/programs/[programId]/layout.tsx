@@ -190,25 +190,44 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
     <div
       className="min-h-screen"
       style={{
-        ["--background" as any]: theme.background,
-        ["--foreground" as any]: theme.foreground,
+        // v1 core neutrals
+        ["--app-bg" as any]: theme.appBg,
+        ["--surface-1" as any]: theme.surface1,
+        ["--surface-2" as any]: theme.surface2,
+        ["--surface-3" as any]: theme.surface3,
+        ["--border" as any]: theme.border,
+        ["--border-muted" as any]: theme.borderMuted,
+        ["--text" as any]: theme.text,
+        ["--text-muted" as any]: theme.textMuted,
+        ["--text-subtle" as any]: theme.textSubtle,
+        ["--focus-ring" as any]: theme.focusRing,
 
-        ["--brand-primary" as any]: theme.brandPrimary,
-        ["--brand-secondary" as any]: theme.brandSecondary,
+        // v1 brand + accents
+        ["--brand" as any]: theme.brand,
+        ["--brand-contrast" as any]: theme.brandContrast,
         ["--accent" as any]: theme.accent,
-
-        ["--surface" as any]: theme.surface,
-        ["--border-subtle" as any]: theme.borderSubtle,
-
-        ["--muted-foreground" as any]: theme.mutedForeground,
+        ["--accent-contrast" as any]: theme.accentContrast,
+        ["--brand-soft" as any]: theme.brandSoft,
+        ["--brand-rail" as any]: theme.brandRail,
         ["--link" as any]: theme.link,
 
+        // v1 semantic support
         ["--success" as any]: theme.success,
         ["--warning" as any]: theme.warning,
         ["--danger" as any]: theme.danger,
+        ["--info" as any]: theme.info,
 
-        backgroundColor: "var(--background)",
-        color: "var(--foreground)",
+        // legacy aliases (keep during migration)
+        ["--background" as any]: theme.appBg,
+        ["--foreground" as any]: theme.text,
+        ["--brand-primary" as any]: theme.brand,
+        ["--brand-secondary" as any]: theme.surface2,
+        ["--surface" as any]: theme.surface3,
+        ["--border-subtle" as any]: theme.border,
+        ["--muted-foreground" as any]: theme.textMuted,
+
+        backgroundColor: "var(--app-bg)",
+        color: "var(--text)",
       }}
     >
       {/* Program hero header (non-negotiable for coach app) */}

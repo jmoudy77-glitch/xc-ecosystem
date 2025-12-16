@@ -298,7 +298,10 @@ ALTER FUNCTION "public"."identity_normalize_name"("input" "text") OWNER TO "post
 CREATE OR REPLACE FUNCTION "public"."identity_sha256_hex"("input" "text") RETURNS "text"
     LANGUAGE "sql" IMMUTABLE
     AS $$
-  select encode(digest(coalesce(input, ''), 'sha256'), 'hex');
+  select encode(
+    extensions.digest(convert_to(coalesce("input", ''), 'utf8'), 'sha256'::text),
+    'hex'
+  );
 $$;
 
 

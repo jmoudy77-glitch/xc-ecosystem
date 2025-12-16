@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 
@@ -22,6 +22,7 @@ type RosterCandidate = {
   athleteId: string;
   fullName: string;
   gradYear: number | null;
+  eventGroup: string | null;
 };
 
 type RecruitCandidate = {
@@ -30,6 +31,7 @@ type RecruitCandidate = {
   gradYear: number | null;
   status: string | null;
   profileType: string | null;
+  eventGroup: string | null;
 };
 
 type Props = {
@@ -67,6 +69,49 @@ export default function ScenarioRosterClient({
   const [recruitCandidates, setRecruitCandidates] = useState<RecruitCandidate[]>([]);
   const [recruitsError, setRecruitsError] = useState<string | null>(null);
   const [loadingRecruits, setLoadingRecruits] = useState(false);
+
+  function groupKey(label: string | null | undefined) {
+    const v = (label || "").trim();
+    return v.length ? v : "Unassigned";
+  }
+
+  function groupByEvent<T extends { eventGroup: string | null }>(items: T[]) {
+    return items.reduce<Record<string, T[]>>((acc, item) => {
+      const k = groupKey(item.eventGroup);
+      acc[k] = acc[k] || [];
+      acc[k].push(item);
+      return acc;
+    }, {});
+  }
+
+  const [openRosterGroups, setOpenRosterGroups] = useState<Record<string, boolean>>({});
+  const [openRecruitGroups, setOpenRecruitGroups] = useState<Record<string, boolean>>({});
+
+  // Primary sidebar groups (sources)
+  const [openSources, setOpenSources] = useState<Record<"recruits" | "program", boolean>>({
+    recruits: true,
+    program: true,
+  });
+
+  // Sidebar slide-out card state
+  const [selectedCandidate, setSelectedCandidate] = useState<
+    | { kind: "recruit"; id: string; fullName: string; gradYear: number | null; eventGroup: string | null; meta?: { status?: string | null; profileType?: string | null } }
+    | { kind: "athlete"; id: string; fullName: string; gradYear: number | null; eventGroup: string | null }
+    | null
+  >(null);
+
+  function ensureOpenGroups(
+    keys: string[],
+    setter: Dispatch<SetStateAction<Record<string, boolean>>>
+  ) {
+    setter((prev) => {
+      const next = { ...prev };
+      for (const k of keys) {
+        if (next[k] === undefined) next[k] = true;
+      }
+      return next;
+    });
+  }
 
   // Keep in sync if server sends new entries
   useEffect(() => {
@@ -194,10 +239,13 @@ export default function ScenarioRosterClient({
           athleteId: a.athlete_id as string,
           fullName: (a.full_name as string) ?? "Athlete",
           gradYear: (a.grad_year as number | null) ?? null,
+          eventGroup: (a.event_group as string | null) ?? null,
         }))
         .filter((c) => !!c.athleteId && !inScenarioAthleteIds.has(c.athleteId));
 
       setRosterCandidates(mapped);
+      const keys = Object.keys(groupByEvent(mapped));
+      ensureOpenGroups(keys, setOpenRosterGroups);
     } catch (e: any) {
       setRosterError(e?.message || "Unexpected error");
     }
@@ -238,6 +286,7 @@ export default function ScenarioRosterClient({
           gradYear: (r.grad_year as number | null) ?? null,
           status: (r.status as string | null) ?? null,
           profileType: (r.profile_type as string | null) ?? null,
+          eventGroup: (r.event_group as string | null) ?? null,
         }))
         .filter(
           (c) =>
@@ -246,6 +295,8 @@ export default function ScenarioRosterClient({
         );
 
       setRecruitCandidates(mapped);
+      const keys = Object.keys(groupByEvent(mapped));
+      ensureOpenGroups(keys, setOpenRecruitGroups);
     } catch (e: any) {
       setRecruitsError(e?.message || "Unexpected error");
     }
@@ -476,121 +527,382 @@ export default function ScenarioRosterClient({
         )}
       </div>
 
-      {/* Add from current team roster */}
-      <section className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Add from current team roster
-        </p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Pull returning athletes from any season on this team into this scenario.
-        </p>
-
-        {rosterError && (
-          <p className="mt-2 text-[11px] text-rose-400">{rosterError}</p>
-        )}
-
-        {loadingRoster ? (
-          <p className="mt-2 text-[11px] text-slate-500">
-            Loading roster candidates…
-          </p>
-        ) : rosterCandidates.length === 0 ? (
-          <p className="mt-2 text-[11px] text-slate-500">
-            No additional roster athletes available to add.
-          </p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {rosterCandidates.map((c) => (
-              <div
-                key={c.athleteId}
-                className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-100">
-                    {c.fullName}
-                    {c.gradYear && (
-                      <span className="ml-2 text-[10px] text-slate-400">
-                        • {c.gradYear}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={!isManager}
-                  onClick={() => handleAddFromRoster(c)}
-                  className="rounded-md border border-sky-500 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-slate-950 hover:bg-sky-500 disabled:opacity-60"
-                >
-                  Add to scenario
-                </button>
-              </div>
-            ))}
+      {/* Add athletes (intended for the right sidebar) */}
+      <section className="relative overflow-hidden rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--border)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+              Add to scenario
+            </p>
+            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+              Pick from recruits or existing program athletes. Event groups are collapsible.
+            </p>
           </div>
-        )}
-      </section>
-
-      {/* Add from recruits */}
-      <section className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Add from recruits
-        </p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Add committed / target recruits from your recruiting board into this
-          scenario without touching your official roster.
-        </p>
-
-        {recruitsError && (
-          <p className="mt-2 text-[11px] text-rose-400">{recruitsError}</p>
-        )}
-
-        {loadingRecruits ? (
-          <p className="mt-2 text-[11px] text-slate-500">
-            Loading recruits…
-          </p>
-        ) : recruitCandidates.length === 0 ? (
-          <p className="mt-2 text-[11px] text-slate-500">
-            No eligible recruits available to add.
-          </p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {recruitCandidates.map((c) => (
-              <div
-                key={c.programRecruitId}
-                className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-100">
-                    {c.fullName}
-                    {c.gradYear && (
-                      <span className="ml-2 text-[10px] text-slate-400">
-                        • {c.gradYear}
-                      </span>
-                    )}
-                  </p>
-                  <div className="mt-0.5 flex flex-wrap gap-1 text-[10px] text-slate-400">
-                    {c.status && (
-                      <span className="rounded-full border border-emerald-400/40 bg-emerald-900/40 px-2 py-0.5 text-emerald-100">
-                        {c.status}
-                      </span>
-                    )}
-                    {c.profileType && (
-                      <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-2 py-0.5">
-                        {c.profileType}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={!isManager}
-                  onClick={() => handleAddFromRecruit(c)}
-                  className="rounded-md border border-sky-500 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-slate-950 hover:bg-sky-500 disabled:opacity-60"
-                >
-                  Add to scenario
-                </button>
-              </div>
-            ))}
+          <div className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+            {isManager ? "" : "Read-only"}
           </div>
-        )}
+        </div>
+
+        {/* Primary group: Recruits */}
+        <div className="mt-3 overflow-hidden rounded-xl bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]">
+          <button
+            type="button"
+            onClick={() =>
+              setOpenSources((prev) => ({ ...prev, recruits: !prev.recruits }))
+            }
+            className="flex w-full items-center justify-between px-3 py-2 text-left"
+          >
+            <div className="min-w-0">
+              <div className="truncate text-[12px] font-semibold text-[var(--foreground)]">
+                Recruits
+                <span className="ml-2 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                  • {recruitCandidates.length}
+                </span>
+              </div>
+              <div className="mt-0.5 text-[10px] text-[var(--muted-foreground)]">
+                From your recruiting board
+              </div>
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+              {openSources.recruits ? "Hide" : "Show"}
+            </div>
+          </button>
+
+          {openSources.recruits ? (
+            <div className="border-t border-[var(--border)] p-2">
+              {recruitsError ? (
+                <p className="mb-2 text-[11px] text-rose-400">{recruitsError}</p>
+              ) : null}
+
+              {loadingRecruits ? (
+                <p className="text-[11px] text-[var(--muted-foreground)]">Loading recruits…</p>
+              ) : recruitCandidates.length === 0 ? (
+                <p className="text-[11px] text-[var(--muted-foreground)]">No eligible recruits available to add.</p>
+              ) : (
+                <div className="space-y-2">
+                  {Object.entries(groupByEvent(recruitCandidates))
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([group, items]) => {
+                      const open = openRecruitGroups[group] !== false;
+                      return (
+                        <div
+                          key={group}
+                          className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenRecruitGroups((prev) => ({
+                                ...prev,
+                                [group]: !open,
+                              }))
+                            }
+                            className="flex w-full items-center justify-between px-3 py-2 text-left"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-[12px] font-semibold text-[var(--foreground)]">
+                                {group}
+                                <span className="ml-2 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                  • {items.length}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+                              {open ? "Hide" : "Show"}
+                            </div>
+                          </button>
+
+                          {open ? (
+                            <div className="space-y-2 border-t border-[var(--border)] p-2">
+                              {items.map((c) => (
+                                <div
+                                  key={c.programRecruitId}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() =>
+                                    setSelectedCandidate({
+                                      kind: "recruit",
+                                      id: c.programRecruitId,
+                                      fullName: c.fullName,
+                                      gradYear: c.gradYear,
+                                      eventGroup: c.eventGroup,
+                                      meta: { status: c.status, profileType: c.profileType },
+                                    })
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      setSelectedCandidate({
+                                        kind: "recruit",
+                                        id: c.programRecruitId,
+                                        fullName: c.fullName,
+                                        gradYear: c.gradYear,
+                                        eventGroup: c.eventGroup,
+                                        meta: { status: c.status, profileType: c.profileType },
+                                      });
+                                    }
+                                  }}
+                                  className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                                  title="Click for details"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                                      {c.fullName}
+                                      {c.gradYear && (
+                                        <span className="ml-2 text-[10px] text-[var(--muted-foreground)]">• {c.gradYear}</span>
+                                      )}
+                                    </p>
+                                    {(c.status || c.profileType) && (
+                                      <div className="mt-0.5 flex flex-wrap gap-1 text-[10px] text-[var(--muted-foreground)]">
+                                        {c.status ? (
+                                          <span className="rounded-full bg-[var(--surface-subtle)] px-2 py-0.5 ring-1 ring-[var(--border)]">
+                                            {c.status}
+                                          </span>
+                                        ) : null}
+                                        {c.profileType ? (
+                                          <span className="rounded-full bg-[var(--surface-subtle)] px-2 py-0.5 ring-1 ring-[var(--border)]">
+                                            {c.profileType}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={!isManager}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddFromRecruit(c);
+                                    }}
+                                    className="rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
+                                    title="Add to scenario"
+                                  >
+                                    + Add
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Primary group: Program athletes */}
+        <div className="mt-3 overflow-hidden rounded-xl bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]">
+          <button
+            type="button"
+            onClick={() =>
+              setOpenSources((prev) => ({ ...prev, program: !prev.program }))
+            }
+            className="flex w-full items-center justify-between px-3 py-2 text-left"
+          >
+            <div className="min-w-0">
+              <div className="truncate text-[12px] font-semibold text-[var(--foreground)]">
+                Program athletes
+                <span className="ml-2 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                  • {rosterCandidates.length}
+                </span>
+              </div>
+              <div className="mt-0.5 text-[10px] text-[var(--muted-foreground)]">
+                From any season on this team
+              </div>
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+              {openSources.program ? "Hide" : "Show"}
+            </div>
+          </button>
+
+          {openSources.program ? (
+            <div className="border-t border-[var(--border)] p-2">
+              {rosterError ? (
+                <p className="mb-2 text-[11px] text-rose-400">{rosterError}</p>
+              ) : null}
+
+              {loadingRoster ? (
+                <p className="text-[11px] text-[var(--muted-foreground)]">Loading program athletes…</p>
+              ) : rosterCandidates.length === 0 ? (
+                <p className="text-[11px] text-[var(--muted-foreground)]">No additional program athletes available to add.</p>
+              ) : (
+                <div className="space-y-2">
+                  {Object.entries(groupByEvent(rosterCandidates))
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([group, items]) => {
+                      const open = openRosterGroups[group] !== false;
+                      return (
+                        <div
+                          key={group}
+                          className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenRosterGroups((prev) => ({
+                                ...prev,
+                                [group]: !open,
+                              }))
+                            }
+                            className="flex w-full items-center justify-between px-3 py-2 text-left"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-[12px] font-semibold text-[var(--foreground)]">
+                                {group}
+                                <span className="ml-2 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                  • {items.length}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+                              {open ? "Hide" : "Show"}
+                            </div>
+                          </button>
+
+                          {open ? (
+                            <div className="space-y-2 border-t border-[var(--border)] p-2">
+                              {items.map((c) => (
+                                <div
+                                  key={c.athleteId}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() =>
+                                    setSelectedCandidate({
+                                      kind: "athlete",
+                                      id: c.athleteId,
+                                      fullName: c.fullName,
+                                      gradYear: c.gradYear,
+                                      eventGroup: c.eventGroup,
+                                    })
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      setSelectedCandidate({
+                                        kind: "athlete",
+                                        id: c.athleteId,
+                                        fullName: c.fullName,
+                                        gradYear: c.gradYear,
+                                        eventGroup: c.eventGroup,
+                                      });
+                                    }
+                                  }}
+                                  className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                                  title="Click for details"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                                      {c.fullName}
+                                      {c.gradYear && (
+                                        <span className="ml-2 text-[10px] text-[var(--muted-foreground)]">• {c.gradYear}</span>
+                                      )}
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={!isManager}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddFromRoster(c);
+                                    }}
+                                    className="rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
+                                    title="Add to scenario"
+                                  >
+                                    + Add
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Slide-out detail card (within sidebar) */}
+        {selectedCandidate ? (
+          <div className="absolute inset-0 z-10 bg-[var(--surface)] p-4 ring-1 ring-[var(--border)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                  {selectedCandidate.kind === "recruit" ? "Recruit" : "Program athlete"} details
+                </p>
+                <p className="mt-1 truncate text-base font-semibold text-[var(--foreground)]">
+                  {selectedCandidate.fullName}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                  {selectedCandidate.gradYear ? `Grad year: ${selectedCandidate.gradYear}` : "Grad year: —"}
+                  {" · "}
+                  {selectedCandidate.eventGroup ? `Event group: ${groupKey(selectedCandidate.eventGroup)}` : "Event group: Unassigned"}
+                </p>
+                {selectedCandidate.kind === "recruit" && selectedCandidate.meta ? (
+                  <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                    {selectedCandidate.meta.status ? `Status: ${selectedCandidate.meta.status}` : ""}
+                    {selectedCandidate.meta.status && selectedCandidate.meta.profileType ? " · " : ""}
+                    {selectedCandidate.meta.profileType ? `Profile: ${selectedCandidate.meta.profileType}` : ""}
+                  </p>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCandidate(null)}
+                className="rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl bg-[var(--surface-subtle)] p-3 ring-1 ring-[var(--border)]">
+              <p className="text-[11px] font-semibold text-[var(--foreground)]">Quick actions</p>
+              <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                Add this {selectedCandidate.kind === "recruit" ? "recruit" : "athlete"} to the scenario.
+              </p>
+
+              <div className="mt-3">
+                {selectedCandidate.kind === "recruit" ? (
+                  <button
+                    type="button"
+                    disabled={!isManager}
+                    onClick={async () => {
+                      const found = recruitCandidates.find((r) => r.programRecruitId === selectedCandidate.id);
+                      if (found) await handleAddFromRecruit(found);
+                      setSelectedCandidate(null);
+                    }}
+                    className="w-full rounded-md bg-[color:var(--brand)] px-3 py-2 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                  >
+                    + Add recruit to scenario
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!isManager}
+                    onClick={async () => {
+                      const found = rosterCandidates.find((a) => a.athleteId === selectedCandidate.id);
+                      if (found) await handleAddFromRoster(found);
+                      setSelectedCandidate(null);
+                    }}
+                    className="w-full rounded-md bg-[color:var(--brand)] px-3 py-2 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                  >
+                    + Add athlete to scenario
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 text-[10px] text-[var(--muted-foreground)]">
+              Coach note: this panel is intentionally lightweight for now; the full athlete slide-out will reuse the Athlete profile UI.
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );

@@ -90,6 +90,9 @@ async function assertProgramMember(
 export async function GET(req: NextRequest, ctx: RouteParams) {
   const { programId } = await ctx.params;
 
+  const searchParams = req.nextUrl.searchParams;
+  const q = searchParams.get("q")?.trim() || null;
+
   const authCheck = await assertProgramMember(req, programId);
   if (!authCheck.ok) {
     return NextResponse.json(
@@ -99,7 +102,8 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
   }
 
   // Pull recruits for this program with their athlete + profile info
-  const { data: rows, error } = await supabaseAdmin
+  // If `q` is present, run a lightweight search used by Scenario Add modal.
+  const queryBase = supabaseAdmin
     .from("program_recruits")
     .select(
       `
@@ -121,13 +125,23 @@ export async function GET(req: NextRequest, ctx: RouteParams) {
     `
     )
     .eq("program_id", programId)
-    // You can add status filters here later if needed
     .order("created_at", { ascending: false });
+
+  const query = q
+    ? queryBase
+        // Filter against the joined athletes table (the `athlete:athletes!inner` relation)
+        .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`, {
+          foreignTable: "athletes",
+        })
+        .limit(25)
+    : queryBase;
+
+  const { data: rows, error } = await query;
 
   if (error) {
     console.error("[ProgramRecruits] select error:", error);
     return NextResponse.json(
-      { error: "Failed to load recruits" },
+      { error: q ? "Failed to search recruits" : "Failed to load recruits" },
       { status: 500 }
     );
   }

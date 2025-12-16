@@ -127,6 +127,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       target_season_label,
       target_season_year,
       notes,
+      status,
       created_at
     `
     )
@@ -148,6 +149,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     target_season_label: (row.target_season_label as string | null) ?? null,
     target_season_year: (row.target_season_year as number | null) ?? null,
     notes: (row.notes as string | null) ?? null,
+    status: ((row as any).status as string | null) ?? "draft",
     created_at: row.created_at as string,
   }));
 
@@ -210,6 +212,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     .insert({
       program_id: programId,
       team_id: teamId,
+      status: "draft",
       name,
       target_season_label: targetLabel,
       target_season_year:
@@ -225,6 +228,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       target_season_label,
       target_season_year,
       notes,
+      status,
       created_at
     `
     )
@@ -246,6 +250,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     target_season_year:
       (inserted.target_season_year as number | null) ?? null,
     notes: (inserted.notes as string | null) ?? null,
+    status: ((inserted as any).status as string | null) ?? "draft",
     created_at: inserted.created_at as string,
   };
 

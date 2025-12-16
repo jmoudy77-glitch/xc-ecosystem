@@ -143,8 +143,66 @@ export async function GET(
     "relationshipType",
   ) as RelationshipType | null;
   const status = searchParams.get("status") ?? null;
+  const q = searchParams.get("q")?.trim() || null;
 
   try {
+    // SEARCH MODE (used by Scenario Add modal)
+    if (q) {
+      const { data, error } = await supabaseAdmin
+        .from("program_athletes")
+        .select(
+          `
+          id,
+          athlete_id,
+          relationship_type,
+          status,
+          athlete:athletes!inner(
+            id,
+            first_name,
+            last_name,
+            grad_year,
+            event_group
+          )
+        `
+        )
+        .eq("program_id", programId)
+        .is("archived_at", null)
+        .not("athlete_id", "is", null)
+        .or(
+          `first_name.ilike.%${q}%,last_name.ilike.%${q}%`, { foreignTable: "athletes" }
+        )
+        .order("created_at", { ascending: false })
+        .limit(25);
+
+      if (error) {
+        console.error(
+          "[/api/programs/[programId]/athletes] search error:",
+          error,
+        );
+        return NextResponse.json(
+          { error: "Failed to search program athletes" },
+          { status: 500 },
+        );
+      }
+
+      const results = (data || []).filter((row: any) => row?.athlete).map((row: any) => ({
+        id: row.athlete.id,
+        programAthleteId: row.id,
+        first_name: row.athlete.first_name,
+        last_name: row.athlete.last_name,
+        grad_year: row.athlete.grad_year,
+        event_group: row.athlete.event_group ?? null,
+        relationship_type: row.relationship_type,
+        status: row.status,
+      }));
+
+      return NextResponse.json(
+        { programId, athletes: results },
+        { status: 200 },
+      );
+    }
+
+    // DEFAULT LIST MODE (existing behavior)
     let query = supabaseAdmin
       .from("program_athletes")
       .select(

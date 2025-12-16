@@ -1,4 +1,3 @@
-// app/programs/[programId]/teams/[teamId]/TeamManagementShell.tsx
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -7,6 +6,39 @@ import TeamSeasonsClient, {
   type TeamSeasonSummary,
 } from "./TeamSeasonsClient";
 import TeamToolsPanel from "./TeamToolsPanel";
+
+type TeamContext = "seasons" | "active-roster" | "roster-planning";
+
+function deriveTeamContext(pathname: string | null | undefined): TeamContext {
+  if (!pathname) return "seasons";
+  if (pathname.includes("/active-roster")) return "active-roster";
+  if (pathname.includes("/roster-planning")) return "roster-planning";
+  return "seasons";
+}
+
+type TeamToolsContext = TeamContext | "roster-scenario";
+
+function deriveTeamToolsContext(pathname: string | null | undefined): TeamToolsContext {
+  if (!pathname) return "seasons";
+  if (pathname.includes("/scenarios/")) return "roster-scenario";
+  return deriveTeamContext(pathname);
+}
+
+function deriveScenarioId(pathname: string | null | undefined): string | undefined {
+  if (!pathname) return undefined;
+  const marker = "/scenarios/";
+  const idx = pathname.indexOf(marker);
+  if (idx === -1) return undefined;
+  const rest = pathname.slice(idx + marker.length);
+  const firstSeg = rest.split("/")[0];
+  return firstSeg || undefined;
+}
+
+type TeamContextTab = {
+  key: TeamContext;
+  label: string;
+  href: string;
+};
 
 type TeamManagementShellProps = {
   programId: string;
@@ -22,21 +54,6 @@ type TeamManagementShellProps = {
   isManager: boolean;
   activeSeason: TeamSeasonSummary | null;
   children?: ReactNode;
-};
-
-type TeamContext = "seasons" | "active-roster" | "roster-planning";
-
-function deriveTeamContext(pathname: string | null | undefined): TeamContext {
-  if (!pathname) return "seasons";
-  if (pathname.includes("/active-roster")) return "active-roster";
-  if (pathname.includes("/roster-planning")) return "roster-planning";
-  return "seasons";
-}
-
-type TeamContextTab = {
-  key: TeamContext;
-  label: string;
-  href: string;
 };
 
 export default function TeamManagementShell({
@@ -55,6 +72,8 @@ export default function TeamManagementShell({
   const router = useRouter();
   const teamBasePath = `/programs/${programId}/teams/${teamId}`;
   const activeContext = deriveTeamContext(pathname);
+  const toolsContext = deriveTeamToolsContext(pathname);
+  const scenarioId = deriveScenarioId(pathname);
 
   const tabs: TeamContextTab[] = [
     { key: "active-roster", label: "Active Roster", href: `${teamBasePath}/active-roster` },
@@ -170,8 +189,9 @@ export default function TeamManagementShell({
                 programId={programId}
                 teamId={teamId}
                 isManager={isManager}
-                activeContext={activeContext}
+                activeContext={toolsContext as any}
                 teamBasePath={teamBasePath}
+                scenarioId={scenarioId}
               />
             </aside>
           </div>

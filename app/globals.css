@@ -1,22 +1,56 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  /* Theme variables (new) */
-  --brand-primary: #0f172a;
-  --brand-secondary: #1e293b;
+  /* =========================
+     Theme Tokens (v1 contract)
+     Defaults are neutral-dark (brand-safe)
+     ========================= */
+
+  /* Core neutrals */
+  --app-bg: #020617;
+  --surface-1: #0b1220;
+  --surface-2: #0f172a;
+  --surface-3: #020617;
+  --border: #1f2937;
+  --border-muted: #111827;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --text-subtle: #6b7280;
+  --focus-ring: #38bdf8;
+
+  /* Brand + accents */
+  --brand: #2563eb;
+  --brand-contrast: #ffffff;
   --accent: #22c55e;
-
-  --surface: #020617;
-  --border-subtle: #1f2937;
-
-  --muted-foreground: #9ca3af;
+  --accent-contrast: #052e16;
+  --brand-soft: #2563eb33; /* ~20% alpha */
+  --brand-rail: #2563eb;
   --link: #38bdf8;
 
+  /* Semantic support */
   --success: #22c55e;
+  --success-contrast: #052e16;
   --warning: #f97316;
+  --warning-contrast: #431407;
   --danger: #ef4444;
+  --danger-contrast: #450a0a;
+  --info: #38bdf8;
+  --info-contrast: #082f49;
+
+  /* =========================
+     Legacy aliases (kept)
+     These keep existing screens working during migration.
+     ========================= */
+  --background: var(--app-bg);
+  --foreground: var(--text);
+
+  --brand-primary: var(--brand);
+  --brand-secondary: var(--surface-2);
+
+  --surface: var(--surface-3);
+  --border-subtle: var(--border);
+
+  --muted-foreground: var(--text-muted);
 }
 
 @theme inline {
@@ -26,10 +60,27 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --app-bg: #ffffff;
+    --surface-1: #f8fafc;
+    --surface-2: #ffffff;
+    --surface-3: #f1f5f9;
+    --border: #e5e7eb;
+    --border-muted: #f1f5f9;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-subtle: #64748b;
+
+    /* Keep brand/semantics the same in light mode; contrasts remain readable */
+    --background: var(--app-bg);
+    --foreground: var(--text);
+
+    --brand-primary: var(--brand);
+    --brand-secondary: var(--surface-2);
+    --surface: var(--surface-3);
+    --border-subtle: var(--border);
+    --muted-foreground: var(--text-muted);
   }
 }
 
@@ -62,16 +113,34 @@
 
 @layer utilities {
   .bg-brand {
-    background-color: var(--brand-primary);
+    background-color: var(--brand);
   }
   .bg-brand-soft {
-    background-color: var(--surface);
+    background-color: var(--brand-soft);
+  }
+  .bg-surface-1 {
+    background-color: var(--surface-1);
+  }
+  .bg-surface-2 {
+    background-color: var(--surface-2);
+  }
+  .bg-surface-3 {
+    background-color: var(--surface-3);
+  }
+  .text-subtle {
+    color: var(--text-subtle);
+  }
+  .ring-subtle {
+    --tw-ring-color: var(--border);
+  }
+  .focus-ring {
+    --tw-ring-color: var(--focus-ring);
   }
   .border-subtle {
-    border-color: var(--border-subtle);
+    border-color: var(--border);
   }
   .text-muted {
-    color: var(--muted-foreground);
+    color: var(--text-muted);
   }
   .text-link {
     color: var(--link);

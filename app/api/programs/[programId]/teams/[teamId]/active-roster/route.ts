@@ -1,146 +1,3 @@
-export async function PATCH(req: NextRequest, { params }: Params) {
-  const { programId, teamId } = await params;
-
-  try {
-    const { supabase } = supabaseServer(req);
-
-    // Ensure an auth session exists (prevents confusing 401s from downstream)
-    const { data: authData, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !authData?.user) {
-      console.error("[active-roster][PATCH] auth error", authErr);
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-
-    const {
-      roster_entry_id,
-      status,
-      role,
-      depth_order,
-      event_group,
-      scholarship_amount,
-      scholarship_unit,
-      scholarship_notes,
-      notes,
-    } = body || {};
-
-    if (!roster_entry_id) {
-      return NextResponse.json({ error: "roster_entry_id is required" }, { status: 400 });
-    }
-
-    // Only update fields that are explicitly provided
-    const updatePayload: any = {};
-    if (status !== undefined) updatePayload.status = status;
-    if (role !== undefined) updatePayload.role = role;
-    if (depth_order !== undefined) updatePayload.depth_order = depth_order;
-    if (event_group !== undefined) updatePayload.event_group = event_group;
-    if (scholarship_amount !== undefined) updatePayload.scholarship_amount = scholarship_amount;
-    if (scholarship_unit !== undefined) updatePayload.scholarship_unit = scholarship_unit;
-    if (scholarship_notes !== undefined) updatePayload.scholarship_notes = scholarship_notes;
-    if (notes !== undefined) updatePayload.notes = notes;
-
-    if (Object.keys(updatePayload).length === 0) {
-      return NextResponse.json({ error: "No fields provided to update" }, { status: 400 });
-    }
-
-    // Update the roster entry
-    const { error: updateErr } = await supabase
-      .from("team_roster")
-      .update(updatePayload)
-      .eq("id", roster_entry_id)
-      .eq("program_id", programId)
-      .eq("team_id", teamId);
-
-    if (updateErr) {
-      console.error("[active-roster][PATCH] update error", updateErr);
-      return NextResponse.json(
-        { error: "Failed to update roster entry" },
-        { status: 500 }
-      );
-    }
-
-    // Fetch the updated roster row joined to athlete fields (normalized shape)
-    const { data: row, error: fetchErr } = await supabase
-      .from("team_roster")
-      .select(
-        `
-        id,
-        athlete_id,
-        role,
-        status,
-        depth_order,
-        event_group,
-        scholarship_amount,
-        scholarship_unit,
-        scholarship_notes,
-        athletes:athletes!team_roster_athlete_id_fkey (
-          first_name,
-          last_name,
-          grad_year,
-          event_group,
-          avatar_url
-        )
-      `
-      )
-      .eq("program_id", programId)
-      .eq("team_id", teamId)
-      .eq("id", roster_entry_id)
-      .maybeSingle();
-
-    if (fetchErr) {
-      console.error("[active-roster][PATCH] fetch error", fetchErr);
-      return NextResponse.json(
-        { error: "Failed to fetch updated roster entry" },
-        { status: 500 }
-      );
-    }
-
-    const athlete = (row as any)?.athletes ?? {};
-
-    const normalized = row
-      ? {
-          id: (row as any).id as string,
-          athlete_id: (row as any).athlete_id as string,
-
-          athlete_first_name: (athlete.first_name as string) ?? "",
-          athlete_last_name: (athlete.last_name as string) ?? "",
-          athlete_grad_year: (athlete.grad_year as number | null) ?? null,
-          athlete_default_event_group: (athlete.event_group as string | null) ?? null,
-          athlete_event_group: (athlete.event_group as string | null) ?? null,
-          athlete_avatar_url: (athlete.avatar_url as string | null) ?? null,
-
-          role: ((row as any).role as string | null) ?? null,
-          status: ((row as any).status as string | null) ?? null,
-          depth_order: ((row as any).depth_order as number | null) ?? null,
-          roster_event_group: ((row as any).event_group as string | null) ?? null,
-          event_group: ((row as any).event_group as string | null) ?? null,
-
-          scholarship_amount: ((row as any).scholarship_amount as number | null) ?? null,
-          scholarship_unit: ((row as any).scholarship_unit as string | null) ?? null,
-          scholarship_notes: ((row as any).scholarship_notes as string | null) ?? null,
-        }
-      : null;
-
-    return NextResponse.json(
-      {
-        roster_entry: normalized,
-      },
-      { status: 200 }
-    );
-  } catch (err) {
-    console.error("[active-roster][PATCH] unexpected error", err);
-    return NextResponse.json(
-      { error: "Unexpected error updating roster entry" },
-      { status: 500 }
-    );
-  }
-}
 // app/api/programs/[programId]/teams/[teamId]/active-roster/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -155,6 +12,8 @@ type TeamSeasonRow = {
   end_date: string | null;
   is_active: boolean | null;
   is_current: boolean | null;
+  is_locked: boolean | null;
+  roster_lock_date: string | null;
 };
 
 type Params = {
@@ -177,6 +36,41 @@ type AddToRosterBody = {
   notes?: string | null;
 };
 
+function resolveActiveSeason(seasons: TeamSeasonRow[]) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  return (
+    seasons.find((s) => s.is_current) ??
+    seasons.find((s) => s.is_active) ??
+    seasons
+      .filter((s) => s.start_date && s.start_date >= todayIso)
+      .sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""))[0] ??
+    seasons[0]
+  );
+}
+
+function draftResponse(activeSeason: TeamSeasonRow) {
+  return NextResponse.json(
+    {
+      error: "ROSTER_IN_DRAFT",
+      message:
+        "Roster is in Draft. Close the roster in Roster Planner to activate Active Roster.",
+      season: {
+        id: activeSeason.id,
+        season_label: activeSeason.season_label,
+        season_year: activeSeason.season_year,
+        start_date: activeSeason.start_date,
+        end_date: activeSeason.end_date,
+        is_active: !!activeSeason.is_active,
+        is_current: !!activeSeason.is_current,
+        is_locked: !!activeSeason.is_locked,
+        roster_lock_date: activeSeason.roster_lock_date,
+      },
+    },
+    { status: 409 }
+  );
+}
+
 export async function GET(req: NextRequest, { params }: Params) {
   const { programId, teamId } = await params;
 
@@ -187,7 +81,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const { data: seasonRows, error: seasonsError } = await supabase
       .from("team_seasons")
       .select(
-        "id, team_id, program_id, season_label, season_year, start_date, end_date, is_active, is_current"
+        "id, team_id, program_id, season_label, season_year, start_date, end_date, is_active, is_current, is_locked, roster_lock_date"
       )
       .eq("program_id", programId)
       .eq("team_id", teamId)
@@ -214,23 +108,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     // 2) Determine "active or next upcoming" season
-    const todayIso = new Date().toISOString().slice(0, 10);
-
-    // Prefer explicit is_current flag (canonical season for tools)
-    let activeSeason =
-      seasons.find((s) => s.is_current) ??
-      // Otherwise, prefer explicit is_active flag
-      seasons.find((s) => s.is_active) ??
-      // Otherwise, the nearest upcoming season (start_date >= today)
-      seasons
-        .filter((s) => s.start_date && s.start_date >= todayIso)
-        .sort((a, b) => {
-          const ad = a.start_date ?? "";
-          const bd = b.start_date ?? "";
-          return ad.localeCompare(bd);
-        })[0] ??
-      // Fallback: the most recent by season_year
-      seasons[0];
+    const activeSeason = resolveActiveSeason(seasons);
 
     if (!activeSeason) {
       return NextResponse.json(
@@ -240,6 +118,11 @@ export async function GET(req: NextRequest, { params }: Params) {
         },
         { status: 200 }
       );
+    }
+
+    // Option A: Active Roster is inaccessible until roster is locked/closed
+    if (!activeSeason.is_locked) {
+      return draftResponse(activeSeason);
     }
 
     // 3) Load roster for that season, joined to athletes
@@ -256,6 +139,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         scholarship_amount,
         scholarship_unit,
         scholarship_notes,
+        notes,
         athletes:athletes!team_roster_athlete_id_fkey (
           first_name,
           last_name,
@@ -305,6 +189,7 @@ export async function GET(req: NextRequest, { params }: Params) {
           scholarship_amount: (row.scholarship_amount as number | null) ?? null,
           scholarship_unit: (row.scholarship_unit as string | null) ?? null,
           scholarship_notes: (row.scholarship_notes as string | null) ?? null,
+          notes: (row.notes as string | null) ?? null,
         };
       }) ?? [];
 
@@ -319,6 +204,8 @@ export async function GET(req: NextRequest, { params }: Params) {
           end_date: activeSeason.end_date,
           is_active: !!activeSeason.is_active,
           is_current: !!activeSeason.is_current,
+          is_locked: !!activeSeason.is_locked,
+          roster_lock_date: activeSeason.roster_lock_date,
         },
       },
       { status: 200 }
@@ -361,7 +248,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { data: seasonRows, error: seasonsError } = await supabase
       .from("team_seasons")
       .select(
-        "id, team_id, program_id, season_label, season_year, start_date, end_date, is_active, is_current"
+        "id, team_id, program_id, season_label, season_year, start_date, end_date, is_active, is_current, is_locked, roster_lock_date"
       )
       .eq("program_id", programId)
       .eq("team_id", teamId)
@@ -384,26 +271,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    // 2) Determine "active or next upcoming" season (same logic as GET)
-    const todayIso = new Date().toISOString().slice(0, 10);
-
-    const activeSeason =
-      seasons.find((s) => s.is_current) ??
-      seasons.find((s) => s.is_active) ??
-      seasons
-        .filter((s) => s.start_date && s.start_date >= todayIso)
-        .sort((a, b) => {
-          const ad = a.start_date ?? "";
-          const bd = b.start_date ?? "";
-          return ad.localeCompare(bd);
-        })[0] ??
-      seasons[0];
+    // 2) Resolve active season + Option A gate
+    const activeSeason = resolveActiveSeason(seasons);
 
     if (!activeSeason) {
       return NextResponse.json(
         { error: "No active season resolved" },
         { status: 400 }
       );
+    }
+
+    if (!activeSeason.is_locked) {
+      return draftResponse(activeSeason);
     }
 
     // 3) Guardrail: prevent duplicate roster entries for the active season
@@ -464,7 +343,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    // 4) Fetch the created/existing roster row joined to athlete fields (normalized shape)
+    // 4) Fetch the created roster row joined to athlete fields (normalized shape)
     const { data: row, error: fetchErr } = await supabase
       .from("team_roster")
       .select(
@@ -478,6 +357,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         scholarship_amount,
         scholarship_unit,
         scholarship_notes,
+        notes,
         athletes:athletes!team_roster_athlete_id_fkey (
           first_name,
           last_name,
@@ -524,6 +404,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           scholarship_amount: ((row as any).scholarship_amount as number | null) ?? null,
           scholarship_unit: ((row as any).scholarship_unit as string | null) ?? null,
           scholarship_notes: ((row as any).scholarship_notes as string | null) ?? null,
+          notes: ((row as any).notes as string | null) ?? null,
         }
       : null;
 
@@ -538,6 +419,8 @@ export async function POST(req: NextRequest, { params }: Params) {
           end_date: activeSeason.end_date,
           is_active: !!activeSeason.is_active,
           is_current: !!activeSeason.is_current,
+          is_locked: !!activeSeason.is_locked,
+          roster_lock_date: activeSeason.roster_lock_date,
         },
         idempotent: false,
       },
@@ -549,5 +432,168 @@ export async function POST(req: NextRequest, { params }: Params) {
       { error: "Unexpected error adding athlete to active roster" },
       { status: 500 }
     );
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const { programId, teamId } = await params;
+
+  try {
+    const { supabase } = supabaseServer(req);
+
+    // Ensure an auth session exists (prevents confusing 401s from downstream)
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !authData?.user) {
+      console.error("[active-roster][PATCH] auth error", authErr);
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const {
+      roster_entry_id,
+      status,
+      role,
+      depth_order,
+      event_group,
+      scholarship_amount,
+      scholarship_unit,
+      scholarship_notes,
+      notes,
+    } = body || {};
+
+    if (!roster_entry_id) {
+      return NextResponse.json({ error: "roster_entry_id is required" }, { status: 400 });
+    }
+
+    // Load seasons and resolve active season (canonical for Active Roster)
+    const { data: seasonRows, error: seasonsError } = await supabase
+      .from("team_seasons")
+      .select(
+        "id, team_id, program_id, season_label, season_year, start_date, end_date, is_active, is_current, is_locked, roster_lock_date"
+      )
+      .eq("program_id", programId)
+      .eq("team_id", teamId)
+      .order("season_year", { ascending: false });
+
+    if (seasonsError) {
+      console.error("[active-roster][PATCH] seasonsError", seasonsError);
+      return NextResponse.json({ error: "Failed to load team seasons" }, { status: 500 });
+    }
+
+    const seasons: TeamSeasonRow[] = (seasonRows ?? []) as TeamSeasonRow[];
+    if (seasons.length === 0) {
+      return NextResponse.json({ error: "No seasons found for this team" }, { status: 400 });
+    }
+
+    const activeSeason = resolveActiveSeason(seasons);
+    if (!activeSeason) {
+      return NextResponse.json({ error: "No active season resolved" }, { status: 400 });
+    }
+
+    if (!activeSeason.is_locked) {
+      return draftResponse(activeSeason);
+    }
+
+    // Only update fields that are explicitly provided
+    const updatePayload: any = {};
+    if (status !== undefined) updatePayload.status = status;
+    if (role !== undefined) updatePayload.role = role;
+    if (depth_order !== undefined) updatePayload.depth_order = depth_order;
+    if (event_group !== undefined) updatePayload.event_group = event_group;
+    if (scholarship_amount !== undefined) updatePayload.scholarship_amount = scholarship_amount;
+    if (scholarship_unit !== undefined) updatePayload.scholarship_unit = scholarship_unit;
+    if (scholarship_notes !== undefined) updatePayload.scholarship_notes = scholarship_notes;
+    if (notes !== undefined) updatePayload.notes = notes;
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: "No fields provided to update" }, { status: 400 });
+    }
+
+    // Update the roster entry (active season only)
+    const { error: updateErr } = await supabase
+      .from("team_roster")
+      .update(updatePayload)
+      .eq("id", roster_entry_id)
+      .eq("program_id", programId)
+      .eq("team_id", teamId)
+      .eq("team_season_id", activeSeason.id);
+
+    if (updateErr) {
+      console.error("[active-roster][PATCH] update error", updateErr);
+      return NextResponse.json({ error: "Failed to update roster entry" }, { status: 500 });
+    }
+
+    // Fetch the updated roster row joined to athlete fields (normalized shape)
+    const { data: row, error: fetchErr } = await supabase
+      .from("team_roster")
+      .select(
+        `
+        id,
+        athlete_id,
+        role,
+        status,
+        depth_order,
+        event_group,
+        scholarship_amount,
+        scholarship_unit,
+        scholarship_notes,
+        notes,
+        athletes:athletes!team_roster_athlete_id_fkey (
+          first_name,
+          last_name,
+          grad_year,
+          event_group,
+          avatar_url
+        )
+      `
+      )
+      .eq("program_id", programId)
+      .eq("team_id", teamId)
+      .eq("team_season_id", activeSeason.id)
+      .eq("id", roster_entry_id)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error("[active-roster][PATCH] fetch error", fetchErr);
+      return NextResponse.json({ error: "Failed to fetch updated roster entry" }, { status: 500 });
+    }
+
+    const athlete = (row as any)?.athletes ?? {};
+
+    const normalized = row
+      ? {
+          id: (row as any).id as string,
+          athlete_id: (row as any).athlete_id as string,
+
+          athlete_first_name: (athlete.first_name as string) ?? "",
+          athlete_last_name: (athlete.last_name as string) ?? "",
+          athlete_grad_year: (athlete.grad_year as number | null) ?? null,
+          athlete_default_event_group: (athlete.event_group as string | null) ?? null,
+          athlete_event_group: (athlete.event_group as string | null) ?? null,
+          athlete_avatar_url: (athlete.avatar_url as string | null) ?? null,
+
+          role: ((row as any).role as string | null) ?? null,
+          status: ((row as any).status as string | null) ?? null,
+          depth_order: ((row as any).depth_order as number | null) ?? null,
+          roster_event_group: ((row as any).event_group as string | null) ?? null,
+          event_group: ((row as any).event_group as string | null) ?? null,
+
+          scholarship_amount: ((row as any).scholarship_amount as number | null) ?? null,
+          scholarship_unit: ((row as any).scholarship_unit as string | null) ?? null,
+          scholarship_notes: ((row as any).scholarship_notes as string | null) ?? null,
+          notes: ((row as any).notes as string | null) ?? null,
+        }
+      : null;
+
+    return NextResponse.json({ roster_entry: normalized }, { status: 200 });
+  } catch (err) {
+    console.error("[active-roster][PATCH] unexpected error", err);
+    return NextResponse.json({ error: "Unexpected error updating roster entry" }, { status: 500 });
   }
 }

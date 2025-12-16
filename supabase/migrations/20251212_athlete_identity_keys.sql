@@ -3,8 +3,7 @@
 
 begin;
 
--- 0) Extensions
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- 1) Canonical identity functions
 create or replace function public.identity_normalize_name(input text)
@@ -22,12 +21,14 @@ as $$
   );
 $$;
 
+create extension if not exists pgcrypto with schema extensions;
+
 create or replace function public.identity_sha256_hex(input text)
 returns text
 language sql
 immutable
 as $$
-  select encode(digest(coalesce(input, ''), 'sha256'), 'hex');
+  select encode(extensions.digest(convert_to(coalesce(input, ''), 'utf8'), 'sha256'::text), 'hex');
 $$;
 
 create or replace function public.athlete_identity_key_weak(

@@ -3,24 +3,8 @@
 
 import { useEffect, useState } from "react";
 import RosterSandboxClient from "./RosterSandboxClient";
-import ScenarioRosterClient from "./scenarios/[scenarioId]/ScenarioRosterClient";
+import ScenarioEntriesClient from "./scenarios/[scenarioId]/ScenarioEntriesClient";
 
-export type ActiveRosterRow = {
-  id: string;
-  athlete_id: string;
-  athlete_first_name: string;
-  athlete_last_name: string;
-  athlete_grad_year: number | null;
-  athlete_default_event_group: string | null;
-  roster_event_group: string | null;
-  athlete_avatar_url: string | null;
-  role: string | null;
-  status: string | null;
-  depth_order: number | null;
-  scholarship_amount: number | null;
-  scholarship_unit: string | null;
-  scholarship_notes: string | null;
-};
 
 export const ACTIVE_ROSTER_TOOLS_EVENT = "xc:active-roster:tools";
 
@@ -65,9 +49,11 @@ export default function TeamToolsPanel({
   const toolsKey = `xc:team:${programId}:${teamId}:activeRoster:tools`;
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     // default: collapsed
-    active_roster_snapshot: true,
     sandbox_scenarios: true,
     scenario_add_to_scenario: false,
+    scenario_budget: true,
+    scenario_quotas: true,
+    scenario_actions: true,
 
     // Active Roster toolbox modules
     ar_view_filters: true,
@@ -167,31 +153,6 @@ export default function TeamToolsPanel({
               </p>
             </div>
 
-            {/* Active Roster Snapshot (not shown while Active Roster is the center work surface) */}
-            {!isActiveRoster && (
-              <div className="rounded-2xl bg-surface ring-1 ring-subtle">
-                <button
-                  type="button"
-                  onClick={() => toggleSection("active_roster_snapshot")}
-                  className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left"
-                >
-                  <div>
-                    <p className="text-[11px] font-semibold text">Active Roster Snapshot</p>
-                    <p className="mt-0.5 text-[10px] text-muted">
-                      Group counts for the current team season.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-semibold text-muted">
-                    {collapsed.active_roster_snapshot ? "Show" : "Hide"}
-                  </span>
-                </button>
-                {!collapsed.active_roster_snapshot && (
-                  <div className="px-3 pb-3">
-                    <ActiveRosterSummary programId={programId} teamId={teamId} />
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Active Roster toolbox (no navigation; support tools only) */}
             {isActiveRoster && (
@@ -523,42 +484,216 @@ export default function TeamToolsPanel({
 
             {/* Scenario intake (Roster Scenario only) */}
             {isRosterScenario && (
-              <div className="rounded-2xl bg-surface ring-1 ring-subtle">
-                <button
-                  type="button"
-                  onClick={() => toggleSection("scenario_add_to_scenario")}
-                  className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left"
-                >
-                  <div>
-                    <p className="text-[11px] font-semibold text">Add to scenario</p>
-                    <p className="mt-0.5 text-[10px] text-muted">
-                      Recruits and program athletes grouped by event.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-semibold text-muted">
-                    {collapsed.scenario_add_to_scenario ? "Show" : "Hide"}
-                  </span>
-                </button>
-
-                {!collapsed.scenario_add_to_scenario && (
-                  <div className="px-3 pb-3">
-                    {scenarioId ? (
-                      <ScenarioRosterClient
-                        programId={programId}
-                        teamId={teamId}
-                        scenarioId={scenarioId}
-                        isManager={isManager}
-                        // ScenarioRosterClient expects initialEntries; it will refetch in-client anyway.
-                        initialEntries={[] as any}
-                      />
-                    ) : (
-                      <p className="text-[11px] text-muted">
-                        No scenario selected.
+              <>
+                <div className="rounded-2xl bg-surface ring-1 ring-subtle">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection("scenario_add_to_scenario")}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left"
+                  >
+                    <div>
+                      <p className="text-[11px] font-semibold text">Add to scenario</p>
+                      <p className="mt-0.5 text-[10px] text-muted">
+                        Recruits and program athletes grouped by event.
                       </p>
-                    )}
-                  </div>
-                )}
-              </div>
+                    </div>
+                    <span className="text-[10px] font-semibold text-muted">
+                      {collapsed.scenario_add_to_scenario ? "Show" : "Hide"}
+                    </span>
+                  </button>
+
+                  {!collapsed.scenario_add_to_scenario && (
+                    <div className="px-3 pb-3">
+                      {scenarioId ? (
+                        <ScenarioEntriesClient
+                          programId={programId}
+                          teamId={teamId}
+                          scenarioId={scenarioId}
+                          isManager={isManager}
+                        />
+                      ) : (
+                        <p className="text-[11px] text-muted">
+                          No scenario selected.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* Scenario budget card */}
+                <div className="rounded-2xl bg-surface ring-1 ring-subtle">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection("scenario_budget")}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left"
+                  >
+                    <div>
+                      <p className="text-[11px] font-semibold text">Scenario scholarship budget</p>
+                      <p className="mt-0.5 text-[10px] text-muted">
+                        Override the season budget for this scenario only.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-muted">
+                      {collapsed.scenario_budget ? "Show" : "Hide"}
+                    </span>
+                  </button>
+
+                  {!collapsed.scenario_budget && (
+                    <div className="space-y-3 px-3 pb-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                            Equivalencies
+                          </label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            placeholder="e.g., 12.6"
+                            className="h-9 w-full rounded-md border border-subtle bg-surface px-2 text-sm"
+                            disabled
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                            Dollars (optional)
+                          </label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            placeholder="e.g., 45000"
+                            className="h-9 w-full rounded-md border border-subtle bg-surface px-2 text-sm"
+                            disabled
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="h-9 w-full rounded-md bg-surface-2 text-sm font-semibold text ring-1 ring-subtle opacity-60"
+                        disabled
+                      >
+                        Save scenario budget (coming soon)
+                      </button>
+
+                      <button
+                        type="button"
+                        className="h-9 w-full rounded-md bg-surface-2 text-sm font-semibold text ring-1 ring-subtle opacity-60"
+                        disabled
+                      >
+                        Reset to season defaults (coming soon)
+                      </button>
+
+                      <p className="text-[10px] text-muted">
+                        Budget overrides will be stored on the scenario (not the season). UI is wired here; save/reset will be enabled after the scenario settings schema + API route exist.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {/* Scenario quotas card */}
+                <div className="rounded-2xl bg-surface ring-1 ring-subtle">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection("scenario_quotas")}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left"
+                  >
+                    <div>
+                      <p className="text-[11px] font-semibold text">Scenario event group quotas</p>
+                      <p className="mt-0.5 text-[10px] text-muted">
+                        Set target headcount by group for this scenario.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-muted">
+                      {collapsed.scenario_quotas ? "Show" : "Hide"}
+                    </span>
+                  </button>
+
+                  {!collapsed.scenario_quotas && (
+                    <div className="space-y-3 px-3 pb-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[
+                          "Distance",
+                          "Mid-distance",
+                          "Sprints",
+                          "Jumps",
+                          "Throws",
+                        ].map((label) => (
+                          <div key={label} className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                              {label}
+                            </label>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              placeholder="0"
+                              className="h-9 w-full rounded-md border border-subtle bg-surface px-2 text-sm"
+                              disabled
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="h-9 w-full rounded-md bg-surface-2 text-sm font-semibold text ring-1 ring-subtle opacity-60"
+                        disabled
+                      >
+                        Save scenario quotas (coming soon)
+                      </button>
+
+                      <button
+                        type="button"
+                        className="h-9 w-full rounded-md bg-surface-2 text-sm font-semibold text ring-1 ring-subtle opacity-60"
+                        disabled
+                      >
+                        Reset to season defaults (coming soon)
+                      </button>
+
+                      <p className="text-[10px] text-muted">
+                        Quota overrides will be stored on the scenario (not the season). UI is wired here; save/reset will be enabled after the scenario settings schema + API route exist.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {/* Scenario actions card */}
+                <div className="rounded-2xl bg-surface ring-1 ring-subtle">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection("scenario_actions")}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left"
+                  >
+                    <div>
+                      <p className="text-[11px] font-semibold text">Scenario actions</p>
+                      <p className="mt-0.5 text-[10px] text-muted">
+                        Duplicate, archive, and other scenario-level actions.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-muted">
+                      {collapsed.scenario_actions ? "Show" : "Hide"}
+                    </span>
+                  </button>
+
+                  {!collapsed.scenario_actions && (
+                    <div className="grid gap-2 px-3 pb-3">
+                      <button
+                        type="button"
+                        className="h-9 rounded-md bg-surface-2 text-sm font-semibold text ring-1 ring-subtle opacity-60"
+                        disabled
+                      >
+                        Duplicate scenario (coming soon)
+                      </button>
+                      <button
+                        type="button"
+                        className="h-9 rounded-md bg-surface-2 text-sm font-semibold text ring-1 ring-subtle opacity-60"
+                        disabled
+                      >
+                        Archive scenario (coming soon)
+                      </button>
+                      <p className="text-[10px] text-muted">
+                        These are scenario-level actions (reversible). We’ll enable after wiring the scenarios API.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             {/* Sandbox Scenarios (Roster Planning only) */}
@@ -587,155 +722,9 @@ export default function TeamToolsPanel({
               </div>
             )}
 
-            {/* Micro guidance (non-interactive, no links) */}
-            <div className="rounded-2xl bg-surface ring-1 ring-subtle p-3">
-              <p className="text-[10px] text-muted">
-                {isActiveRoster
-                  ? "Active Roster is the current work surface. The toolbox provides filters, bulk actions, exports, and completeness checks (no navigation)."
-                  : "Use the mode switcher above the shell to change work surfaces. This toolbox adapts to the current mode."}
-              </p>
-            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-
-
-function ActiveRosterSummary({
-  programId,
-  teamId,
-}: Pick<TeamToolsPanelProps, "programId" | "teamId">) {
-  const [roster, setRoster] = useState<ActiveRosterRow[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadActiveRoster() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const res = await fetch(
-          `/api/programs/${programId}/teams/${teamId}/active-roster`,
-          { method: "GET", credentials: "include" }
-        );
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          if (!isMounted) return;
-          console.error("[ActiveRosterSummary] failed response", body);
-          setError(body.error || "Failed to load active roster");
-          setRoster([]);
-          return;
-        }
-
-        const body = await res.json();
-        const rows: ActiveRosterRow[] = body.roster ?? [];
-        if (!isMounted) return;
-        setRoster(rows);
-      } catch (err) {
-        console.error("[ActiveRosterSummary] error", err);
-        if (!isMounted) return;
-        setError("Failed to load active roster");
-        setRoster([]);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    }
-
-    loadActiveRoster();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [programId, teamId]);
-
-  const getGroupKey = (row: ActiveRosterRow) =>
-    row.roster_event_group ?? row.athlete_default_event_group ?? "Unassigned";
-
-  const groupedRoster = roster.reduce<Record<string, ActiveRosterRow[]>>(
-    (acc, row) => {
-      const key = getGroupKey(row);
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(row);
-      return acc;
-    },
-    {}
-  );
-
-  const groupOrder = Object.keys(groupedRoster).sort((a, b) => {
-    if (a === "Unassigned") return 1;
-    if (b === "Unassigned") return -1;
-    return a.localeCompare(b);
-  });
-
-  if (loading) return <p className="text-[11px] text-muted">Loading…</p>;
-  if (error) return <p className="text-[11px] text-red-400">{error}</p>;
-  if (roster.length === 0)
-    return <p className="text-[11px] text-muted">No active roster yet.</p>;
-
-  return (
-    <div className="space-y-2 text-[11px] text-muted">
-      {groupOrder.map((groupKey) => {
-        const rows = groupedRoster[groupKey] ?? [];
-        const isCollapsed = collapsedGroups[groupKey] ?? false;
-
-        return (
-          <div
-            key={groupKey}
-            className="rounded-xl bg-surface ring-1 ring-subtle"
-          >
-            <button
-              type="button"
-              onClick={() =>
-                setCollapsedGroups((prev) => ({
-                  ...prev,
-                  [groupKey]: !(prev[groupKey] ?? false),
-                }))
-              }
-              className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text">
-                  {groupKey}
-                </span>
-                <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-semibold text ring-1 ring-subtle">
-                  {rows.length}
-                </span>
-              </div>
-              <span className="text-[10px] text-muted">
-                {isCollapsed ? "Show" : "Hide"}
-              </span>
-            </button>
-
-            {!isCollapsed && (
-              <div className="space-y-1 px-3 pb-3">
-                {rows.slice(0, 6).map((row) => (
-                  <div key={row.id} className="flex items-center justify-between">
-                    <span className="text-[11px] text">
-                      {row.athlete_first_name} {row.athlete_last_name}
-                    </span>
-                    <span className="text-[10px] text-muted">
-                      {row.athlete_grad_year ? `${row.athlete_grad_year}` : ""}
-                    </span>
-                  </div>
-                ))}
-                {rows.length > 6 && (
-                  <p className="pt-1 text-[10px] text-muted">
-                    +{rows.length - 6} more… (see Active Roster work surface)
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }

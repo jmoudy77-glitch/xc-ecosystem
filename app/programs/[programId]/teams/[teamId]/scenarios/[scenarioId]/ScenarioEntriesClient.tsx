@@ -1,993 +1,774 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ManageAthleteModal } from "../../active-roster/page";
 
-type ScenarioEntry = {
+type RecruitRow = {
+  // normalized id we use in UI + actions (must be stable)
   id: string;
-  athleteId: string | null;
-  programRecruitId: string | null;
-  athleteName: string;
-  gradYear: number | null;
-  scholarshipAmount: number | null;
-  scholarshipUnit: "percent" | "amount" | string;
-  scholarshipNotes: string | null;
-  createdAt: string | null;
-};
-
-type AthleteSearchResult = {
-  id: string;
+  // raw fields we might get back from the API
+  program_recruit_id?: string;
   first_name: string;
   last_name: string;
-  grad_year: number | null;
-  event_group: string | null;
-  relationship_type?: string | null;
-  status?: string | null;
+  grad_year?: number | null;
+  event_group?: string | null;
+  pipeline_stage?: string | null;
 };
 
-type RecruitSearchResult = {
-  id: string; // program_recruits.id
+type ReturningAthleteRow = {
+  athlete_id: string;
   first_name: string;
   last_name: string;
-  grad_year: number | null;
-  event_group: string | null;
-  status?: string | null;
+  grad_year?: number | null;
+  event_group?: string | null;
 };
 
 type Props = {
   programId: string;
   teamId: string;
   scenarioId: string;
-  initialEntries: ScenarioEntry[];
-  unitLabel: string; // for display only
+  isManager: boolean;
 };
-
-type ScenarioStatus = "draft" | "candidate" | "active";
-
-function normalizeScenarioStatus(v: any): ScenarioStatus {
-  return v === "active" || v === "candidate" || v === "draft" ? v : "draft";
-}
-
-function StatusBadge({ status }: { status: ScenarioStatus }) {
-  const label = status === "active" ? "Active" : status === "candidate" ? "Candidate" : "Draft";
-  const icon = status === "active" ? "👑" : status === "candidate" ? "⭐" : "";
-  const tone =
-    status === "active"
-      ? "bg-[var(--success-subtle)] text-[var(--success)] ring-[var(--success)]"
-      : status === "candidate"
-      ? "bg-[var(--muted)] text-[var(--foreground)] ring-[var(--border)]"
-      : "bg-[var(--surface)] text-[var(--muted-foreground)] ring-[var(--border)]";
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ${tone}`}
-      title={
-        status === "active"
-          ? "Official roster (locked)"
-          : status === "candidate"
-          ? "Next in line for promotion"
-          : "Safe draft"
-      }
-    >
-      {icon ? <span aria-hidden>{icon}</span> : null}
-      <span>{label}</span>
-    </span>
-  );
-}
 
 export default function ScenarioEntriesClient({
   programId,
   teamId,
   scenarioId,
-  initialEntries,
-  unitLabel,
+  isManager,
 }: Props) {
-  const [entries, setEntries] = useState<ScenarioEntry[]>(initialEntries);
+  const router = useRouter();
+  const removedIdsRef = useRef<Set<string>>(new Set());
+
+  const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [recruits, setRecruits] = useState<RecruitRow[]>([]);
+  const [query, setQuery] = useState("");
 
-  const [scenarioStatus, setScenarioStatus] = useState<ScenarioStatus>("draft");
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [statusActionLoading, setStatusActionLoading] = useState<ScenarioStatus | "return" | null>(null);
-  const [statusError, setStatusError] = useState<string | null>(null);
-
-  const scenariosEndpoint = useMemo(
-    () => `/api/programs/${programId}/teams/${teamId}/roster-scenarios`,
-    [programId, teamId]
+  // Returning athletes modal state
+  const [returningOpen, setReturningOpen] = useState(false);
+  const [returningLoading, setReturningLoading] = useState(false);
+  const [returningError, setReturningError] = useState<string | null>(null);
+  const [returningAll, setReturningAll] = useState<ReturningAthleteRow[]>([]);
+  const [returningRemovedIds, setReturningRemovedIds] = useState<Set<string>>(
+    new Set()
   );
+  const [returningSaving, setReturningSaving] = useState(false);
 
-  const statusEndpoint = useMemo(
-    () =>
-      `/api/programs/${programId}/teams/${teamId}/roster-scenarios/${scenarioId}/status`,
-    [programId, teamId, scenarioId]
+  // Housekeeping modal (optional follow-up after removing returning athletes)
+  const [housekeepingOpen, setHousekeepingOpen] = useState(false);
+  // Which removed athletes should be persisted as program-level non-returners
+  const [housekeepingNonReturningIds, setHousekeepingNonReturningIds] = useState<Set<string>>(
+    new Set()
   );
-  useEffect(() => {
-    let canceled = false;
+  const [housekeepingSaving, setHousekeepingSaving] = useState(false);
+  const [housekeepingError, setHousekeepingError] = useState<string | null>(null);
+  async function persistProgramNonReturners(athleteIds: string[]) {
+    if (!isManager) return;
+    if (athleteIds.length === 0) return;
 
-    async function run() {
-      setStatusError(null);
-      setStatusLoading(true);
-      try {
-        const res = await fetch(scenariosEndpoint, { method: "GET" });
-        const body = await res.json();
-        if (canceled) return;
-
-        if (!res.ok) {
-          setStatusError(body?.error || "Failed to load scenario status");
-          setStatusLoading(false);
-          return;
-        }
-
-        const list = (body?.scenarios || []) as any[];
-        const sc = list.find((s) => s?.id === scenarioId);
-        setScenarioStatus(normalizeScenarioStatus(sc?.status));
-      } catch (e: any) {
-        if (canceled) return;
-        setStatusError(e?.message || "Failed to load scenario status");
-      }
-
-      if (!canceled) setStatusLoading(false);
-    }
-
-    run();
-    return () => {
-      canceled = true;
-    };
-  }, [scenariosEndpoint, scenarioId]);
-  async function setScenarioStatusRemote(next: ScenarioStatus | "return") {
-    setStatusError(null);
-    setStatusActionLoading(next);
+    setHousekeepingSaving(true);
+    setHousekeepingError(null);
 
     try {
-      const payload =
-        next === "return" ? { returnToPlanning: true } : { status: next };
+      await Promise.all(
+        athleteIds.map(async (athleteId) => {
+          const res = await fetch(
+            `/api/programs/${programId}/teams/${teamId}/roster-scenarios/${scenarioId}/returning-candidates`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                athlete_id: athleteId,
+                is_returning: false,
+              }),
+            }
+          );
 
-      const res = await fetch(statusEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            throw new Error(
+              `Failed to mark non-returning (${res.status})${text ? `: ${text}` : ""}`
+            );
+          }
+        })
+      );
 
-      const body = await res.json();
+      // Force next open to re-fetch with the new exclusions
+      setReturningAll([]);
+      setReturningRemovedIds(new Set());
+      removedIdsRef.current = new Set();
 
-      if (!res.ok) {
-        setStatusError(body?.error || "Failed to update scenario status");
-        setStatusActionLoading(null);
-        return;
-      }
-
-      const updated = body?.scenario;
-      setScenarioStatus(normalizeScenarioStatus(updated?.status));
-
-      // Refresh server components / summary cards.
       router.refresh();
+      setHousekeepingOpen(false);
     } catch (e: any) {
-      setStatusError(e?.message || "Failed to update scenario status");
+      setHousekeepingError(e?.message ?? "Failed to save housekeeping");
+    } finally {
+      setHousekeepingSaving(false);
     }
-
-    setStatusActionLoading(null);
   }
 
-  const [addOpen, setAddOpen] = useState(false);
-  const [addTab, setAddTab] = useState<"athlete" | "recruit">("athlete");
-  // const [addAthleteId, setAddAthleteId] = useState("");
-  // const [addRecruitId, setAddRecruitId] = useState("");
-  const [addEventGroup, setAddEventGroup] = useState("");
-  const [addNotes, setAddNotes] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-
-  const [athleteQuery, setAthleteQuery] = useState("");
-  const [athleteSearching, setAthleteSearching] = useState(false);
-  const [athleteResults, setAthleteResults] = useState<AthleteSearchResult[]>([]);
-
-  const athleteSearchEndpoint = useMemo(() => {
-    const q = athleteQuery.trim();
-    if (!q) return null;
-    return `/api/programs/${programId}/athletes?q=${encodeURIComponent(q)}`;
-  }, [athleteQuery, programId]);
-
-  const existingAthleteIds = useMemo(() => {
-    return new Set(entries.map((e) => e.athleteId).filter(Boolean) as string[]);
-  }, [entries]);
-
-  const [recruitQuery, setRecruitQuery] = useState("");
-  const [recruitSearching, setRecruitSearching] = useState(false);
-  const [recruitResults, setRecruitResults] = useState<RecruitSearchResult[]>([]);
-
-  const recruitSearchEndpoint = useMemo(() => {
-    const q = recruitQuery.trim();
-    if (!q) return null;
-    return `/api/programs/${programId}/recruits?q=${encodeURIComponent(q)}`;
-  }, [recruitQuery, programId]);
-
-  const existingRecruitIds = useMemo(() => {
-    return new Set(
-      entries.map((e) => e.programRecruitId).filter(Boolean) as string[]
-    );
-  }, [entries]);
-
-  const entriesEndpoint = useMemo(
-    () =>
-      `/api/programs/${programId}/teams/${teamId}/roster-scenarios/${scenarioId}/entries`,
-    [programId, teamId, scenarioId]
+  const [manageAthleteOpen, setManageAthleteOpen] = useState(false);
+  const [manageAthleteRow, setManageAthleteRow] = useState<any | null>(null);
+  const [manageAthleteUnavailableOpen, setManageAthleteUnavailableOpen] = useState(false);
+  const [manageAthleteUnavailableMsg, setManageAthleteUnavailableMsg] = useState<string>(
+    "This athlete isn’t on the Active Roster yet, so the Active Roster admin modal can’t open."
   );
 
   useEffect(() => {
-    let canceled = false;
+    let cancelled = false;
 
-    async function run() {
-      if (addTab !== "athlete") return;
-      if (!athleteSearchEndpoint) {
-        setAthleteResults([]);
-        setAthleteSearching(false);
-        return;
-      }
-
-      setAthleteSearching(true);
+    async function load() {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch(athleteSearchEndpoint, { method: "GET" });
-        const body = await res.json();
-        if (canceled) return;
+        const res = await fetch(`/api/programs/${programId}/recruits`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) throw new Error(`Failed to load recruits (${res.status})`);
 
-        if (!res.ok) {
-          console.error("[ScenarioEntries] athlete search failed:", body?.error);
-          setAthleteResults([]);
-          setAthleteSearching(false);
-          return;
-        }
+        const json = await res.json();
+        const rawRows: any[] = Array.isArray(json?.recruits)
+          ? json.recruits
+          : Array.isArray(json)
+          ? json
+          : [];
 
-        const list = (body?.athletes || []) as AthleteSearchResult[];
-        // Filter out athletes already in the scenario
-        setAthleteResults(list.filter((a) => !existingAthleteIds.has(a.id)));
-      } catch (e) {
-        if (canceled) return;
-        console.error("[ScenarioEntries] athlete search exception:", e);
-        setAthleteResults([]);
-      }
-
-      if (!canceled) setAthleteSearching(false);
-    }
-
-    const t = setTimeout(run, 200);
-    return () => {
-      canceled = true;
-      clearTimeout(t);
-    };
-  }, [addTab, athleteSearchEndpoint, existingAthleteIds]);
-
-  useEffect(() => {
-    let canceled = false;
-
-    async function run() {
-      if (addTab !== "recruit") return;
-      if (!recruitSearchEndpoint) {
-        setRecruitResults([]);
-        setRecruitSearching(false);
-        return;
-      }
-
-      setRecruitSearching(true);
-      try {
-        const res = await fetch(recruitSearchEndpoint, { method: "GET" });
-        const body = await res.json();
-        if (canceled) return;
-
-        if (!res.ok) {
-          console.error("[ScenarioEntries] recruit search failed:", body?.error);
-          setRecruitResults([]);
-          setRecruitSearching(false);
-          return;
-        }
-
-        const rows = (body?.recruits || []) as any[];
-
-        const list: RecruitSearchResult[] = rows
+        const normalized: RecruitRow[] = rawRows
           .map((r) => {
-            const a = r?.recruiting_profile?.athlete;
-            if (!r?.id || !a) return null;
+            const stableId = r?.program_recruit_id ?? r?.id;
+            if (!stableId) return null;
             return {
-              id: r.id,
-              first_name: a.first_name,
-              last_name: a.last_name,
-              grad_year: a.grad_year ?? null,
-              event_group: a.event_group ?? null,
-              status: r.status ?? null,
-            } as RecruitSearchResult;
+              id: String(stableId),
+              program_recruit_id: r?.program_recruit_id
+                ? String(r.program_recruit_id)
+                : undefined,
+              first_name: String(r?.first_name ?? ""),
+              last_name: String(r?.last_name ?? ""),
+              grad_year: r?.grad_year ?? null,
+              event_group: r?.event_group ?? null,
+              pipeline_stage: r?.pipeline_stage ?? null,
+            };
           })
-          .filter(Boolean) as RecruitSearchResult[];
+          .filter(Boolean) as RecruitRow[];
 
-        setRecruitResults(list.filter((r) => !existingRecruitIds.has(r.id)));
-      } catch (e) {
-        if (canceled) return;
-        console.error("[ScenarioEntries] recruit search exception:", e);
-        setRecruitResults([]);
+        const pruned = normalized.filter((r) => !removedIdsRef.current.has(r.id));
+        if (!cancelled) setRecruits(pruned);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? "Failed to load recruits");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      if (!canceled) setRecruitSearching(false);
     }
 
-    const t = setTimeout(run, 200);
+    load();
     return () => {
-      canceled = true;
-      clearTimeout(t);
+      cancelled = true;
     };
-  }, [addTab, recruitSearchEndpoint, existingRecruitIds]);
+  }, [programId]);
 
-  async function refreshEntries() {
-    try {
-      const res = await fetch(entriesEndpoint, { method: "GET" });
-      const body = await res.json();
-      if (!res.ok) {
-        // Don’t clobber the main error banner; this is best-effort.
-        console.error("[ScenarioEntries] refresh failed:", body?.error);
-        return;
-      }
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return recruits;
+    return recruits.filter((r) => {
+      const name = `${r.first_name ?? ""} ${r.last_name ?? ""}`.toLowerCase();
+      const eg = (r.event_group ?? "").toLowerCase();
+      const gy = r.grad_year ? String(r.grad_year) : "";
+      return name.includes(q) || eg.includes(q) || gy.includes(q);
+    });
+  }, [recruits, query]);
 
-      // Expect the API to return { entries: [...] }
-      const next = (body?.entries || []) as any[];
-      setEntries(
-        next.map((e) => ({
-          id: e.id,
-          athleteId: e.athlete_id ?? null,
-          programRecruitId: e.program_recruit_id ?? null,
-          athleteName: e.athlete_name || e.athleteName || "—",
-          gradYear: e.grad_year ?? e.gradYear ?? null,
-          scholarshipAmount: e.scholarship_amount ?? e.scholarshipAmount ?? null,
-          scholarshipUnit: e.scholarship_unit ?? e.scholarshipUnit ?? "percent",
-          scholarshipNotes: e.scholarship_notes ?? e.scholarshipNotes ?? null,
-          createdAt: e.created_at ?? e.createdAt ?? null,
-        }))
-      );
-    } catch (e) {
-      console.error("[ScenarioEntries] refresh exception:", e);
-    }
-  }
-
-  async function handleAddEntry(override?: { athlete_id?: string | null; program_recruit_id?: string | null }) {
-    setAddError(null);
-
-    // Remove dead state logic for addAthleteId/addRecruitId
-    const athlete_id = (override?.athlete_id ?? "") || "";
-    const program_recruit_id = (override?.program_recruit_id ?? "") || "";
-
-    if (!athlete_id && !program_recruit_id) {
-      setAddError(
-        addTab === "athlete"
-          ? "Athlete ID is required"
-          : "Recruit ID is required"
-      );
-      return;
-    }
-
-    setAdding(true);
-
-    try {
-      const res = await fetch(entriesEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          athlete_id: athlete_id || null,
-          program_recruit_id: program_recruit_id || null,
-          event_group: addEventGroup.trim() || null,
-          notes: addNotes.trim() || null,
-          // Keep unit consistent with the current scenario view; editable later.
-          scholarship_unit: "percent",
-        }),
-      });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        setAddError(body?.error || "Failed to add entry");
-        setAdding(false);
-        return;
-      }
-
-      // Best-effort: refresh list from server for canonical join fields.
-      await refreshEntries();
-
-      // Update summary card
-      router.refresh();
-
-      // Close + reset
-      setAddOpen(false);
-      setAddEventGroup("");
-      setAddNotes("");
-      setAddError(null);
-      setAthleteQuery("");
-      setAthleteResults([]);
-      setAthleteSearching(false);
-      setRecruitQuery("");
-      setRecruitResults([]);
-      setRecruitSearching(false);
-    } catch (e: any) {
-      setAddError(e?.message || "Unexpected error adding entry");
-    }
-
-    setAdding(false);
-  }
-
-  async function handleSave(entryId: string) {
-    const entry = entries.find((e) => e.id === entryId);
-    if (!entry) return;
-
-    setSavingId(entryId);
+  async function handleAdd(recruitId: string) {
+    if (!isManager) return;
+    setSavingId(recruitId);
     setError(null);
 
     try {
       const res = await fetch(
-        `/api/programs/${programId}/teams/${teamId}/roster-scenarios/${scenarioId}/entries/${entryId}/scholarship`,
+        `/api/programs/${programId}/teams/${teamId}/roster-scenarios/${scenarioId}/entries/add-from-recruit`,
         {
-          method: "PATCH",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            scholarship_amount: entry.scholarshipAmount,
-            scholarship_notes: entry.scholarshipNotes,
-            // For now we keep unit fixed; wire this up later if needed:
-            scholarship_unit: entry.scholarshipUnit,
+            program_recruit_id: recruitId,
+            programRecruitId: recruitId,
           }),
         }
       );
 
-      const body = await res.json();
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Failed to add (${res.status})${text ? `: ${text}` : ""}`);
+      }
+
+      removedIdsRef.current.add(recruitId);
+      setRecruits((prev) => prev.filter((r) => r.id !== recruitId));
+      router.refresh();
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to add recruit");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  const returningSelected = useMemo(() => {
+    return returningAll.filter((a) => !returningRemovedIds.has(a.athlete_id));
+  }, [returningAll, returningRemovedIds]);
+
+  const returningRemoved = useMemo(() => {
+    return returningAll.filter((a) => returningRemovedIds.has(a.athlete_id));
+  }, [returningAll, returningRemovedIds]);
+
+  async function openReturningModal() {
+    if (!isManager) return;
+    setReturningOpen(true);
+    setReturningError(null);
+
+    // Only load once per session
+    if (returningAll.length > 0) return;
+
+    setReturningLoading(true);
+    try {
+      const res = await fetch(
+        `/api/programs/${programId}/teams/${teamId}/roster-scenarios/${scenarioId}/returning-candidates`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
 
       if (!res.ok) {
-        setError(body.error || "Failed to save scholarship values");
-        setSavingId(null);
+        const text = await res.text().catch(() => "");
+        throw new Error(
+          `Failed to load returning athletes (${res.status})${text ? `: ${text}` : ""}`
+        );
+      }
+
+      const json = await res.json();
+      const rows: any[] = Array.isArray(json?.athletes)
+        ? json.athletes
+        : Array.isArray(json)
+        ? json
+        : [];
+
+      const normalized: ReturningAthleteRow[] = rows
+        .map((r) => {
+          const id = r?.athlete_id ?? r?.id;
+          if (!id) return null;
+          return {
+            athlete_id: String(id),
+            first_name: String(r?.first_name ?? ""),
+            last_name: String(r?.last_name ?? ""),
+            grad_year: r?.grad_year ?? null,
+            event_group: r?.event_group ?? null,
+          };
+        })
+        .filter(Boolean) as ReturningAthleteRow[];
+
+      setReturningAll(normalized);
+    } catch (e: any) {
+      setReturningError(e?.message ?? "Failed to load returning athletes");
+    } finally {
+      setReturningLoading(false);
+    }
+  }
+
+  function removeFromReturningImport(athleteId: string) {
+    setReturningRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(athleteId);
+      return next;
+    });
+  }
+
+  async function openManageAthleteFromHousekeeping(athleteId: string) {
+    try {
+      const res = await fetch(`/api/programs/${programId}/teams/${teamId}/active-roster`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        setManageAthleteUnavailableMsg(
+          "Couldn’t load the Active Roster right now. Try again in a moment."
+        );
+        setManageAthleteUnavailableOpen(true);
         return;
       }
 
-      const updated = body.entry as {
-        id: string;
-        scholarship_amount: number | null;
-        scholarship_unit: string;
-        scholarship_notes: string | null;
-      };
+      const body = await res.json().catch(() => ({}));
+      const rows: any[] = Array.isArray(body?.roster)
+        ? body.roster
+        : Array.isArray(body?.rows)
+        ? body.rows
+        : Array.isArray(body)
+        ? body
+        : [];
 
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === updated.id
-            ? {
-                ...e,
-                scholarshipAmount: updated.scholarship_amount,
-                scholarshipUnit: updated.scholarship_unit,
-                scholarshipNotes: updated.scholarship_notes,
-              }
-            : e
-        )
+      const found = rows.find(
+        (r) => String(r?.athlete_id ?? r?.athleteId ?? "") === String(athleteId)
       );
 
-      // Refresh to update summary card
-      router.refresh();
-    } catch (e: any) {
-      setError(e?.message || "Unexpected error saving scholarship");
-    }
+      if (!found) {
+        setManageAthleteUnavailableMsg(
+          "This athlete isn’t on the Active Roster yet, so the Active Roster admin modal can’t open here."
+        );
+        setManageAthleteUnavailableOpen(true);
+        return;
+      }
 
-    setSavingId(null);
+      setManageAthleteRow(found);
+      setManageAthleteOpen(true);
+    } catch {
+      setManageAthleteUnavailableMsg(
+        "Couldn’t open the athlete modal due to a network error. Try again."
+      );
+      setManageAthleteUnavailableOpen(true);
+    }
   }
 
-  if (entries.length === 0) {
-    return (
-      <section className="mt-2 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-5">
-        <div className="mb-4 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--border)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-[11px] font-semibold text-[var(--foreground)]">Scenario status</p>
-                <StatusBadge status={scenarioStatus} />
-                {statusLoading ? (
-                  <span className="text-[10px] text-[var(--muted-foreground)]">Loading…</span>
-                ) : null}
-              </div>
-              <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                {scenarioStatus === "draft"
-                  ? "Safe draft — add athletes and explore options."
-                  : scenarioStatus === "candidate"
-                  ? "Review details, then promote when ready."
-                  : "Active roster (locked) — return to planning to make edits."}
-              </p>
-            </div>
+  async function addReturningAthletes() {
+    if (!isManager) return;
 
-            <div className="flex items-center gap-2">
-              {scenarioStatus === "draft" ? (
-                <button
-                  type="button"
-                  onClick={() => setScenarioStatusRemote("candidate")}
-                  disabled={!!statusActionLoading}
-                  className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                  title="Mark this scenario as the primary candidate for promotion"
-                >
-                  {statusActionLoading === "candidate" ? "Working…" : "Mark as Candidate"}
-                </button>
-              ) : null}
+    if (returningSelected.length === 0) {
+      setReturningOpen(false);
+      if (returningRemovedIds.size > 0) {
+        setTimeout(() => {
+          setHousekeepingNonReturningIds(new Set(Array.from(returningRemovedIds)));
+          setHousekeepingError(null);
+          setHousekeepingOpen(true);
+        }, 0);
+      }
+      return;
+    }
 
-              {scenarioStatus === "candidate" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setScenarioStatusRemote("active")}
-                    disabled={!!statusActionLoading}
-                    className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                    title="Promote this scenario to the Active Roster"
-                  >
-                    {statusActionLoading === "active" ? "Working…" : "Promote to Active"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScenarioStatusRemote("draft")}
-                    disabled={!!statusActionLoading}
-                    className="rounded-md bg-[var(--surface-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--muted-foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                    title="Return this scenario to Draft"
-                  >
-                    {statusActionLoading === "draft" ? "Working…" : "Back to Draft"}
-                  </button>
-                </>
-              ) : null}
+    setReturningSaving(true);
+    setReturningError(null);
 
-              {scenarioStatus === "active" ? (
-                <button
-                  type="button"
-                  onClick={() => setScenarioStatusRemote("return")}
-                  disabled={!!statusActionLoading}
-                  className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                  title="Return the Active Roster to planning (demotable unless season is locked)"
-                >
-                  {statusActionLoading === "return" ? "Working…" : "Return to Planning"}
-                </button>
-              ) : null}
-            </div>
-          </div>
+    try {
+      // Use existing single-entry endpoint (athlete_id support) to avoid new bulk API for now.
+      await Promise.all(
+        returningSelected.map(async (a) => {
+          const res = await fetch(
+            `/api/programs/${programId}/teams/${teamId}/roster-scenarios/${scenarioId}/entries`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                athlete_id: a.athlete_id,
+                athleteId: a.athlete_id,
+              }),
+            }
+          );
 
-          {statusError ? (
-            <div className="mt-2 text-[11px] text-[var(--danger)]">{statusError}</div>
-          ) : null}
-        </div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-          Scenario entries
-        </p>
-        <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-          No athletes have been added to this scenario yet. Once you add
-          athletes or recruits, you&rsquo;ll be able to assign scholarship
-          amounts here.
-        </p>
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => {
-              setAddError(null);
-              setAddOpen(true);
-            }}
-            className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
-          >
-            Add athlete or recruit
-          </button>
-        </div>
-      </section>
-    );
+          // 409 (already exists) is safe to ignore
+          if (!res.ok && res.status !== 409) {
+            const text = await res.text().catch(() => "");
+            throw new Error(
+              `Failed adding ${a.first_name} ${a.last_name} (${res.status})${
+                text ? `: ${text}` : ""
+              }`
+            );
+          }
+        })
+      );
+
+      setReturningOpen(false);
+      router.refresh();
+
+      if (returningRemovedIds.size > 0) {
+        setTimeout(() => {
+          setHousekeepingNonReturningIds(new Set(Array.from(returningRemovedIds)));
+          setHousekeepingError(null);
+          setHousekeepingOpen(true);
+        }, 0);
+      }
+    } catch (e: any) {
+      setReturningError(e?.message ?? "Failed to add returning athletes");
+    } finally {
+      setReturningSaving(false);
+    }
   }
 
   return (
-    <section className="mt-2 rounded-xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
-      <div className="mb-4 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--border)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] font-semibold text-[var(--foreground)]">Scenario status</p>
-              <StatusBadge status={scenarioStatus} />
-              {statusLoading ? (
-                <span className="text-[10px] text-[var(--muted-foreground)]">Loading…</span>
-              ) : null}
-            </div>
-            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-              {scenarioStatus === "draft"
-                ? "Safe draft — add athletes and explore options."
-                : scenarioStatus === "candidate"
-                ? "Review details, then promote when ready."
-                : "Active roster (locked) — return to planning to make edits."}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {scenarioStatus === "draft" ? (
-              <button
-                type="button"
-                onClick={() => setScenarioStatusRemote("candidate")}
-                disabled={!!statusActionLoading}
-                className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                title="Mark this scenario as the primary candidate for promotion"
-              >
-                {statusActionLoading === "candidate" ? "Working…" : "Mark as Candidate"}
-              </button>
-            ) : null}
-
-            {scenarioStatus === "candidate" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setScenarioStatusRemote("active")}
-                  disabled={!!statusActionLoading}
-                  className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                  title="Promote this scenario to the Active Roster"
-                >
-                  {statusActionLoading === "active" ? "Working…" : "Promote to Active"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScenarioStatusRemote("draft")}
-                  disabled={!!statusActionLoading}
-                  className="rounded-md bg-[var(--surface-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--muted-foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                  title="Return this scenario to Draft"
-                >
-                  {statusActionLoading === "draft" ? "Working…" : "Back to Draft"}
-                </button>
-              </>
-            ) : null}
-
-            {scenarioStatus === "active" ? (
-              <button
-                type="button"
-                onClick={() => setScenarioStatusRemote("return")}
-                disabled={!!statusActionLoading}
-                className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                title="Return the Active Roster to planning (demotable unless season is locked)"
-              >
-                {statusActionLoading === "return" ? "Working…" : "Return to Planning"}
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {statusError ? (
-          <div className="mt-2 text-[11px] text-[var(--danger)]">{statusError}</div>
-        ) : null}
-      </div>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-            Scenario entries
-          </p>
-          <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-            Edit scholarship amounts and notes for each athlete in this
-            scenario. Changes here only affect this sandbox.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setAddError(null);
-            setAddOpen(true);
-          }}
-          className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
-        >
-          Add
-        </button>
-      </div>
-
-      {error && (
-        <p className="mt-2 text-[11px] text-[var(--danger)]">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-3 overflow-x-auto">
-        <table className="min-w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-[var(--border)] text-[10px] text-[var(--muted-foreground)]">
-              <th className="px-2 py-1 text-left font-normal">Athlete</th>
-              <th className="px-2 py-1 text-left font-normal">Class</th>
-              <th className="px-2 py-1 text-left font-normal">
-                Scholarship ({unitLabel})
-              </th>
-              <th className="px-2 py-1 text-left font-normal">Notes</th>
-              <th className="px-2 py-1 text-right font-normal">Save</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr
-                key={entry.id}
-                className="border-b border-[var(--border)]/50 last:border-0"
-              >
-                <td className="px-2 py-1 text-[var(--foreground)]">
-                  {entry.athleteName}
-                </td>
-                <td className="px-2 py-1 text-[var(--muted-foreground)]">
-                  {entry.gradYear ?? "—"}
-                </td>
-                <td className="px-2 py-1">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-24 rounded-md bg-[var(--surface)] px-2 py-1 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--border)]"
-                    value={
-                      entry.scholarshipAmount ?? ""
-                    }
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setEntries((prev) =>
-                        prev.map((p) =>
-                          p.id === entry.id
-                            ? {
-                                ...p,
-                                scholarshipAmount:
-                                  value === "" ? null : Number(value),
-                              }
-                            : p
-                        )
-                      );
-                    }}
-                  />
-                </td>
-                <td className="px-2 py-1">
-                  <textarea
-                    rows={2}
-                    className="w-full min-w-[180px] rounded-md bg-[var(--surface)] px-2 py-1 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--border)]"
-                    value={entry.scholarshipNotes ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setEntries((prev) =>
-                        prev.map((p) =>
-                          p.id === entry.id
-                            ? {
-                                ...p,
-                                scholarshipNotes:
-                                  value === "" ? null : value,
-                              }
-                            : p
-                        )
-                      );
-                    }}
-                  />
-                </td>
-                <td className="px-2 py-1 text-right">
-                  <button
-                    type="button"
-                    onClick={() => handleSave(entry.id)}
-                    disabled={savingId === entry.id}
-                    className="rounded-md bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                  >
-                    {savingId === entry.id ? "Saving…" : "Save"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {addOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[var(--foreground)]">
-                  Add to scenario
-                </div>
-                <div className="mt-1 text-[12px] text-[var(--muted-foreground)]">
-                  Search and add athletes or recruits. Click a result to add it to this scenario.
-                </div>
+    <div className="space-y-3">
+      {manageAthleteUnavailableOpen ? (
+        <div className="fixed inset-0 z-[102] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                  Not available yet
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                  {manageAthleteUnavailableMsg}
+                </p>
               </div>
+
               <button
                 type="button"
-                onClick={() => setAddOpen(false)}
-                className="rounded-md bg-[var(--muted)] px-2 py-1 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                onClick={() => setManageAthleteUnavailableOpen(false)}
+                className="h-8 shrink-0 rounded-md bg-[var(--muted)] px-3 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
               >
                 Close
               </button>
             </div>
 
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAddTab("athlete")}
-                className={`flex-1 rounded-md px-3 py-2 text-[12px] font-semibold ring-1 ring-[var(--border)] ${
-                  addTab === "athlete"
-                    ? "bg-[var(--muted)] text-[var(--foreground)]"
-                    : "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)]"
-                }`}
-              >
-                Athlete
-              </button>
-              <button
-                type="button"
-                onClick={() => setAddTab("recruit")}
-                className={`flex-1 rounded-md px-3 py-2 text-[12px] font-semibold ring-1 ring-[var(--border)] ${
-                  addTab === "recruit"
-                    ? "bg-[var(--muted)] text-[var(--foreground)]"
-                    : "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)]"
-                }`}
-              >
-                Recruit
-              </button>
+            <div className="p-4">
+              <p className="text-[11px] text-[var(--muted-foreground)]">
+                Next: we’ll add a scenario-safe housekeeping modal that can persist “not returning” without requiring Active Roster membership.
+              </p>
             </div>
+          </div>
+        </div>
+      ) : null}
+      {manageAthleteOpen && manageAthleteRow ? (
+        <ManageAthleteModal
+          selectedAthlete={manageAthleteRow}
+          programId={programId}
+          teamId={teamId}
+          onClose={() => {
+            setManageAthleteOpen(false);
+            setManageAthleteRow(null);
+          }}
+          onUpdated={(updated) => {
+            setManageAthleteRow(updated);
+            router.refresh();
+          }}
+        />
+      ) : null}
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold text-[var(--foreground)]">Add to scenario</p>
+        <button
+          type="button"
+          onClick={openReturningModal}
+          disabled={!isManager}
+          className={
+            "h-8 rounded-md px-3 text-[11px] font-semibold ring-1 ring-[var(--border)] " +
+            (!isManager
+              ? "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] opacity-60"
+              : "bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted-hover)]")
+          }
+          title={!isManager ? "Manager permission required" : "Add returning athletes"}
+        >
+          Add returning athletes
+        </button>
+      </div>
 
-            {addError ? (
-              <div className="mt-3 text-[11px] text-[var(--danger)]">
-                {addError}
-              </div>
-            ) : null}
-
-            <div className="mt-4 space-y-3">
-              {addTab === "athlete" ? (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[var(--muted-foreground)]">
-                      Search athletes
-                    </label>
-                    <input
-                      value={athleteQuery}
-                      onChange={(e) => setAthleteQuery(e.target.value)}
-                      placeholder="Search by first or last name…"
-                      className="w-full rounded-md bg-[var(--surface)] px-2 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--border)]"
-                    />
-                    <div className="text-[10px] text-[var(--muted-foreground)]">
-                      Showing athletes in this program (excluding those already in the scenario).
-                    </div>
-                  </div>
-
-                  <div className="max-h-64 overflow-auto rounded-xl bg-[var(--surface-subtle)] p-2 ring-1 ring-[var(--border)]">
-                    {!athleteQuery.trim() ? (
-                      <div className="p-2 text-[11px] text-[var(--muted-foreground)]">
-                        Type a name to search.
-                      </div>
-                    ) : athleteSearching ? (
-                      <div className="p-2 text-[11px] text-[var(--muted-foreground)]">
-                        Searching…
-                      </div>
-                    ) : athleteResults.length === 0 ? (
-                      <div className="p-2 text-[11px] text-[var(--muted-foreground)]">
-                        No matches.
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {athleteResults.map((a) => (
-                          <button
-                            key={a.id}
-                            type="button"
-                            onClick={async () => {
-                              setAddError(null);
-                              await handleAddEntry({ athlete_id: a.id, program_recruit_id: null });
-                            }}
-                            disabled={adding}
-                            className="flex w-full items-center justify-between rounded-lg bg-[var(--surface)] px-3 py-2 text-left ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                          >
-                            <div className="min-w-0">
-                              <div className="truncate text-[12px] font-semibold text-[var(--foreground)]">
-                                {a.first_name} {a.last_name}
-                              </div>
-                              <div className="truncate text-[10px] text-[var(--muted-foreground)]">
-                                {a.grad_year ?? "—"} • {a.event_group || "—"}
-                              </div>
-                            </div>
-                            <div className="ml-3 shrink-0 text-[10px] font-semibold text-[var(--muted-foreground)]">
-                              Add
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-xl bg-[var(--surface-subtle)] p-3 text-[11px] text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
-                    Can’t find an athlete? Use the roster/recruiting tools to add them to the program first.
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[var(--muted-foreground)]">
-                      Search recruits
-                    </label>
-                    <input
-                      value={recruitQuery}
-                      onChange={(e) => setRecruitQuery(e.target.value)}
-                      placeholder="Search by first or last name…"
-                      className="w-full rounded-md bg-[var(--surface)] px-2 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--border)]"
-                    />
-                    <div className="text-[10px] text-[var(--muted-foreground)]">
-                      Showing recruits in this program (excluding those already in the scenario).
-                    </div>
-                  </div>
-
-                  <div className="max-h-64 overflow-auto rounded-xl bg-[var(--surface-subtle)] p-2 ring-1 ring-[var(--border)]">
-                    {!recruitQuery.trim() ? (
-                      <div className="p-2 text-[11px] text-[var(--muted-foreground)]">
-                        Type a name to search.
-                      </div>
-                    ) : recruitSearching ? (
-                      <div className="p-2 text-[11px] text-[var(--muted-foreground)]">
-                        Searching…
-                      </div>
-                    ) : recruitResults.length === 0 ? (
-                      <div className="p-2 text-[11px] text-[var(--muted-foreground)]">
-                        No matches.
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {recruitResults.map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={async () => {
-                              setAddError(null);
-                              await handleAddEntry({ athlete_id: null, program_recruit_id: r.id });
-                            }}
-                            disabled={adding}
-                            className="flex w-full items-center justify-between rounded-lg bg-[var(--surface)] px-3 py-2 text-left ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
-                          >
-                            <div className="min-w-0">
-                              <div className="truncate text-[12px] font-semibold text-[var(--foreground)]">
-                                {r.first_name} {r.last_name}
-                              </div>
-                              <div className="truncate text-[10px] text-[var(--muted-foreground)]">
-                                {r.grad_year ?? "—"} • {r.event_group || "—"}
-                              </div>
-                            </div>
-                            <div className="ml-3 shrink-0 text-[10px] font-semibold text-[var(--muted-foreground)]">
-                              Add
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-xl bg-[var(--surface-subtle)] p-3 text-[11px] text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
-                    Can’t find a recruit? Add them to the recruiting board first.
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <div className="flex-1 space-y-1">
-                  <label className="text-[10px] text-[var(--muted-foreground)]">
-                    Event group (optional)
-                  </label>
-                  <input
-                    value={addEventGroup}
-                    onChange={(e) => setAddEventGroup(e.target.value)}
-                    placeholder="Distance"
-                    className="w-full rounded-md bg-[var(--surface)] px-2 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--border)]"
-                  />
-                </div>
+      {returningOpen ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                  Add returning athletes
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                  Remove anyone you don’t want to import into this scenario.
+                </p>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] text-[var(--muted-foreground)]">
-                  Notes (optional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={addNotes}
-                  onChange={(e) => setAddNotes(e.target.value)}
-                  placeholder="Why they’re in this scenario / what you’re assuming…"
-                  className="w-full rounded-md bg-[var(--surface)] px-2 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--border)]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setAddOpen(false)}
-                  className="rounded-md bg-[var(--surface-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--muted-foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                  onClick={() => {
+                    setReturningOpen(false);
+                    if (returningRemovedIds.size > 0) {
+                      setTimeout(() => {
+                        setHousekeepingNonReturningIds(new Set(Array.from(returningRemovedIds)));
+                        setHousekeepingError(null);
+                        setHousekeepingOpen(true);
+                      }, 0);
+                    }
+                  }}
+                  className="h-8 rounded-md bg-[var(--surface-subtle)] px-3 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleAddEntry()}
-                  disabled={adding}
-                  className="rounded-md bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)] disabled:opacity-60"
+                  onClick={addReturningAthletes}
+                  disabled={returningSaving || returningLoading}
+                  className={
+                    "h-8 rounded-md px-3 text-[11px] font-semibold ring-1 ring-[var(--border)] " +
+                    (returningSaving || returningLoading
+                      ? "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] opacity-60"
+                      : "bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted-hover)]")
+                  }
                 >
-                  {adding ? "Adding…" : "Add to scenario"}
+                  {returningSaving ? "Adding…" : "Add athletes"}
                 </button>
               </div>
+            </div>
+
+            {returningError ? (
+              <div className="px-4 pt-3 text-[11px] text-[var(--danger)]">{returningError}</div>
+            ) : null}
+
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              {returningLoading ? (
+                <div className="text-[11px] text-[var(--muted-foreground)]">
+                  Loading returning athletes…
+                </div>
+              ) : returningAll.length === 0 ? (
+                <div className="text-[11px] text-[var(--muted-foreground)]">
+                  No returning athletes available.
+                </div>
+              ) : (
+                <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-lg ring-1 ring-[var(--border)]">
+                  {returningSelected.map((a) => {
+                    const label = `${a.first_name} ${a.last_name}`.trim() || "Unnamed athlete";
+                    const meta = [
+                      a.event_group ? a.event_group : null,
+                      a.grad_year ? `’${String(a.grad_year).slice(-2)}` : null,
+                    ].filter(Boolean);
+
+                    return (
+                      <li
+                        key={a.athlete_id}
+                        className="flex items-center gap-3 bg-[var(--surface)] px-3 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-semibold text-[var(--foreground)]">
+                            {label}
+                          </p>
+                          {meta.length > 0 ? (
+                            <p className="mt-0.5 truncate text-[10px] text-[var(--muted-foreground)]">
+                              {meta.join(" • ")}
+                            </p>
+                          ) : (
+                            <p className="mt-0.5 text-[10px] text-[var(--muted-foreground)]">—</p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeFromReturningImport(a.athlete_id)}
+                          className="h-8 shrink-0 rounded-md bg-[var(--surface-subtle)] px-3 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                          title="Remove from this import list"
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
         </div>
       ) : null}
-    </section>
+
+      {housekeepingOpen ? (
+        <div className="fixed inset-0 z-[101] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                  Housekeeping: non-returning athletes
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                  You removed {returningRemoved.length} athlete
+                  {returningRemoved.length === 1 ? "" : "s"} from the returning list. Want
+                  to update any of their info now?
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setHousekeepingOpen(false)}
+                  className="h-8 rounded-md bg-[var(--surface-subtle)] px-3 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  disabled={housekeepingSaving}
+                  onClick={() =>
+                    persistProgramNonReturners(Array.from(housekeepingNonReturningIds))
+                  }
+                  className={
+                    "h-8 rounded-md px-3 text-[11px] font-semibold ring-1 ring-[var(--border)] " +
+                    (housekeepingSaving
+                      ? "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] opacity-60"
+                      : "bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted-hover)]")
+                  }
+                >
+                  {housekeepingSaving ? "Saving…" : "Done"}
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              {housekeepingError ? (
+                <div className="mb-3 rounded-md bg-[var(--surface)] p-2 text-[11px] text-[var(--danger)] ring-1 ring-[var(--border)]">
+                  {housekeepingError}
+                </div>
+              ) : null}
+              {returningRemoved.length === 0 ? (
+                <div className="text-[11px] text-[var(--muted-foreground)]">
+                  No athletes were removed.
+                </div>
+              ) : (
+                <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-lg ring-1 ring-[var(--border)]">
+                  {returningRemoved.map((a) => {
+                    const label = `${a.first_name} ${a.last_name}`.trim() || "Unnamed athlete";
+                    const meta = [
+                      a.event_group ? a.event_group : null,
+                      a.grad_year ? `’${String(a.grad_year).slice(-2)}` : null,
+                    ].filter(Boolean);
+
+                    return (
+                      <li key={a.athlete_id} className="flex items-center gap-3 bg-[var(--surface)] px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-semibold text-[var(--foreground)]">
+                            {label}
+                          </p>
+                          {meta.length > 0 ? (
+                            <p className="mt-0.5 truncate text-[10px] text-[var(--muted-foreground)]">
+                              {meta.join(" • ")}
+                            </p>
+                          ) : (
+                            <p className="mt-0.5 text-[10px] text-[var(--muted-foreground)]">—</p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHousekeepingNonReturningIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(a.athlete_id)) next.delete(a.athlete_id);
+                              else next.add(a.athlete_id);
+                              return next;
+                            });
+                          }}
+                          className={
+                            "h-8 shrink-0 rounded-md px-3 text-[11px] font-semibold ring-1 ring-[var(--border)] " +
+                            (housekeepingNonReturningIds.has(a.athlete_id)
+                              ? "bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted-hover)]"
+                              : "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)]")
+                          }
+                          title="Toggle non-returning"
+                        >
+                          {housekeepingNonReturningIds.has(a.athlete_id)
+                            ? "Non-returning"
+                            : "Keep returning"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openManageAthleteFromHousekeeping(a.athlete_id);
+                          }}
+                          className="h-8 shrink-0 rounded-md bg-[var(--surface-subtle)] px-3 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                          title="Edit athlete"
+                        >
+                          Edit
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="space-y-1">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+          Search recruits
+        </label>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Name, event group, grad year…"
+          className="h-9 w-full rounded-md bg-[var(--surface)] px-2 text-sm text-[var(--foreground)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--border)]"
+        />
+      </div>
+
+      {!isManager ? (
+        <p className="text-[10px] text-[var(--muted-foreground)]">
+          You can view recruits, but only managers can add to scenarios.
+        </p>
+      ) : null}
+
+      {error ? (
+        <div className="rounded-md bg-[var(--surface)] p-2 text-[11px] text-[var(--danger)] ring-1 ring-[var(--border)]">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
+        <div className="flex items-center justify-between px-3 py-2">
+          <p className="text-[11px] font-semibold text-[var(--foreground)]">Recruits</p>
+          <p className="text-[10px] text-[var(--muted-foreground)]">
+            {loading ? "Loading…" : `${filtered.length} available`}
+          </p>
+        </div>
+
+        <div className="max-h-[360px] overflow-y-auto border-t border-[var(--border)]">
+          {loading ? (
+            <div className="p-3 text-[11px] text-[var(--muted-foreground)]">Loading recruits…</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-3 text-[11px] text-[var(--muted-foreground)]">No recruits found.</div>
+          ) : (
+            <ul className="divide-y divide-[var(--border)]">
+              {filtered.map((r) => {
+                const label = `${r.first_name} ${r.last_name}`;
+                const meta = [
+                  r.event_group ? r.event_group : null,
+                  r.grad_year ? `’${String(r.grad_year).slice(-2)}` : null,
+                  r.pipeline_stage ? r.pipeline_stage : null,
+                ].filter(Boolean);
+
+                const disabled = !isManager || savingId === r.id;
+
+                return (
+                  <li key={r.id} className="flex items-center gap-3 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12px] font-semibold text-[var(--foreground)]">
+                        {label}
+                      </p>
+                      {meta.length > 0 ? (
+                        <p className="mt-0.5 truncate text-[10px] text-[var(--muted-foreground)]">
+                          {meta.join(" • ")}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-[10px] text-[var(--muted-foreground)]">—</p>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => handleAdd(r.id)}
+                      className={
+                        "h-8 shrink-0 rounded-md px-3 text-[11px] font-semibold ring-1 ring-[var(--border)] " +
+                        (disabled
+                          ? "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] opacity-60"
+                          : "bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted-hover)]")
+                      }
+                      title={!isManager ? "Manager permission required" : "Add this recruit to the scenario"}
+                    >
+                      {savingId === r.id ? "Adding…" : "Add"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <p className="text-[10px] text-[var(--muted-foreground)]">
+        Added recruits will appear in the Scenario Athletes list in the center canvas.
+      </p>
+    </div>
   );
 }

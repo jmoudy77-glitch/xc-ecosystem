@@ -65,7 +65,10 @@ async function assertProgramManager(
     .maybeSingle();
 
   if (membershipError) {
-    console.error("[Scenario add-from-recruit] membership error:", membershipError);
+    console.error(
+      "[Scenario add-from-recruit] membership error:",
+      membershipError
+    );
     return {
       ok: false,
       status: 500,
@@ -112,10 +115,7 @@ export async function POST(req: NextRequest, ctx: RouteParams) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid JSON body" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const programRecruitId =
@@ -136,10 +136,7 @@ export async function POST(req: NextRequest, ctx: RouteParams) {
 
   if (scenarioError) {
     console.error("[Scenario add-from-recruit] scenario error:", scenarioError);
-    return NextResponse.json(
-      { error: "Failed to load scenario" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load scenario" }, { status: 500 });
   }
 
   if (
@@ -172,7 +169,10 @@ export async function POST(req: NextRequest, ctx: RouteParams) {
     .maybeSingle();
 
   if (prError) {
-    console.error("[Scenario add-from-recruit] program_recruits error:", prError);
+    console.error(
+      "[Scenario add-from-recruit] program_recruits error:",
+      prError
+    );
     return NextResponse.json(
       { error: "Failed to resolve recruiting record" },
       { status: 500 }
@@ -212,13 +212,14 @@ export async function POST(req: NextRequest, ctx: RouteParams) {
     .from("roster_scenario_entries")
     .select("id")
     .eq("scenario_id", scenarioId)
-    .or(
-      `athlete_id.eq.${athleteId},program_recruit_id.eq.${programRecruitId}`
-    )
+    .or(`athlete_id.eq.${athleteId},program_recruit_id.eq.${programRecruitId}`)
     .maybeSingle();
 
   if (existingError) {
-    console.error("[Scenario add-from-recruit] duplicate check error:", existingError);
+    console.error(
+      "[Scenario add-from-recruit] duplicate check error:",
+      existingError
+    );
     return NextResponse.json(
       { error: "Failed to check existing scenario entry" },
       { status: 500 }

@@ -217,6 +217,12 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
         ["--danger" as any]: theme.danger,
         ["--info" as any]: theme.info,
 
+        // Surface System (v1)
+        ["--canvas-bg" as any]: theme.canvasBg,
+        ["--panel-bg" as any]: theme.panelBg,
+        ["--panel-muted-bg" as any]: theme.panelMutedBg,
+        ["--panel-ring" as any]: theme.panelRing,
+
         // legacy aliases (keep during migration)
         ["--background" as any]: theme.appBg,
         ["--foreground" as any]: theme.text,
@@ -231,7 +237,7 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
       }}
     >
       {/* Program hero header (non-negotiable for coach app) */}
-      <header className="border-b border-subtle bg-brand-soft/80 backdrop-blur">
+      <header className="border-b border-subtle bg-panel-muted backdrop-blur">
         <div className="flex w-full items-center justify-between px-4 py-3 lg:px-8">
               <div className="flex items-center gap-3">
                 {theme.logoUrl && (
@@ -254,16 +260,16 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
                 </div>
               </div>
           <div className="flex flex-wrap justify-end gap-1 text-[11px] text-muted">
-            <span className="rounded-full border border-subtle px-2 py-0.5">
+            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
               {formatLevelTag(program.level)}
             </span>
-            <span className="rounded-full border border-subtle px-2 py-0.5">
+            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
               {formatSportTag(program.sport)}
             </span>
-            <span className="rounded-full border border-subtle px-2 py-0.5">
+            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
               {formatGenderTag(program.gender)}
             </span>
-            <span className="rounded-full border border-subtle px-2 py-0.5">
+            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
               {formatSeasonTag(program.season)}
             </span>
           </div>

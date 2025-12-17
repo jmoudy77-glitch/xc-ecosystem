@@ -45,6 +45,15 @@ export type ProgramThemeTokens = {
   wordmarkUrl?: string | null;
 
   // =========================
+  // Surface System (v1)
+  // Semantic surface roles used by global utilities (bg-canvas, panel, panel-muted, ring-panel)
+  // =========================
+  canvasBg: string; // --canvas-bg
+  panelBg: string; // --panel-bg
+  panelMutedBg: string; // --panel-muted-bg
+  panelRing: string; // --panel-ring
+
+  // =========================
   // Legacy aliases (kept for backwards compatibility)
   // =========================
   // These map to the older theming approach used in existing screens.
@@ -59,16 +68,16 @@ export type ProgramThemeTokens = {
 };
 
 export const DEFAULT_THEME: ProgramThemeTokens = {
-  // v1 neutrals (default dark)
-  appBg: "#020617",
-  surface1: "#0b1220",
-  surface2: "#0f172a",
-  surface3: "#020617",
-  border: "#1f2937",
-  borderMuted: "#111827",
-  text: "#e5e7eb",
-  textMuted: "#9ca3af",
-  textSubtle: "#6b7280",
+  // v1 neutrals (default dark) — hue-agnostic (no slate/navy tint)
+  appBg: "#070708",
+  surface1: "#0f1012",
+  surface2: "#15171a",
+  surface3: "#1c1f24",
+  border: "#2a2d33",
+  borderMuted: "#1f2227",
+  text: "#f2f4f8",
+  textMuted: "#a6adb8",
+  textSubtle: "#6d7480",
   focusRing: "#38bdf8",
 
   // v1 brand + accents
@@ -94,14 +103,22 @@ export const DEFAULT_THEME: ProgramThemeTokens = {
   logoUrl: null,
   wordmarkUrl: null,
 
+  // Surface System (v1)
+  // Keep canvas slightly lifted from appBg so panels never visually merge.
+  canvasBg: "#0b0c0d",
+  panelBg: "#15171a",
+  // Muted panels blend toward canvas for depth without aggressive glass.
+  panelMutedBg: "#121316",
+  panelRing: "#2a2d33",
+
   // legacy aliases (kept)
-  background: "#020617",
-  foreground: "#e5e7eb",
-  brandPrimary: "#0b1220",
-  brandSecondary: "#0f172a",
-  surface: "#0b1220",
-  borderSubtle: "#1f2937",
-  mutedForeground: "#9ca3af",
+  background: "#070708",
+  foreground: "#f2f4f8",
+  brandPrimary: "#15171a",
+  brandSecondary: "#0f1012",
+  surface: "#0f1012",
+  borderSubtle: "#2a2d33",
+  mutedForeground: "#a6adb8",
 };
 function hexWithAlpha(hex: string, alphaHex: string): string {
   // Supports #RGB or #RRGGBB; falls back to original if format is unexpected.
@@ -433,6 +450,16 @@ export async function loadProgramTheme(
   const border = mix(surface2, text, 0.14);
   const borderMuted = mix(surface1, text, 0.10);
 
+  // -------------------------
+  // Surface System (v1)
+  // Intent: canvas is distinct from appBg; panels are distinct from canvas.
+  // Keep this neutral (no brand tint) so it works across any primary/secondary colors.
+  // -------------------------
+  const canvasBg = appBg; // subtle lift off app background
+  const panelBg = surface2;
+  const panelMutedBg = mix(panelBg, canvasBg, 0.35); // muted depth without aggressive translucency
+  const panelRing = border;
+
   // Brand & accents
   const brand = (brandPrimary ?? derived.brand ?? base.brand).trim();
   const brandContrast = contrastText(brand);
@@ -459,6 +486,12 @@ export async function loadProgramTheme(
     textMuted,
     textSubtle,
     focusRing,
+
+    // Surface System (v1)
+    canvasBg,
+    panelBg,
+    panelMutedBg,
+    panelRing,
 
     brand,
     brandContrast,

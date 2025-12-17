@@ -639,369 +639,18 @@ export default function ActiveRosterPage() {
         </div>
       </div>
       {/* Manage Athlete Modal */}
-      {selectedAthlete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setSelectedAthlete(null)}
-          />
-
-          <div className="relative mx-4 flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface-2 ring-1 ring-subtle shadow-2xl text-[color:var(--text)]">
-            {/* Zone 1: Identity Header (fixed) */}
-            <div className="flex items-start justify-between gap-4 border-b border-subtle bg-surface-1 px-5 py-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="h-12 w-10 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-subtle">
-                  {selectedAthlete.athlete_avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={selectedAthlete.athlete_avatar_url}
-                      alt={`${selectedAthlete.athlete_first_name} ${selectedAthlete.athlete_last_name}`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold text-subtle">
-                      —
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">
-                    {selectedAthlete.athlete_first_name} {selectedAthlete.athlete_last_name}
-                  </h2>
-
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                    <span className="rounded-full bg-surface-1 px-2.5 py-1 ring-1 ring-subtle">
-                      Grad: <span className="font-semibold text-[color:var(--text)]">{selectedAthlete.athlete_grad_year ?? "—"}</span>
-                    </span>
-                    <span className="rounded-full bg-surface-1 px-2.5 py-1 ring-1 ring-subtle">
-                      Group: <span className="font-semibold text-[color:var(--text)]">{getGroupKey(selectedAthlete)}</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="shrink-0 rounded-lg border border-subtle bg-surface-2 px-3 py-1.5 text-[11px] font-semibold hover:bg-surface-1"
-                onClick={() => setSelectedAthlete(null)}
-              >
-                Close
-              </button>
-            </div>
-
-            {/* Zone 2: Profile (scrollable, read-only) */}
-            <div className="flex-1 overflow-y-auto bg-surface-2 px-5 py-4">
-              <div className="space-y-3">
-                <section className="rounded-xl bg-surface-1 p-4 ring-1 ring-subtle">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Overview
-                    </h3>
-                    <span className="text-[10px] text-subtle">Read-only</span>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Name</p>
-                      <p className="mt-1 text-[12px] font-semibold">
-                        {selectedAthlete.athlete_first_name} {selectedAthlete.athlete_last_name}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Grad Year</p>
-                      <p className="mt-1 text-[12px] font-semibold">{selectedAthlete.athlete_grad_year ?? "—"}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Event Group</p>
-                      <p className="mt-1 text-[12px] font-semibold">{getGroupKey(selectedAthlete)}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Scholarship</p>
-                      <p className="mt-1 text-[12px] font-semibold">
-                        {selectedAthlete.scholarship_amount !== null && selectedAthlete.scholarship_unit
-                          ? `${selectedAthlete.scholarship_amount}${selectedAthlete.scholarship_unit === "percent" ? "%" : ""}`
-                          : "—"}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="rounded-xl bg-surface-1 p-4 ring-1 ring-subtle">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Performance Snapshot
-                  </h3>
-                  <p className="mt-2 text-[12px] text-muted">
-                    This section will surface PRs and recent results from the athlete performance history.
-                  </p>
-                  <div className="mt-3 rounded-lg bg-surface-2 p-3 ring-1 ring-subtle">
-                    <p className="text-[11px] text-subtle">Not yet connected.</p>
-                  </div>
-                </section>
-
-                <section className="rounded-xl bg-surface-1 p-4 ring-1 ring-subtle">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Notes
-                  </h3>
-                  <p className="mt-2 text-[12px] text-muted">
-                    Athlete profile notes will live here (read-only in this modal).
-                  </p>
-                  <div className="mt-3 rounded-lg bg-surface-2 p-3 ring-1 ring-subtle">
-                    <p className="text-[11px] text-subtle">Not yet connected.</p>
-                  </div>
-                </section>
-              </div>
-            </div>
-
-            {/* Zone 3: Roster Administration (fixed) */}
-            <div className="border-t border-subtle bg-surface-1 px-5 py-4 shadow-[0_-10px_30px_-20px_rgba(0,0,0,0.65)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-[12px] font-semibold">Roster Administration</h3>
-                  <p className="mt-1 text-[11px] text-muted">
-                    Current-season administrative truth.
-                  </p>
-                </div>
-
-                {!isEditingAdmin ? (
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-lg border border-subtle bg-surface-2 px-3 py-1.5 text-[11px] font-semibold hover:bg-surface-1"
-                    onClick={() => {
-                      setAdminError(null);
-                      setIsEditingAdmin(true);
-                    }}
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="rounded-lg border border-subtle bg-surface-2 px-3 py-1.5 text-[11px] font-semibold hover:bg-surface-1"
-                      disabled={adminSaving}
-                      onClick={() => {
-                        setAdminError(null);
-                        setIsEditingAdmin(false);
-
-                        // Reset draft to current selected athlete
-                        setAdminDraft({
-                          status: selectedAthlete.status ?? null,
-                          event_group:
-                            selectedAthlete.roster_event_group ??
-                            selectedAthlete.athlete_default_event_group ??
-                            selectedAthlete.athlete_event_group ??
-                            null,
-                          scholarship_amount:
-                            typeof selectedAthlete.scholarship_amount === "number"
-                              ? selectedAthlete.scholarship_amount
-                              : null,
-                          scholarship_unit: selectedAthlete.scholarship_unit ?? "percent",
-                          scholarship_notes: null,
-                          notes: null,
-                        });
-                      }}
-                    >
-                      Cancel
-                    </button>
-
-                    <button
-                      type="button"
-                      className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-60"
-                      disabled={adminSaving}
-                      onClick={async () => {
-                        setAdminSaving(true);
-                        setAdminError(null);
-
-                        try {
-                          const res = await fetch(
-                            `/api/programs/${programId}/teams/${teamId}/active-roster`,
-                            {
-                              method: "PATCH",
-                              credentials: "include",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                roster_entry_id: selectedAthlete.id,
-                                status: adminDraft.status,
-                                event_group: adminDraft.event_group,
-                                scholarship_amount: adminDraft.scholarship_amount,
-                                scholarship_unit: adminDraft.scholarship_unit,
-                                scholarship_notes: adminDraft.scholarship_notes,
-                                notes: adminDraft.notes,
-                              }),
-                            }
-                          );
-
-                          const body = await res.json().catch(() => ({}));
-
-                          if (!res.ok) {
-                            console.error("[active-roster/page] admin save failed", body);
-                            setAdminError(body.error || "Failed to save roster administration");
-                            return;
-                          }
-
-                          const updated = (body.roster_entry ?? body.rosterEntry ?? null) as ActiveRosterApiRow | null;
-
-                          if (updated) {
-                            setSelectedAthlete(updated);
-                            setRoster((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
-                          }
-
-                          setIsEditingAdmin(false);
-                        } catch (e) {
-                          console.error("[active-roster/page] admin save error", e);
-                          setAdminError("Failed to save roster administration");
-                        } finally {
-                          setAdminSaving(false);
-                        }
-                      }}
-                    >
-                      {adminSaving ? "Saving…" : "Save"}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {adminError ? (
-                <p className="mt-3 text-[12px] text-red-400">{adminError}</p>
-              ) : null}
-
-              {!isEditingAdmin ? (
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Status</p>
-                    <p className="mt-1 text-[12px] font-semibold">{selectedAthlete.status ?? "—"}</p>
-                  </div>
-
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Event Group</p>
-                    <p className="mt-1 text-[12px] font-semibold">{getGroupKey(selectedAthlete)}</p>
-                  </div>
-
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Scholarship</p>
-                    <p className="mt-1 text-[12px] font-semibold">
-                      {selectedAthlete.scholarship_amount !== null && selectedAthlete.scholarship_unit
-                        ? `${selectedAthlete.scholarship_amount}${selectedAthlete.scholarship_unit === "percent" ? "%" : ""}`
-                        : "—"}
-                    </p>
-                    <p className="mt-1 text-[10px] text-subtle">Notes: —</p>
-                  </div>
-
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Roster Notes</p>
-                    <p className="mt-1 text-[12px] font-semibold">—</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Status
-                    </label>
-                    <select
-                      className="mt-2 w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus-ring"
-                      value={adminDraft.status ?? ""}
-                      onChange={(e) =>
-                        setAdminDraft((d) => ({ ...d, status: e.target.value ? e.target.value : null }))
-                      }
-                    >
-                      <option value="">—</option>
-                      <option value="active">Active</option>
-                      <option value="redshirt">Redshirt</option>
-                      <option value="injured">Injured</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Event Group
-                    </label>
-                    <input
-                      className="mt-2 w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
-                      value={adminDraft.event_group ?? ""}
-                      placeholder="e.g. Distance"
-                      onChange={(e) =>
-                        setAdminDraft((d) => ({ ...d, event_group: e.target.value ? e.target.value : null }))
-                      }
-                    />
-                    <p className="mt-1 text-[10px] text-subtle">
-                      This updates the roster event group (used for grouping on the roster).
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Scholarship
-                    </label>
-
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <input
-                        inputMode="decimal"
-                        className="w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
-                        value={adminDraft.scholarship_amount ?? ""}
-                        placeholder="Amount"
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          if (raw === "") {
-                            setAdminDraft((d) => ({ ...d, scholarship_amount: null }));
-                            return;
-                          }
-                          const n = Number(raw);
-                          setAdminDraft((d) => ({ ...d, scholarship_amount: Number.isFinite(n) ? n : d.scholarship_amount }));
-                        }}
-                      />
-
-                      <select
-                        className="w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus-ring"
-                        value={adminDraft.scholarship_unit ?? "percent"}
-                        onChange={(e) =>
-                          setAdminDraft((d) => ({ ...d, scholarship_unit: e.target.value }))
-                        }
-                      >
-                        <option value="percent">Percent</option>
-                        <option value="equivalency">Equivalency</option>
-                        <option value="amount">Amount</option>
-                      </select>
-                    </div>
-
-                    <textarea
-                      className="mt-2 w-full resize-none rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
-                      rows={2}
-                      placeholder="Scholarship notes (optional)"
-                      value={adminDraft.scholarship_notes ?? ""}
-                      onChange={(e) =>
-                        setAdminDraft((d) => ({ ...d, scholarship_notes: e.target.value ? e.target.value : null }))
-                      }
-                    />
-                  </div>
-
-                  <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
-                    <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Roster Notes
-                    </label>
-                    <textarea
-                      className="mt-2 w-full resize-none rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
-                      rows={5}
-                      placeholder="Administrative notes for the current season"
-                      value={adminDraft.notes ?? ""}
-                      onChange={(e) =>
-                        setAdminDraft((d) => ({ ...d, notes: e.target.value ? e.target.value : null }))
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {selectedAthlete ? (
+        <ManageAthleteModal
+          selectedAthlete={selectedAthlete}
+          programId={programId}
+          teamId={teamId}
+          onClose={() => setSelectedAthlete(null)}
+          onUpdated={(updated) => {
+            setSelectedAthlete(updated);
+            setRoster((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+          }}
+        />
+      ) : null}
       {/* Quick-add Athlete Modal (recruit pool only) */}
       {quickAddOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1084,6 +733,425 @@ export default function ActiveRosterPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+export function ManageAthleteModal({
+  selectedAthlete,
+  programId,
+  teamId,
+  onClose,
+  onUpdated,
+}: {
+  selectedAthlete: ActiveRosterApiRow;
+  programId: string;
+  teamId: string;
+  onClose: () => void;
+  onUpdated?: (updated: ActiveRosterApiRow) => void;
+}) {
+  type AdminDraft = {
+    status: string | null;
+    event_group: string | null;
+    scholarship_amount: number | null;
+    scholarship_unit: string | null;
+    scholarship_notes: string | null;
+    notes: string | null;
+  };
+
+  const getGroupKey = (row: ActiveRosterApiRow) =>
+    row.roster_event_group ??
+    row.athlete_default_event_group ??
+    row.athlete_event_group ??
+    "Unassigned";
+
+  const [isEditingAdmin, setIsEditingAdmin] = useState(false);
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminDraft, setAdminDraft] = useState<AdminDraft>({
+    status: null,
+    event_group: null,
+    scholarship_amount: null,
+    scholarship_unit: "percent",
+    scholarship_notes: null,
+    notes: null,
+  });
+
+  useEffect(() => {
+    setIsEditingAdmin(false);
+    setAdminSaving(false);
+    setAdminError(null);
+
+    setAdminDraft({
+      status: selectedAthlete.status ?? null,
+      event_group:
+        selectedAthlete.roster_event_group ??
+        selectedAthlete.athlete_default_event_group ??
+        selectedAthlete.athlete_event_group ??
+        null,
+      scholarship_amount:
+        typeof selectedAthlete.scholarship_amount === "number"
+          ? selectedAthlete.scholarship_amount
+          : null,
+      scholarship_unit: selectedAthlete.scholarship_unit ?? "percent",
+      scholarship_notes: null,
+      notes: null,
+    });
+  }, [selectedAthlete]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 bg-black/60"
+        onClick={onClose}
+      />
+
+      <div className="relative mx-4 flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface-2 ring-1 ring-subtle shadow-2xl text-[color:var(--text)]">
+        {/* Zone 1: Identity Header (fixed) */}
+        <div className="flex items-start justify-between gap-4 border-b border-subtle bg-surface-1 px-5 py-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="h-12 w-10 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-subtle">
+              {selectedAthlete.athlete_avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={selectedAthlete.athlete_avatar_url}
+                  alt={`${selectedAthlete.athlete_first_name} ${selectedAthlete.athlete_last_name}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold text-subtle">
+                  —
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">
+                {selectedAthlete.athlete_first_name} {selectedAthlete.athlete_last_name}
+              </h2>
+
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                <span className="rounded-full bg-surface-1 px-2.5 py-1 ring-1 ring-subtle">
+                  Grad:{" "}
+                  <span className="font-semibold text-[color:var(--text)]">
+                    {selectedAthlete.athlete_grad_year ?? "—"}
+                  </span>
+                </span>
+                <span className="rounded-full bg-surface-1 px-2.5 py-1 ring-1 ring-subtle">
+                  Group:{" "}
+                  <span className="font-semibold text-[color:var(--text)]">
+                    {getGroupKey(selectedAthlete)}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="shrink-0 rounded-lg border border-subtle bg-surface-2 px-3 py-1.5 text-[11px] font-semibold hover:bg-surface-1"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+
+        {/* Zone 2: Profile (scrollable, read-only) */}
+        <div className="flex-1 overflow-y-auto bg-surface-2 px-5 py-4">
+          <div className="space-y-3">
+            <section className="rounded-xl bg-surface-1 p-4 ring-1 ring-subtle">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Overview
+                </h3>
+                <span className="text-[10px] text-subtle">Read-only</span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    Name
+                  </p>
+                  <p className="mt-1 text-[12px] font-semibold">
+                    {selectedAthlete.athlete_first_name} {selectedAthlete.athlete_last_name}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    Grad Year
+                  </p>
+                  <p className="mt-1 text-[12px] font-semibold">
+                    {selectedAthlete.athlete_grad_year ?? "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    Event Group
+                  </p>
+                  <p className="mt-1 text-[12px] font-semibold">
+                    {getGroupKey(selectedAthlete)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    Scholarship
+                  </p>
+                  <p className="mt-1 text-[12px] font-semibold">
+                    {selectedAthlete.scholarship_amount !== null && selectedAthlete.scholarship_unit
+                      ? `${selectedAthlete.scholarship_amount}${selectedAthlete.scholarship_unit === "percent" ? "%" : ""}`
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl bg-surface-1 p-4 ring-1 ring-subtle">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                Performance Snapshot
+              </h3>
+              <p className="mt-2 text-[12px] text-muted">
+                This section will surface PRs and recent results from the athlete performance history.
+              </p>
+              <div className="mt-3 rounded-lg bg-surface-2 p-3 ring-1 ring-subtle">
+                <p className="text-[11px] text-subtle">Not yet connected.</p>
+              </div>
+            </section>
+
+            <section className="rounded-xl bg-surface-1 p-4 ring-1 ring-subtle">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                Notes
+              </h3>
+              <p className="mt-2 text-[12px] text-muted">
+                Athlete profile notes will live here (read-only in this modal).
+              </p>
+              <div className="mt-3 rounded-lg bg-surface-2 p-3 ring-1 ring-subtle">
+                <p className="text-[11px] text-subtle">Not yet connected.</p>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        {/* Zone 3: Roster Administration (fixed) */}
+        <div className="border-t border-subtle bg-surface-1 px-5 py-4 shadow-[0_-10px_30px_-20px_rgba(0,0,0,0.65)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-[12px] font-semibold">Roster Administration</h3>
+              <p className="mt-1 text-[11px] text-muted">Current-season administrative truth.</p>
+            </div>
+
+            {!isEditingAdmin ? (
+              <button
+                type="button"
+                className="shrink-0 rounded-lg border border-subtle bg-surface-2 px-3 py-1.5 text-[11px] font-semibold hover:bg-surface-1"
+                onClick={() => {
+                  setAdminError(null);
+                  setIsEditingAdmin(true);
+                }}
+              >
+                Edit
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-subtle bg-surface-2 px-3 py-1.5 text-[11px] font-semibold hover:bg-surface-1"
+                  disabled={adminSaving}
+                  onClick={() => {
+                    setAdminError(null);
+                    setIsEditingAdmin(false);
+
+                    setAdminDraft({
+                      status: selectedAthlete.status ?? null,
+                      event_group:
+                        selectedAthlete.roster_event_group ??
+                        selectedAthlete.athlete_default_event_group ??
+                        selectedAthlete.athlete_event_group ??
+                        null,
+                      scholarship_amount:
+                        typeof selectedAthlete.scholarship_amount === "number"
+                          ? selectedAthlete.scholarship_amount
+                          : null,
+                      scholarship_unit: selectedAthlete.scholarship_unit ?? "percent",
+                      scholarship_notes: null,
+                      notes: null,
+                    });
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-60"
+                  disabled={adminSaving}
+                  onClick={async () => {
+                    setAdminSaving(true);
+                    setAdminError(null);
+
+                    try {
+                      const res = await fetch(`/api/programs/${programId}/teams/${teamId}/active-roster`, {
+                        method: "PATCH",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          roster_entry_id: selectedAthlete.id,
+                          status: adminDraft.status,
+                          event_group: adminDraft.event_group,
+                          scholarship_amount: adminDraft.scholarship_amount,
+                          scholarship_unit: adminDraft.scholarship_unit,
+                          scholarship_notes: adminDraft.scholarship_notes,
+                          notes: adminDraft.notes,
+                        }),
+                      });
+
+                      const body = await res.json().catch(() => ({}));
+
+                      if (!res.ok) {
+                        console.error("[active-roster/page] admin save failed", body);
+                        setAdminError(body.error || "Failed to save roster administration");
+                        return;
+                      }
+
+                      const updated = (body.roster_entry ?? body.rosterEntry ?? null) as ActiveRosterApiRow | null;
+
+                      if (updated) {
+                        onUpdated?.(updated);
+                      }
+
+                      setIsEditingAdmin(false);
+                    } catch (e) {
+                      console.error("[active-roster/page] admin save error", e);
+                      setAdminError("Failed to save roster administration");
+                    } finally {
+                      setAdminSaving(false);
+                    }
+                  }}
+                >
+                  {adminSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {adminError ? <p className="mt-3 text-[12px] text-red-400">{adminError}</p> : null}
+
+          {!isEditingAdmin ? (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Status</p>
+                <p className="mt-1 text-[12px] font-semibold">{selectedAthlete.status ?? "—"}</p>
+              </div>
+
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Event Group</p>
+                <p className="mt-1 text-[12px] font-semibold">{getGroupKey(selectedAthlete)}</p>
+              </div>
+
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Scholarship</p>
+                <p className="mt-1 text-[12px] font-semibold">
+                  {selectedAthlete.scholarship_amount !== null && selectedAthlete.scholarship_unit
+                    ? `${selectedAthlete.scholarship_amount}${selectedAthlete.scholarship_unit === "percent" ? "%" : ""}`
+                    : "—"}
+                </p>
+                <p className="mt-1 text-[10px] text-subtle">Notes: —</p>
+              </div>
+
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Roster Notes</p>
+                <p className="mt-1 text-[12px] font-semibold">—</p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">Status</label>
+                <select
+                  className="mt-2 w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus-ring"
+                  value={adminDraft.status ?? ""}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, status: e.target.value ? e.target.value : null }))}
+                >
+                  <option value="">—</option>
+                  <option value="active">Active</option>
+                  <option value="redshirt">Redshirt</option>
+                  <option value="injured">Injured</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">Event Group</label>
+                <input
+                  className="mt-2 w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
+                  value={adminDraft.event_group ?? ""}
+                  placeholder="e.g. Distance"
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, event_group: e.target.value ? e.target.value : null }))}
+                />
+                <p className="mt-1 text-[10px] text-subtle">This updates the roster event group (used for grouping on the roster).</p>
+              </div>
+
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">Scholarship</label>
+
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input
+                    inputMode="decimal"
+                    className="w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
+                    value={adminDraft.scholarship_amount ?? ""}
+                    placeholder="Amount"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setAdminDraft((d) => ({ ...d, scholarship_amount: null }));
+                        return;
+                      }
+                      const n = Number(raw);
+                      setAdminDraft((d) => ({
+                        ...d,
+                        scholarship_amount: Number.isFinite(n) ? n : d.scholarship_amount,
+                      }));
+                    }}
+                  />
+
+                  <select
+                    className="w-full rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus-ring"
+                    value={adminDraft.scholarship_unit ?? "percent"}
+                    onChange={(e) => setAdminDraft((d) => ({ ...d, scholarship_unit: e.target.value }))}
+                  >
+                    <option value="percent">Percent</option>
+                    <option value="equivalency">Equivalency</option>
+                    <option value="amount">Amount</option>
+                  </select>
+                </div>
+
+                <textarea
+                  className="mt-2 w-full resize-none rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
+                  rows={2}
+                  placeholder="Scholarship notes (optional)"
+                  value={adminDraft.scholarship_notes ?? ""}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, scholarship_notes: e.target.value ? e.target.value : null }))}
+                />
+              </div>
+
+              <div className="rounded-xl bg-surface-2 p-3 ring-1 ring-subtle">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-muted">Roster Notes</label>
+                <textarea
+                  className="mt-2 w-full resize-none rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-[12px] placeholder:text-subtle focus:outline-none focus:ring-2 focus-ring"
+                  rows={5}
+                  placeholder="Administrative notes for the current season"
+                  value={adminDraft.notes ?? ""}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, notes: e.target.value ? e.target.value : null }))}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

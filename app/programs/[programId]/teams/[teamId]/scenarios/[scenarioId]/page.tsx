@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import ScenarioEntriesClient from "./ScenarioEntriesClient";
 import ScenarioRosterClient from "./ScenarioRosterClient";
 
 type PageProps = {
@@ -12,13 +11,15 @@ type PageProps = {
     teamId: string;
     scenarioId: string;
   }>;
+  searchParams?: Promise<{ view?: string }>;
 };
 
 type ScenarioEntry = {
   id: string;
   athleteId: string | null;
   programRecruitId: string | null;
-  athleteName: string;
+  eventGroup: string | null;
+  name: string;
   gradYear: number | null;
   scholarshipAmount: number | null;
   scholarshipUnit: string;
@@ -26,8 +27,11 @@ type ScenarioEntry = {
   createdAt: string | null;
 };
 
-export default async function ScenarioPage({ params }: PageProps) {
+export default async function ScenarioPage({ params, searchParams }: PageProps) {
   const { programId, teamId, scenarioId } = await params;
+  const sp = (await searchParams) ?? {};
+  const view = (sp.view ?? "").toString();
+  const isCardsView = view === "cards";
 
   const supabase = await supabaseServerComponent();
 
@@ -256,6 +260,7 @@ export default async function ScenarioPage({ params }: PageProps) {
       scenario_id,
       athlete_id,
       program_recruit_id,
+      event_group,
       scholarship_amount,
       scholarship_unit,
       scholarship_notes,
@@ -265,6 +270,16 @@ export default async function ScenarioPage({ params }: PageProps) {
         first_name,
         last_name,
         grad_year
+      ),
+      program_recruit:program_recruits!left (
+        id,
+        athlete_id,
+        athlete:athletes!left (
+          id,
+          first_name,
+          last_name,
+          grad_year
+        )
       )
     `
     )
@@ -277,10 +292,17 @@ export default async function ScenarioPage({ params }: PageProps) {
   }
 
   const entries: ScenarioEntry[] = (entryRows ?? []).map((row: any) => {
+    // Primary join: roster_scenario_entries.athlete_id -> athletes
     const athleteRel = row.athlete;
-    const athleteRecord = Array.isArray(athleteRel)
-      ? athleteRel[0]
-      : athleteRel;
+    const directAthlete = Array.isArray(athleteRel) ? athleteRel[0] : athleteRel;
+
+    // Fallback join: roster_scenario_entries.program_recruit_id -> program_recruits.athlete_id -> athletes
+    const prRel = row.program_recruit;
+    const prRecord = Array.isArray(prRel) ? prRel[0] : prRel;
+    const prAthleteRel = prRecord?.athlete;
+    const recruitAthlete = Array.isArray(prAthleteRel) ? prAthleteRel[0] : prAthleteRel;
+
+    const athleteRecord = directAthlete ?? recruitAthlete ?? null;
 
     const firstName = (athleteRecord?.first_name as string | null) ?? "";
     const lastName = (athleteRecord?.last_name as string | null) ?? "";
@@ -291,21 +313,55 @@ export default async function ScenarioPage({ params }: PageProps) {
 
     return {
       id: row.id as string,
-      athleteId: (row.athlete_id as string | null) ?? null,
+      athleteId: (row.athlete_id as string | null) ?? (athleteRecord?.id as string | null) ?? null,
       programRecruitId: (row.program_recruit_id as string | null) ?? null,
-      athleteName: fullName,
+      eventGroup: (row.event_group as string | null) ?? null,
+      name: fullName,
       gradYear: (athleteRecord?.grad_year as number | null) ?? null,
       scholarshipAmount:
-        row.scholarship_amount !== null &&
-        row.scholarship_amount !== undefined
+        row.scholarship_amount !== null && row.scholarship_amount !== undefined
           ? Number(row.scholarship_amount)
           : null,
-      scholarshipUnit:
-        (row.scholarship_unit as string | null) ?? scholarshipUnit,
+      scholarshipUnit: (row.scholarship_unit as string | null) ?? scholarshipUnit,
       scholarshipNotes: (row.scholarship_notes as string | null) ?? null,
       createdAt: (row.created_at as string | null) ?? null,
     };
   });
+
+  // ---- Event group quota fulfillment (best-effort, uses current team season) ----
+  const { data: currentSeasonRow } = await supabaseAdmin
+    .from("team_seasons")
+    .select("id, academic_year, season_label, season_year, event_group_quotas")
+    .eq("program_id", programId)
+    .eq("team_id", teamId)
+    .eq("is_current", true)
+    .maybeSingle();
+
+  const quotas: Record<string, number> = (() => {
+    const raw = (currentSeasonRow as any)?.event_group_quotas;
+    if (!raw || typeof raw !== "object") return {};
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, any>)) {
+      const n = Number(v);
+      if (!Number.isNaN(n)) out[k] = n;
+    }
+    return out;
+  })();
+
+  const countsByEventGroup = entries.reduce<Record<string, number>>((acc, e) => {
+    const g = (e.eventGroup ?? "").trim();
+    if (!g) return acc;
+    acc[g] = (acc[g] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const quotaRows = Object.keys(quotas)
+    .sort((a, b) => a.localeCompare(b))
+    .map((k) => ({
+      eventGroup: k,
+      target: quotas[k] ?? 0,
+      current: countsByEventGroup[k] ?? 0,
+    }));
 
   // ---- Scholarship summary calculations ----
   const totalScenarioScholarship = entries.reduce((sum, entry) => {
@@ -352,7 +408,7 @@ export default async function ScenarioPage({ params }: PageProps) {
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
                 <Link href="/dashboard" className="hover:text-[var(--foreground)]">
                   Dashboard
                 </Link>
@@ -390,292 +446,267 @@ export default async function ScenarioPage({ params }: PageProps) {
               )}
             </div>
             <Link
-              href={`/programs/${programId}/teams/${teamId}`}
+              href={`/programs/${programId}/teams/${teamId}/roster-planning`}
               className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
             >
-              ← Back to team
+              ← Back to planning
             </Link>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <div className="lg:flex lg:items-start lg:gap-4">
+        <div>
           <div className="min-w-0 flex-1 space-y-4">
-        <section className="rounded-xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="inline-flex items-center rounded-md bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)]"
-                  title="This is a planning workspace"
-                >
-                  Scenario workspace
-                </span>
-
-                <span
-                  className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ${
-                    scenarioStatus === "active"
-                      ? "bg-[var(--success-subtle)] text-[var(--success)] ring-[var(--success)]"
-                      : scenarioStatus === "candidate"
-                      ? "bg-[var(--muted)] text-[var(--foreground)] ring-[var(--border)]"
-                      : "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] ring-[var(--border)]"
-                  }`}
-                  title={
-                    scenarioStatus === "active"
-                      ? "Official roster (locked)"
-                      : scenarioStatus === "candidate"
-                      ? "Next in line for promotion"
-                      : "Safe draft"
-                  }
-                >
-                  {statusIcon ? <span aria-hidden>{statusIcon}</span> : null}
-                  <span>{statusLabel}</span>
-                </span>
-              </div>
-
-              <p className="mt-2 text-sm text-[var(--foreground)]">
-                You’re editing a roster scenario. It’s safe to experiment here.
-              </p>
-              <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                Promote to Active only when you’re ready for this scenario to become the official roster.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {scenarioStatus === "draft" ? (
-                <form action={async () => {
-                  "use server";
-                  await actionSetScenarioStatus("candidate");
-                }}>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
-                    title="Mark this scenario as the primary candidate for promotion"
-                  >
-                    Mark Candidate
-                  </button>
-                </form>
-              ) : null}
-
-              {scenarioStatus === "candidate" ? (
-                <>
-                  <form action={async () => {
-                    "use server";
-                    await actionSetScenarioStatus("active");
-                  }}>
-                    <button
-                      type="submit"
-                      className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
-                      title="Promote this scenario to the Active Roster"
+            {/* Scenario workspace (planning) */}
+            <section className="rounded-xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className="inline-flex items-center rounded-md bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)]"
+                      title="This is a planning workspace"
                     >
-                      Promote Active
-                    </button>
-                  </form>
-
-                  <form action={async () => {
-                    "use server";
-                    await actionSetScenarioStatus("draft");
-                  }}>
-                    <button
-                      type="submit"
-                      className="rounded-full bg-[var(--surface-subtle)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
-                      title="Return this scenario to Draft"
-                    >
-                      Back to Draft
-                    </button>
-                  </form>
-                </>
-              ) : null}
-
-              {scenarioStatus === "active" ? (
-                <form action={async () => {
-                  "use server";
-                  await actionReturnToPlanning();
-                }}>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
-                    title="Return the Active Roster to planning (demotable unless season is locked)"
-                  >
-                    Return to Planning
-                  </button>
-                </form>
-              ) : null}
-
-              <Link
-                href={`/programs/${programId}/teams/${teamId}/roster-planning`}
-                className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
-                title="Return to Planning"
-              >
-                ← Back to planning
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Scenario overview */}
-        <section className="rounded-xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-            Scenario overview
-          </p>
-          <p className="mt-2 text-sm text-[var(--foreground)]">
-            This is a sandbox scenario for planning future rosters. Changes here
-            do not affect your official season rosters.
-          </p>
-          {scenarioRow.notes && (
-            <p className="mt-3 whitespace-pre-wrap text-[11px] text-[var(--muted-foreground)]">
-              {scenarioRow.notes}
-            </p>
-          )}
-        </section>
-
-        {/* Scholarship summary */}
-        <section className="rounded-xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                Scholarship snapshot (scenario)
-              </p>
-              <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                Based on scholarship amounts assigned to athletes in this
-                scenario only.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-4 text-right text-xs">
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
-                  Total in scenario
-                </p>
-                <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-                  {formattedTotal}{" "}
-                  <span className="text-[10px] font-normal text-[var(--muted-foreground)]">
-                    {unitLabel}
-                  </span>
-                </p>
-              </div>
-
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
-                  Team budget
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                  {formattedBudget !== null ? (
-                    <>
-                      {formattedBudget}{" "}
-                      <span className="text-[10px] font-normal text-[var(--muted-foreground)]">
-                        {unitLabel}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[11px] text-[var(--muted-foreground)]">
-                      Not set
+                      Scenario workspace
                     </span>
-                  )}
-                </p>
-              </div>
 
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
-                  Remaining
-                </p>
-                <p
-                  className={`mt-1 text-sm font-semibold ${
-                    remaining !== null && remaining < 0
-                      ? "text-[var(--danger)]"
-                      : "text-[var(--success)]"
-                  }`}
-                >
-                  {formattedRemaining !== null ? (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ${
+                        scenarioStatus === "active"
+                          ? "bg-[var(--success-subtle)] text-[var(--success)] ring-[var(--success)]"
+                          : scenarioStatus === "candidate"
+                          ? "bg-[var(--muted)] text-[var(--foreground)] ring-[var(--border)]"
+                          : "bg-[var(--surface-subtle)] text-[var(--muted-foreground)] ring-[var(--border)]"
+                      }`}
+                      title={
+                        scenarioStatus === "active"
+                          ? "Official roster (locked)"
+                          : scenarioStatus === "candidate"
+                          ? "Next in line for promotion"
+                          : "Safe draft"
+                      }
+                    >
+                      {statusIcon ? <span aria-hidden>{statusIcon}</span> : null}
+                      <span>{statusLabel}</span>
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-sm text-[var(--foreground)]">
+                    You’re editing a roster scenario. It’s safe to experiment here.
+                  </p>
+                  <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                    Promote to Active only when you’re ready for this scenario to become the official roster.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {scenarioStatus === "draft" ? (
+                    <form action={async () => {
+                      "use server";
+                      await actionSetScenarioStatus("candidate");
+                    }}>
+                      <button
+                        type="submit"
+                        className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                        title="Mark this scenario as the primary candidate for promotion"
+                      >
+                        Promote to Candidate
+                      </button>
+                    </form>
+                  ) : null}
+
+                  {scenarioStatus === "candidate" ? (
                     <>
-                      {formattedRemaining}{" "}
-                      <span className="text-[10px] font-normal text-[var(--muted-foreground)]">
-                        {unitLabel}
-                      </span>
+                      <form action={async () => {
+                        "use server";
+                        await actionSetScenarioStatus("active");
+                      }}>
+                        <button
+                          type="submit"
+                          className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                          title="Promote this scenario to the Active Roster"
+                        >
+                          Promote Active
+                        </button>
+                      </form>
+
+                      <form action={async () => {
+                        "use server";
+                        await actionSetScenarioStatus("draft");
+                      }}>
+                        <button
+                          type="submit"
+                          className="rounded-full bg-[var(--surface-subtle)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                          title="Return this scenario to Draft"
+                        >
+                          Back to Draft
+                        </button>
+                      </form>
                     </>
+                  ) : null}
+
+                  {scenarioStatus === "active" ? (
+                    <form action={async () => {
+                      "use server";
+                      await actionReturnToPlanning();
+                    }}>
+                      <button
+                        type="submit"
+                        className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                        title="Return the Active Roster to planning (demotable unless season is locked)"
+                      >
+                        Return to Planning
+                      </button>
+                    </form>
+                  ) : null}
+
+                </div>
+              </div>
+            </section>
+
+            {/* Scenario dashboard (quick-glance) */}
+            <section className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--border)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Scenario dashboard
+                  </p>
+                  <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                    Quick-glance totals for this scenario only.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-end gap-1">
+                  <Link
+                    href={`/programs/${programId}/teams/${teamId}/scenarios/${scenarioId}?view=cards`}
+                    className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                    title="View the entire scenario roster at once"
+                  >
+                    Bird’s-eye view
+                  </Link>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">
+                    View the entire scenario roster at once
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg bg-[var(--surface-subtle)] p-3 ring-1 ring-[var(--border)]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Scholarship used
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+                    {formattedTotal} <span className="text-[10px] font-normal text-[var(--muted-foreground)]">{unitLabel}</span>
+                  </p>
+                  <p className="mt-1 text-[10px] text-[var(--muted-foreground)]">
+                    {formattedBudget !== null ? (
+                      <>Budget {formattedBudget} {unitLabel} • Remaining {formattedRemaining ?? "—"} {unitLabel}</>
+                    ) : (
+                      <>Team budget not set</>
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-[var(--surface-subtle)] p-3 ring-1 ring-[var(--border)]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Headcount
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+                    {entries.length}
+                  </p>
+                  <p className="mt-1 text-[10px] text-[var(--muted-foreground)]">
+                    Scenario entries
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-[var(--surface-subtle)] p-3 ring-1 ring-[var(--border)]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Event group quotas
+                  </p>
+                  {quotaRows.length ? (
+                    <div className="mt-1 space-y-1">
+                      {quotaRows.slice(0, 4).map((q) => (
+                        <div key={q.eventGroup} className="flex items-center justify-between text-[11px]">
+                          <span className="truncate text-[var(--foreground)]">{q.eventGroup}</span>
+                          <span className="shrink-0 text-[var(--muted-foreground)]">{q.current}/{q.target}</span>
+                        </div>
+                      ))}
+                      {quotaRows.length > 4 ? (
+                        <p className="pt-1 text-[10px] text-[var(--muted-foreground)]">+{quotaRows.length - 4} more</p>
+                      ) : null}
+                    </div>
                   ) : (
-                    "—"
+                    <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                      No quotas configured
+                    </p>
                   )}
-                </p>
+                </div>
               </div>
+            </section>
 
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
-                  Used
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                  {pctUsed !== null ? `${pctUsed.toFixed(1)}%` : "—"}
-                </p>
+            {/* Cards overlay (read-only) */}
+            {isCardsView ? (
+              <div className="fixed inset-0 z-50 bg-[rgba(0,0,0,0.6)] p-3 sm:p-6">
+                <div className="mx-auto h-full w-full max-w-7xl overflow-hidden rounded-xl bg-[var(--background)] ring-1 ring-[var(--border)]">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--foreground)]">Bird’s-eye view</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">Read-only view (no edits here).</p>
+                    </div>
+                    <Link
+                      href={`/programs/${programId}/teams/${teamId}/scenarios/${scenarioId}`}
+                      className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)] hover:bg-[var(--muted-hover)]"
+                      title="Close"
+                    >
+                      Close
+                    </Link>
+                  </div>
+
+                  <div className="h-[calc(100%-56px)] overflow-auto p-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {entries.map((e) => (
+                        <div
+                          key={e.id}
+                          className="rounded-xl bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]"
+                        >
+                          <p className="truncate text-sm font-semibold text-[var(--foreground)]">{e.name}</p>
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--muted-foreground)]">
+                            <span>Grad {e.gradYear ?? "—"}</span>
+                            <span>{e.eventGroup ?? "No group"}</span>
+                          </div>
+                          <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                            Scholarship: {e.scholarshipAmount ?? "—"} {e.scholarshipUnit === "percent" ? "%" : e.scholarshipUnit === "equivalency" ? "eq" : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            ) : null}
 
-          <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[var(--muted)]">
-            <div
-              className={`h-full rounded-full ${
-                remaining !== null && remaining < 0
-                  ? "bg-[var(--danger)]"
-                  : "bg-[var(--brand)]"
-              }`}
-              style={{
-                width: `${
-                  pctUsed !== null
-                    ? Math.max(0, Math.min(120, pctUsed))
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
+            {/* Scenario athletes */}
+            <section className="rounded-xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                Scenario athletes
+              </p>
+              <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                Click an athlete to edit details in the popover. Add athletes from the Toolbox.
+              </p>
 
-          <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
-            {entries.length} scenario entries with scholarship values. This is a
-            planning-only view and does not change your official roster or
-            financial aid records.
-          </p>
-        </section>
-
-        <section className="rounded-xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-            Scenario roster
-          </p>
-          <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-            Edit entries here. Use the Toolbox to add recruits or program athletes.
-          </p>
-
-          <div className="mt-4">
-            <ScenarioEntriesClient
-              programId={programId}
-              teamId={teamId}
-              scenarioId={scenarioId}
-              initialEntries={entries}
-              unitLabel={unitLabel}
-            />
-          </div>
-        </section>
-          </div>
-
-          {/* Toolbox (right sidebar): add-from sources */}
-          <aside className="mt-4 w-full shrink-0 lg:mt-0 lg:w-[340px] xl:w-[380px]">
-            <div className="sticky top-4 space-y-3">
-              <div className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--border)]">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                  Toolbox
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                  Add recruits or program athletes to this scenario.
-                </p>
+              <div className="mt-4">
+                <ScenarioRosterClient
+                  programId={programId}
+                  teamId={teamId}
+                  scenarioId={scenarioId}
+                  isManager={isManager}
+                  initialEntries={entries as any}
+                />
               </div>
+            </section>
+          </div>
 
-              <ScenarioRosterClient
-                programId={programId}
-                teamId={teamId}
-                scenarioId={scenarioId}
-                isManager={isManager}
-                initialEntries={entries as any}
-              />
-            </div>
-          </aside>
+          {/* right sidebar removed */}
         </div>
       </main>
     </div>

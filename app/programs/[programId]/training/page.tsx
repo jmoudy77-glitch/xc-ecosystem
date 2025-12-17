@@ -132,12 +132,13 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   //
 
   return (
-    <div className="space-y-4">
+    <div className="bg-canvas">
+      <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-4 sm:px-6">
       {/* Header / context card */}
-      <section className="rounded-xl border border-subtle bg-brand-soft p-5">
-        <div className="flex items-start justify-between gap-4">
+      <section className="rounded-xl ring-1 ring-panel panel-muted p-5 text-[var(--foreground)]">
+        <div className="flex items-start justify-between gap-4 border-l-2 border-subtle pl-4">
           <div>
-            <div className="flex items-center gap-2 text-[11px] text-muted">
+            <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
               <Link href="/dashboard" className="hover:underline">
                 Dashboard
               </Link>
@@ -152,26 +153,26 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
               <span>Training</span>
             </div>
 
-            <h1 className="mt-1 text-sm font-semibold text-slate-100">
+            <h1 className="mt-1 text-sm font-semibold text-[var(--foreground)]">
               Training &amp; practice workspace
             </h1>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
               Central hub for practice plans, workouts, and training templates
               for this program. This will eventually connect directly into the
               weather-aware practice scheduler and athlete training logs.
             </p>
           </div>
 
-          <div className="hidden text-right text-[11px] text-muted sm:block">
+          <div className="hidden text-right text-[11px] text-[var(--muted-foreground)] sm:block">
             <p>
               Your role:{" "}
-              <span className="font-mono text-[11px] text-slate-100">
+              <span className="font-mono text-[11px] text-[var(--foreground)]">
                 {actingRole ?? "unknown"}
               </span>
             </p>
             <p className="mt-1">
               Manager privileges:{" "}
-              <span className="font-mono text-[11px] text-slate-100">
+              <span className="font-mono text-[11px] text-[var(--foreground)]">
                 {isManager ? "yes" : "no"}
               </span>
             </p>
@@ -183,40 +184,40 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
       <section className="grid gap-4 md:grid-cols-3">
         {/* Practice planner */}
         <div className="md:col-span-2 space-y-4">
-          <div className="rounded-xl border border-subtle bg-surface p-5">
+          <div className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-xs font-semibold text-slate-100">
+                <p className="text-xs font-semibold text-[var(--foreground)]">
                   Practice planner
                 </p>
-                <p className="mt-1 text-[11px] text-muted">
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
                   Plan daily practices by group, assign workouts, and tie them
                   to your season roster. Future: integrate weather snapshots and
                   WBGT-based heat policies directly into each practice.
                 </p>
               </div>
-              <div className="hidden text-[11px] text-muted sm:flex sm:flex-col sm:items-end">
-                <span className="rounded-full border border-subtle px-2 py-0.5">
+              <div className="hidden text-[11px] text-[var(--muted-foreground)] sm:flex sm:flex-col sm:items-end">
+                <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5 text-[var(--muted-foreground)]">
                   Roadmap: full practice scheduler
                 </span>
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 text-[11px] text-muted sm:grid-cols-2">
-              <div className="rounded-lg border border-subtle bg-surface/70 p-3">
-                <p className="text-[11px] font-semibold text-slate-100">
+            <div className="mt-4 grid gap-3 text-[11px] text-[var(--muted-foreground)] sm:grid-cols-2">
+              <div className="rounded-lg ring-1 ring-panel panel-muted p-3">
+                <p className="text-[11px] font-semibold text-[var(--foreground)]">
                   Today&apos;s / upcoming practices
                 </p>
-                <p className="mt-1 text-[11px] text-muted">
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
                   Future: list of upcoming practices with quick access to
                   groups, assigned workouts, and weather snapshots.
                 </p>
               </div>
-              <div className="rounded-lg border border-subtle bg-surface/70 p-3">
-                <p className="text-[11px] font-semibold text-slate-100">
+              <div className="rounded-lg ring-1 ring-panel panel-muted p-3">
+                <p className="text-[11px] font-semibold text-[var(--foreground)]">
                   Group assignments
                 </p>
-                <p className="mt-1 text-[11px] text-muted">
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
                   Future: drag-and-drop grouping by event group or training
                   focus, linked directly to your team season rosters.
                 </p>
@@ -225,11 +226,11 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
           </div>
 
           {/* Athlete training logs */}
-          <div className="rounded-xl border border-subtle bg-surface p-5">
-            <p className="text-xs font-semibold text-slate-100">
+          <div className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
+            <p className="text-xs font-semibold text-[var(--foreground)]">
               Athlete training logs
             </p>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
               This area will surface individual sessions from{" "}
               <code className="font-mono text-[10px]">
                 athlete_training_sessions
@@ -237,14 +238,14 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
               as an at-a-glance view of what your athletes are actually doing
               (coach-assigned and self-assigned).
             </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted">
-              <span className="rounded-full border border-subtle px-2 py-0.5">
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--muted-foreground)]">
+              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
                 Coach-assigned vs self-assigned
               </span>
-              <span className="rounded-full border border-subtle px-2 py-0.5">
+              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
                 RPE &amp; volume trends
               </span>
-              <span className="rounded-full border border-subtle px-2 py-0.5">
+              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
                 Availability &amp; injury flags
               </span>
             </div>
@@ -253,16 +254,16 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
 
         {/* Right column: workouts/templates */}
         <aside className="space-y-4">
-          <section className="rounded-xl border border-subtle bg-surface p-5">
-            <p className="text-xs font-semibold text-slate-100">
+          <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
+            <p className="text-xs font-semibold text-[var(--foreground)]">
               Workouts &amp; templates
             </p>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
               Library of reusable workouts and training event templates for this
               program. In the roadmap, these tie directly into your practice
               planner and athlete sessions.
             </p>
-            <ul className="mt-2 space-y-1 text-[11px] text-muted">
+            <ul className="mt-2 space-y-1 text-[11px] text-[var(--muted-foreground)]">
               <li>• System and program-specific workouts</li>
               <li>• Event-specific training blocks</li>
               <li>• Copy / adapt for new seasons</li>
@@ -270,18 +271,18 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
             <div className="mt-3">
               <Link
                 href="#"
-                className="inline-flex items-center rounded-full bg-brand px-3 py-1.5 text-[11px] font-medium text-slate-950 hover:bg-brand-soft"
+                className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
               >
                 Open workouts library
               </Link>
             </div>
           </section>
 
-          <section className="rounded-xl border border-subtle bg-surface p-5">
-            <p className="text-xs font-semibold text-slate-100">
+          <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
+            <p className="text-xs font-semibold text-[var(--foreground)]">
               Weather &amp; heat policies (roadmap)
             </p>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
               Future: snapshot WBGT readings, heat policy recommendations, and
               practice adjustments for each session, using{" "}
               <code className="font-mono text-[10px]">
@@ -296,6 +297,7 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
           </section>
         </aside>
       </section>
+      </div>
     </div>
   );
 }

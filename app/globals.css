@@ -51,6 +51,21 @@
   --border-subtle: var(--border);
 
   --muted-foreground: var(--text-muted);
+
+  /* =========================
+     Surface System (v1)
+     Semantic roles for universal app surfaces
+     ========================= */
+  --canvas-bg: var(--app-bg);
+  --panel-bg: var(--surface-2);
+  --panel-muted-bg: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  --panel-ring: var(--border);
+
+  /* Optional “architectural glass” capability (disabled by default) */
+  --panel-backdrop: none;
+  --panel-backdrop-glass: blur(10px);
+  --panel-glass-bg: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  --panel-muted-glass-bg: color-mix(in srgb, var(--surface-2) 58%, transparent);
 }
 
 @theme inline {
@@ -81,6 +96,18 @@
     --surface: var(--surface-3);
     --border-subtle: var(--border);
     --muted-foreground: var(--text-muted);
+
+    /* Surface System (v1) — light mode */
+    --canvas-bg: var(--app-bg);
+    --panel-bg: var(--surface-2);
+    --panel-muted-bg: color-mix(in srgb, var(--surface-2) 65%, transparent);
+    --panel-ring: var(--border);
+
+    /* Keep glass optional in light mode */
+    --panel-backdrop: none;
+    --panel-backdrop-glass: blur(10px);
+    --panel-glass-bg: color-mix(in srgb, var(--surface-2) 82%, transparent);
+    --panel-muted-glass-bg: color-mix(in srgb, var(--surface-2) 70%, transparent);
   }
 }
 
@@ -144,6 +171,44 @@
   }
   .text-link {
     color: var(--link);
+  }
+
+  /* Surface System utilities */
+  .bg-canvas {
+    background-color: var(--canvas-bg);
+  }
+  .bg-panel {
+    background-color: var(--panel-bg);
+  }
+  .bg-panel-muted {
+    background-color: var(--panel-muted-bg);
+  }
+  .ring-panel {
+    --tw-ring-color: var(--panel-ring);
+  }
+
+  /* Composite surface classes (use these for consistency) */
+  .panel {
+    background-color: var(--panel-bg);
+    --tw-ring-color: var(--panel-ring);
+  }
+  .panel-muted {
+    background-color: var(--panel-muted-bg);
+    --tw-ring-color: var(--panel-ring);
+  }
+
+  /* Optional “architectural glass” (opt-in per surface) */
+  .panel-glass {
+    background-color: var(--panel-glass-bg);
+    backdrop-filter: var(--panel-backdrop-glass);
+    -webkit-backdrop-filter: var(--panel-backdrop-glass);
+    --tw-ring-color: var(--panel-ring);
+  }
+  .panel-muted-glass {
+    background-color: var(--panel-muted-glass-bg);
+    backdrop-filter: var(--panel-backdrop-glass);
+    -webkit-backdrop-filter: var(--panel-backdrop-glass);
+    --tw-ring-color: var(--panel-ring);
   }
 }
 

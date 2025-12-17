@@ -78,15 +78,21 @@ export default function TeamManagementShell({
   const tabs: TeamContextTab[] = [
     { key: "active-roster", label: "Active Roster", href: `${teamBasePath}/active-roster` },
     { key: "roster-planning", label: "Roster Planning", href: `${teamBasePath}/roster-planning` },
-    { key: "seasons", label: "Seasons", href: `${teamBasePath}/seasons` },
+    { key: "seasons", label: "Scenarios", href: `${teamBasePath}/scenarios` },
   ];
+
+  const seasonLabel =
+    activeSeason?.season_label ??
+    // @ts-expect-error fallback if academic_year exists but not typed
+    activeSeason?.academic_year ??
+    "—";
 
   return (
     <main
       className={
         needsSeasonSetup
           ? "mx-auto max-w-4xl px-4 py-6"
-          : "mx-auto max-w-6xl px-4 py-6 md:h-[calc(100vh-220px)] md:min-h-0 md:overflow-hidden md:flex md:flex-col"
+          : "mx-auto max-w-6xl px-4 pt-2 pb-6 md:h-[calc(100vh-220px)] md:min-h-0 md:overflow-hidden md:flex md:flex-col"
       }
     >
       {needsSeasonSetup ? (
@@ -122,6 +128,16 @@ export default function TeamManagementShell({
         </div>
       ) : (
         <>
+          {/* Team / Season context */}
+          <div className="mb-2 hidden items-center gap-2 md:flex">
+            <span className="rounded-full bg-slate-900/60 px-3 py-1 text-[11px] font-semibold text-slate-200 ring-1 ring-[var(--nav-border)] backdrop-blur-sm">
+              Team: <span className="text-slate-50">{teamName}</span>
+            </span>
+            <span className="rounded-full bg-slate-900/60 px-3 py-1 text-[11px] font-semibold text-slate-200 ring-1 ring-[var(--nav-border)] backdrop-blur-sm">
+              Season: <span className="text-slate-50">{seasonLabel}</span>
+            </span>
+          </div>
+
           {/* Team mode switcher (tabbed) */}
           <div className="mb-4">
             <div

@@ -13,11 +13,11 @@ ADD COLUMN IF NOT EXISTS program_id uuid;
 -- Backfill program_id using the most authoritative available source:
 -- (A) practice_plan_id -> practice_plans.program_id
 -- (B) else team_season_id -> team_seasons.program_id
+
+-- (A) From practice_plan_id
 UPDATE public.athlete_training_sessions ats
-SET program_id = COALESCE(pp.program_id, ts.program_id)
+SET program_id = pp.program_id
 FROM public.practice_plans pp
-LEFT JOIN public.team_seasons ts
-  ON ts.id = ats.team_season_id
 WHERE ats.practice_plan_id = pp.id
   AND ats.program_id IS NULL;
 

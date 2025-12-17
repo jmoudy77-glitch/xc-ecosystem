@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies, headers } from "next/headers";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -13,6 +14,15 @@ type PageProps = {
 };
 
 const MANAGER_ROLES = ["head_coach", "director", "admin"] as const;
+
+type TrainingSessionPreview = {
+  id: string;
+  scheduled_date: string | null;
+  completed_at: string | null;
+  workout_category: string;
+  title: string | null;
+  athlete_id: string;
+};
 
 export default async function ProgramTrainingPage({ params }: PageProps) {
   const { programId } = await params;
@@ -122,14 +132,42 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
     MANAGER_ROLES.includes(actingRole.toLowerCase() as any);
 
   //
-  // 4) (Future) Load training summary data
+  // 4) Load training sessions preview via canonical API (no direct DB query)
   //
-  // In the zip this page was mostly layout. For now, we keep it as a
-  // structured hub that we can later wire into:
-  //   - practice_plans / practice_groups
-  //   - workouts / workout_steps
-  //   - athlete_training_sessions
-  //
+  let sessions: TrainingSessionPreview[] = [];
+  let sessionsError: string | null = null;
+
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? "http";
+
+    if (!host) {
+      throw new Error("Missing host header");
+    }
+
+    const baseUrl = `${proto}://${host}`;
+    const cookieHeader = (await cookies()).toString();
+
+    const res = await fetch(
+      `${baseUrl}/api/programs/${programId}/training/sessions`,
+      {
+        cache: "no-store",
+        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${text}`);
+    }
+
+    const json = (await res.json()) as { sessions?: TrainingSessionPreview[] };
+    sessions = (json.sessions ?? []) as TrainingSessionPreview[];
+  } catch (err: any) {
+    sessionsError = err?.message ?? "Failed to load sessions preview";
+    console.error("[ProgramTraining] sessions preview error:", err);
+  }
 
   return (
     <div className="bg-canvas">
@@ -248,6 +286,49 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
               <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
                 Availability &amp; injury flags
               </span>
+              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
+                Showing {sessions.length} recent sessions
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {sessionsError ? (
+                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
+                  Failed to load sessions preview. {sessionsError}
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
+                  No training sessions yet.
+                </div>
+              ) : (
+                sessions.map((s) => {
+                  const athleteLabel = s.athlete_id
+                    ? `Athlete ${s.athlete_id.slice(0, 8)}`
+                    : "Athlete";
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 rounded-lg ring-1 ring-panel panel-muted p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-semibold text-[var(--foreground)]">
+                          {s.title ?? athleteLabel}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                          {s.workout_category}
+                          {s.scheduled_date ? ` • ${s.scheduled_date}` : ""}
+                          {s.completed_at ? " • completed" : ""}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-[11px] text-[var(--muted-foreground)]">
+                        <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
+                          {athleteLabel || "Athlete"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

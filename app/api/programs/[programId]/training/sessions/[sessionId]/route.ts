@@ -4,13 +4,24 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 const coachUpdateSessionSchema = z.object({
+  // Shared
   title: z.string().min(1).max(255).optional(),
   scheduledDate: z.string().min(1).optional(), // ISO date string (YYYY-MM-DD)
+
+  // Planned
   plannedRpe: z.number().int().min(1).max(10).optional(),
   plannedDistanceM: z.number().int().nonnegative().optional(),
   plannedDurationSec: z.number().int().nonnegative().optional(),
   plannedDescription: z.string().max(4000).optional(),
   coachNotes: z.string().max(4000).optional(),
+
+  // Actuals (coach can edit)
+  completedAt: z.string().min(1).optional(), // ISO datetime string
+  actualRpe: z.number().int().min(1).max(10).optional(),
+  actualDistanceM: z.number().int().nonnegative().optional(),
+  actualDurationSec: z.number().int().nonnegative().optional(),
+  actualDescription: z.string().max(4000).optional(),
+  metricsJson: z.record(z.string(), z.any()).optional(),
 });
 
 async function getProgramMemberOrError(req: NextRequest, programId: string) {
@@ -67,11 +78,19 @@ export async function PATCH(req: NextRequest, context: any) {
   const {
     title,
     scheduledDate,
+
     plannedRpe,
     plannedDistanceM,
     plannedDurationSec,
     plannedDescription,
     coachNotes,
+
+    completedAt,
+    actualRpe,
+    actualDistanceM,
+    actualDurationSec,
+    actualDescription,
+    metricsJson,
   } = parsed.data;
 
   const updatePayload: Record<string, any> = {};
@@ -98,6 +117,25 @@ export async function PATCH(req: NextRequest, context: any) {
     updatePayload.coach_notes = coachNotes;
   }
 
+  if (typeof completedAt === "string") {
+    updatePayload.completed_at = completedAt;
+  }
+  if (typeof actualRpe === "number") {
+    updatePayload.actual_rpe = actualRpe;
+  }
+  if (typeof actualDistanceM === "number") {
+    updatePayload.actual_distance_m = actualDistanceM;
+  }
+  if (typeof actualDurationSec === "number") {
+    updatePayload.actual_duration_sec = actualDurationSec;
+  }
+  if (typeof actualDescription === "string") {
+    updatePayload.actual_description = actualDescription;
+  }
+  if (metricsJson && typeof metricsJson === "object") {
+    updatePayload.metrics_json = metricsJson;
+  }
+
   // Always bump updated_at when a coach modifies a session
   if (Object.keys(updatePayload).length > 0) {
     updatePayload.updated_at = new Date().toISOString();
@@ -110,17 +148,12 @@ export async function PATCH(req: NextRequest, context: any) {
     );
   }
 
-  // Ensure this session belongs to the given program via team_seasons
+  // Ensure this session belongs to the given program (direct scope)
   const { data: session, error: sessionError } = await supabase
     .from("athlete_training_sessions")
-    .select(
-      `
-      id,
-      team_seasons!inner ( program_id )
-    `
-    )
+    .select("id, program_id")
     .eq("id", sessionId)
-    .eq("team_seasons.program_id", programId)
+    .eq("program_id", programId)
     .maybeSingle();
 
   if (sessionError) {

@@ -1,3 +1,4 @@
+/* /Users/joshmoudy/Library/CloudStorage/GoogleDrive-jmoudy77@gmail.com/My Drive/Ecosystem_Live/xc-ecosystem/app/globals.css */
 @import "tailwindcss";
 
 :root {
@@ -210,7 +211,70 @@
     -webkit-backdrop-filter: var(--panel-backdrop-glass);
     --tw-ring-color: var(--panel-ring);
   }
+  
+  /* ========== Badges / Chips (theme-cohesive) ========== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+
+  padding: 0.16rem 0.55rem;
+  border-radius: 9999px;
+
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+
+  /* force readable text (this fixes the “blank pill” issue in dark themes) */
+  color: color-mix(in oklab, var(--foreground) 92%, white) !important;
+
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
+
+.badge--brand,
+.badge-brand {
+  border-color: color-mix(in oklab, var(--brand, var(--primary)) 55%, var(--border));
+  background: color-mix(in oklab, var(--brand, var(--primary)) 22%, var(--surface));
+}
+
+.badge--secondary,
+.badge-secondary {
+  border-color: color-mix(in oklab, var(--secondary, var(--muted)) 60%, var(--border));
+  background: color-mix(in oklab, var(--secondary, var(--muted)) 18%, var(--surface));
+}
+
+.badge--danger,
+.badge-danger {
+  border-color: color-mix(in oklab, var(--danger, #ef4444) 60%, var(--border));
+  background: color-mix(in oklab, var(--danger, #ef4444) 18%, var(--surface));
+}
+
+/* Chip style for params */
+.badge--chip,
+.badge-chip {
+  font-weight: 500;
+  padding: 0.14rem 0.5rem;
+
+  /* make chips feel “inset” instead of empty outlines */
+  background: color-mix(in oklab, var(--foreground) 6%, var(--surface));
+  border-color: color-mix(in oklab, var(--foreground) 18%, var(--border));
+}
+
+/* Optional: tiny hover polish (helps buttons/labels feel intentional) */
+.badge--chip:hover,
+.badge-chip:hover {
+  background: color-mix(in oklab, var(--foreground) 9%, var(--surface));
+  border-color: color-mix(in oklab, var(--foreground) 24%, var(--border));
+}
+}
+
+
 
 .coach-panel-slide-out {
   animation: coach-panel-slide-out 0.38s ease-in forwards;

@@ -24,6 +24,15 @@ type TrainingSessionPreview = {
   athlete_id: string;
 };
 
+type TrainingExercisePreview = {
+  id: string;
+  program_id: string | null;
+  label: string;
+  workout_category: string;
+  measurement_unit: string;
+  is_active: boolean;
+};
+
 export default async function ProgramTrainingPage({ params }: PageProps) {
   const { programId } = await params;
 
@@ -132,10 +141,10 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
     MANAGER_ROLES.includes(actingRole.toLowerCase() as any);
 
   //
-  // 4) Load training sessions preview via canonical API (no direct DB query)
+  // 4) Resolve base URL + cookie header once for internal API calls
   //
-  let sessions: TrainingSessionPreview[] = [];
-  let sessionsError: string | null = null;
+  let baseUrl: string | null = null;
+  let cookieHeader: string = "";
 
   try {
     const h = await headers();
@@ -146,8 +155,23 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
       throw new Error("Missing host header");
     }
 
-    const baseUrl = `${proto}://${host}`;
-    const cookieHeader = (await cookies()).toString();
+    baseUrl = `${proto}://${host}`;
+    cookieHeader = (await cookies()).toString();
+  } catch (err) {
+    // baseUrl stays null; each fetch block will surface a friendly error
+    console.error("[ProgramTraining] baseUrl/cookies init error:", err);
+  }
+
+  //
+  // 4) Load training sessions preview via canonical API (no direct DB query)
+  //
+  let sessions: TrainingSessionPreview[] = [];
+  let sessionsError: string | null = null;
+
+  try {
+    if (!baseUrl) {
+      throw new Error("Missing base URL for internal API calls");
+    }
 
     const res = await fetch(
       `${baseUrl}/api/programs/${programId}/training/sessions`,
@@ -167,6 +191,37 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   } catch (err: any) {
     sessionsError = err?.message ?? "Failed to load sessions preview";
     console.error("[ProgramTraining] sessions preview error:", err);
+  }
+
+  //
+  // 5) Load exercise library preview via canonical API
+  //
+  let exercises: TrainingExercisePreview[] = [];
+  let exercisesError: string | null = null;
+
+  try {
+    if (!baseUrl) {
+      throw new Error("Missing base URL for internal API calls");
+    }
+
+    const res = await fetch(
+      `${baseUrl}/api/programs/${programId}/training/exercises?scope=all&active=true&limit=8`,
+      {
+        cache: "no-store",
+        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${text}`);
+    }
+
+    const json = (await res.json()) as { exercises?: TrainingExercisePreview[] };
+    exercises = (json.exercises ?? []) as TrainingExercisePreview[];
+  } catch (err: any) {
+    exercisesError = err?.message ?? "Failed to load exercise library";
+    console.error("[ProgramTraining] exercises preview error:", err);
   }
 
   return (
@@ -335,6 +390,89 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
 
         {/* Right column: workouts/templates */}
         <aside className="space-y-4">
+          <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-[var(--foreground)]">
+                  Exercise library
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                  Foundational catalog (system + program) that workouts and practice plans are built from.
+                </p>
+              </div>
+              <div className="shrink-0">
+                <Link
+                  href={`/programs/${programId}/training/exercises`}
+                  className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
+                >
+                  Manage
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg ring-1 ring-panel panel-muted p-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-[var(--foreground)]">Workout library</p>
+                <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                  Build quantified workouts from your exercise catalog.
+                </p>
+              </div>
+              <div className="shrink-0">
+                <Link
+                  href={`/programs/${programId}/training/workouts`}
+                  className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
+                >
+                  Manage
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {exercisesError ? (
+                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
+                  Failed to load exercises. {exercisesError}
+                </div>
+              ) : exercises.length === 0 ? (
+                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
+                  No exercises yet. Add your first program exercise or seed your catalog.
+                </div>
+              ) : (
+                exercises.map((ex) => {
+                  const scopeLabel = ex.program_id ? "program" : "system";
+                  return (
+                    <div
+                      key={ex.id}
+                      className="flex items-center justify-between gap-3 rounded-lg ring-1 ring-panel panel-muted p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-semibold text-[var(--foreground)]">
+                          {ex.label}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                          {ex.workout_category} • {ex.measurement_unit}
+                        </p>
+                      </div>
+                      <div className="shrink-0">
+                        <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5 text-[11px] text-[var(--muted-foreground)]">
+                          {scopeLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="mt-3">
+              <Link
+                href={`/programs/${programId}/training/exercises`}
+                className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
+              >
+                Open exercise library
+              </Link>
+            </div>
+          </section>
+
           <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
             <p className="text-xs font-semibold text-[var(--foreground)]">
               Workouts &amp; templates

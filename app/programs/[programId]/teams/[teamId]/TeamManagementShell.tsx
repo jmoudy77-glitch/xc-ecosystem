@@ -71,6 +71,7 @@ export default function TeamManagementShell({
   const pathname = usePathname();
   const router = useRouter();
   const teamBasePath = `/programs/${programId}/teams/${teamId}`;
+  const isPracticePlanner = !!pathname && pathname.includes("/practice");
   const activeContext = deriveTeamContext(pathname);
   const toolsContext = deriveTeamToolsContext(pathname);
   const scenarioId = deriveScenarioId(pathname);
@@ -128,51 +129,61 @@ export default function TeamManagementShell({
         </div>
       ) : (
         <>
-          {/* Team / Season context */}
-          <div className="mb-2 hidden items-center gap-2 md:flex">
-            <span className="rounded-full bg-slate-900/60 px-3 py-1 text-[11px] font-semibold text-slate-200 ring-1 ring-[var(--nav-border)] backdrop-blur-sm">
-              Team: <span className="text-slate-50">{teamName}</span>
-            </span>
-            <span className="rounded-full bg-slate-900/60 px-3 py-1 text-[11px] font-semibold text-slate-200 ring-1 ring-[var(--nav-border)] backdrop-blur-sm">
-              Season: <span className="text-slate-50">{seasonLabel}</span>
-            </span>
-          </div>
+          {!isPracticePlanner ? (
+            <>
+              {/* Team / Season context */}
+              <div className="mb-2 hidden items-center gap-2 md:flex">
+                <span className="rounded-full bg-slate-900/60 px-3 py-1 text-[11px] font-semibold text-slate-200 ring-1 ring-[var(--nav-border)] backdrop-blur-sm">
+                  Team: <span className="text-slate-50">{teamName}</span>
+                </span>
+                <span className="rounded-full bg-slate-900/60 px-3 py-1 text-[11px] font-semibold text-slate-200 ring-1 ring-[var(--nav-border)] backdrop-blur-sm">
+                  Season: <span className="text-slate-50">{seasonLabel}</span>
+                </span>
+              </div>
 
-          {/* Team mode switcher (tabbed) */}
-          <div className="mb-4">
-            <div
-              role="tablist"
-              aria-label="Team modes"
-              className="inline-flex rounded-2xl bg-slate-950/60 p-1 ring-1 ring-slate-800 backdrop-blur-sm"
-            >
-              {tabs.map((t) => {
-                const isActive = activeContext === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-controls={`team-surface-${t.key}`}
-                    onClick={() => {
-                      if (!isActive) router.replace(t.href);
-                    }}
-                    className={
-                      "select-none rounded-xl px-4 py-2 text-[12px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-sky-500/40 " +
-                      (isActive
-                        ? "bg-slate-200 text-slate-950 shadow-sm"
-                        : "text-slate-200 hover:bg-slate-900/60 hover:text-slate-100")
-                    }
-                  >
-                    {t.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+              {/* Team mode switcher (tabbed) */}
+              <div className="mb-4">
+                <div
+                  role="tablist"
+                  aria-label="Team modes"
+                  className="inline-flex rounded-2xl bg-slate-950/60 p-1 ring-1 ring-slate-800 backdrop-blur-sm"
+                >
+                  {tabs.map((t) => {
+                    const isActive = activeContext === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        aria-controls={`team-surface-${t.key}`}
+                        onClick={() => {
+                          if (!isActive) router.replace(t.href);
+                        }}
+                        className={
+                          "select-none rounded-xl px-4 py-2 text-[12px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-sky-500/40 " +
+                          (isActive
+                            ? "bg-slate-200 text-slate-950 shadow-sm"
+                            : "text-slate-200 hover:bg-slate-900/60 hover:text-slate-100")
+                        }
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : null}
 
           {/* Two-column shell */}
-          <div className="md:flex-1 md:min-h-0 md:overflow-hidden md:grid md:grid-cols-[minmax(0,2.2fr)_minmax(260px,0.9fr)] md:gap-6">
+          <div
+            className={
+              isPracticePlanner
+                ? "md:flex-1 md:min-h-0 md:overflow-hidden"
+                : "md:flex-1 md:min-h-0 md:overflow-hidden md:grid md:grid-cols-[minmax(0,2.2fr)_minmax(260px,0.9fr)] md:gap-6"
+            }
+          >
             {/* Left column: main team content */}
             <div
               id={`team-surface-${activeContext}`}
@@ -200,16 +211,18 @@ export default function TeamManagementShell({
               )}
             </div>
 
-            <aside className="mt-6 md:mt-0 md:h-full md:min-h-0 md:overflow-hidden md:pl-1">
-              <TeamToolsPanel
-                programId={programId}
-                teamId={teamId}
-                isManager={isManager}
-                activeContext={toolsContext as any}
-                teamBasePath={teamBasePath}
-                scenarioId={scenarioId}
-              />
-            </aside>
+            {!isPracticePlanner ? (
+              <aside className="mt-6 md:mt-0 md:h-full md:min-h-0 md:overflow-hidden md:pl-1">
+                <TeamToolsPanel
+                  programId={programId}
+                  teamId={teamId}
+                  isManager={isManager}
+                  activeContext={toolsContext as any}
+                  teamBasePath={teamBasePath}
+                  scenarioId={scenarioId}
+                />
+              </aside>
+            ) : null}
           </div>
         </>
       )}

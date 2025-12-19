@@ -8,10 +8,10 @@
      ========================= */
 
   /* Core neutrals */
-  --app-bg: #020617;
-  --surface-1: #0b1220;
-  --surface-2: #0f172a;
-  --surface-3: #020617;
+  --app-bg: #050607;
+  --surface-1: #0b0c0e;
+  --surface-2: #111827;
+  --surface-3: #07080a;
   --border: #1f2937;
   --border-muted: #111827;
   --text: #e5e7eb;
@@ -58,15 +58,65 @@
      Semantic roles for universal app surfaces
      ========================= */
   --canvas-bg: var(--app-bg);
-  --panel-bg: var(--surface-2);
-  --panel-muted-bg: color-mix(in srgb, var(--surface-2) 55%, transparent);
-  --panel-ring: var(--border);
 
-  /* Optional “architectural glass” capability (disabled by default) */
+  /* Stronger separation: panels are a brighter surface than the canvas */
+  --panel-bg: var(--surface-2);
+  --panel-muted-bg: color-mix(in srgb, var(--surface-2) 70%, var(--surface-1) 30%);
+
+  /* Slightly stronger ring so edges read against similar surfaces */
+  --panel-ring: color-mix(in srgb, var(--border) 65%, var(--text) 35%);
+
+  /* Elevation (z-axis) — increase depth slightly */
+  --shadow-elev-1: 0 1px 0 rgba(255,255,255,0.05), 0 12px 30px rgba(0,0,0,0.46);
+  --shadow-elev-2: 0 1px 0 rgba(255,255,255,0.07), 0 18px 56px rgba(0,0,0,0.56);
+
+  /* Liquid glass (default surface style)
+     IMPORTANT: use explicit RGBA tints so glass doesn’t wash out over light overlays/backdrops. */
   --panel-backdrop: none;
-  --panel-backdrop-glass: blur(10px);
-  --panel-glass-bg: color-mix(in srgb, var(--surface-2) 72%, transparent);
-  --panel-muted-glass-bg: color-mix(in srgb, var(--surface-2) 58%, transparent);
+  --panel-backdrop-glass: blur(14px) saturate(140%);
+
+  /* Dark mode glass — neutral (no brand tint) */
+  --panel-glass-bg: rgba(7, 8, 10, 0.78);
+  --panel-muted-glass-bg: rgba(7, 8, 10, 0.64);
+}
+
+/* Explicit light theme (no auto-switching) */
+:root[data-theme="light"] {
+  --app-bg: #ffffff;
+  --surface-1: #f8fafc;
+  --surface-2: #ffffff;
+  --surface-3: #f1f5f9;
+  --border: #e5e7eb;
+  --border-muted: #f1f5f9;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+
+  --background: var(--app-bg);
+  --foreground: var(--text);
+
+  --brand-primary: var(--brand);
+  --brand-secondary: var(--surface-2);
+  --surface: var(--surface-3);
+  --border-subtle: var(--border);
+  --muted-foreground: var(--text-muted);
+
+  --canvas-bg: var(--app-bg);
+
+  --panel-bg: var(--surface-3);
+  --panel-muted-bg: var(--surface-1);
+
+  --panel-ring: color-mix(in srgb, var(--border) 75%, var(--text) 25%);
+
+  --shadow-elev-1: 0 1px 0 rgba(15,23,42,0.06), 0 12px 30px rgba(15,23,42,0.14);
+  --shadow-elev-2: 0 1px 0 rgba(15,23,42,0.08), 0 18px 56px rgba(15,23,42,0.18);
+
+  --panel-backdrop: none;
+  --panel-backdrop-glass: blur(14px) saturate(140%);
+
+  /* Light mode glass — neutral (no brand tint) */
+  --panel-glass-bg: rgba(255, 255, 255, 0.82);
+  --panel-muted-glass-bg: rgba(241, 245, 249, 0.76);
 }
 
 @theme inline {
@@ -74,42 +124,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --app-bg: #ffffff;
-    --surface-1: #f8fafc;
-    --surface-2: #ffffff;
-    --surface-3: #f1f5f9;
-    --border: #e5e7eb;
-    --border-muted: #f1f5f9;
-    --text: #0f172a;
-    --text-muted: #475569;
-    --text-subtle: #64748b;
-
-    /* Keep brand/semantics the same in light mode; contrasts remain readable */
-    --background: var(--app-bg);
-    --foreground: var(--text);
-
-    --brand-primary: var(--brand);
-    --brand-secondary: var(--surface-2);
-    --surface: var(--surface-3);
-    --border-subtle: var(--border);
-    --muted-foreground: var(--text-muted);
-
-    /* Surface System (v1) — light mode */
-    --canvas-bg: var(--app-bg);
-    --panel-bg: var(--surface-2);
-    --panel-muted-bg: color-mix(in srgb, var(--surface-2) 65%, transparent);
-    --panel-ring: var(--border);
-
-    /* Keep glass optional in light mode */
-    --panel-backdrop: none;
-    --panel-backdrop-glass: blur(10px);
-    --panel-glass-bg: color-mix(in srgb, var(--surface-2) 82%, transparent);
-    --panel-muted-glass-bg: color-mix(in srgb, var(--surface-2) 70%, transparent);
-  }
 }
 
 @keyframes coach-panel-slide-in {
@@ -188,12 +202,40 @@
     --tw-ring-color: var(--panel-ring);
   }
 
+  .shadow-elev-1 {
+    box-shadow: var(--shadow-elev-1);
+  }
+
+  .shadow-elev-2 {
+    box-shadow: var(--shadow-elev-2);
+  }
+
   /* Composite surface classes (use these for consistency) */
+  /* Default panel = liquid glass */
   .panel {
-    background-color: var(--panel-bg);
+    background-color: var(--panel-glass-bg);
+    backdrop-filter: var(--panel-backdrop-glass);
+    -webkit-backdrop-filter: var(--panel-backdrop-glass);
+    --tw-ring-color: var(--panel-ring);
+    box-shadow: var(--shadow-elev-1);
+  }
+
+  /* Muted panel = inset glass */
+  .panel-muted {
+    background-color: var(--panel-muted-glass-bg);
+    backdrop-filter: var(--panel-backdrop-glass);
+    -webkit-backdrop-filter: var(--panel-backdrop-glass);
     --tw-ring-color: var(--panel-ring);
   }
-  .panel-muted {
+
+  /* Solid surface escape hatches (use sparingly) */
+  .panel-solid {
+    background-color: var(--panel-bg);
+    --tw-ring-color: var(--panel-ring);
+    box-shadow: var(--shadow-elev-1);
+  }
+
+  .panel-muted-solid {
     background-color: var(--panel-muted-bg);
     --tw-ring-color: var(--panel-ring);
   }
@@ -211,6 +253,55 @@
     -webkit-backdrop-filter: var(--panel-backdrop-glass);
     --tw-ring-color: var(--panel-ring);
   }
+
+  /* --- Glass scrollbars (scoped via class) --- */
+.glass-scrollbar {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.06);
+}
+
+/* Chromium / Safari */
+.glass-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.glass-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.glass-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.12)
+  );
+  border-radius: 999px;
+
+  /* “liquid” edge */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 10px 30px rgba(0, 0, 0, 0.35);
+
+  /* keeps thumb from feeling chunky */
+  border: 2px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;
+}
+
+.glass-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.28),
+    rgba(255, 255, 255, 0.16)
+  );
+}
+
+.glass-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
   
   /* ========== Badges / Chips (theme-cohesive) ========== */
 

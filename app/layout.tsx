@@ -35,12 +35,14 @@ export default async function RootLayout({
   const t = theme as any;
 
   // Theme-driven token set (with safe fallbacks)
-  const appBg = t.appBg ?? t.background ?? "#0b0f14";
-  const surface1 = t.surface1 ?? "#111827";
-  const surface2 = t.surface2 ?? t.brandSecondary ?? "#0f172a";
-  const surface3 = t.surface3 ?? appBg;
+  // Base neutrals (L0/L1): stable, professional, and NOT brand-tinted by default.
+  // Program theming should primarily drive L3 (brand/actions), not the canvas/surface ramp.
+  const appBg = t.appBg ?? "#050607";
+  const surface1 = t.surface1 ?? "#0b0c0e";
+  const surface2 = t.surface2 ?? "#111827";
+  const surface3 = t.surface3 ?? "#07080a";
 
-  // Keep canvas matching the surrounding app background by default
+  // Canvas is the stable space behind surfaces.
   const canvasBg = t.canvasBg ?? appBg;
 
   const border = t.border ?? t.borderSubtle ?? "#1f2937";
@@ -69,8 +71,9 @@ export default async function RootLayout({
   const info = t.info ?? focusRing;
   const infoContrast = t.infoContrast ?? "#082f49";
 
+  // Panels: default to the neutral surface ramp unless explicitly overridden.
   const panelBg = t.panelBg ?? surface2;
-  const panelMutedBg = t.panelMutedBg ?? panelBg;
+  const panelMutedBg = t.panelMutedBg ?? surface1;
   const panelRing = t.panelRing ?? border;
 
   return (

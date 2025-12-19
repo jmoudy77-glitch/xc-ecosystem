@@ -272,32 +272,34 @@ export default function PracticePageClient({
 
   // ------- Render -------
 
-  return (
-    <div className="flex h-full gap-4">
+return (
+    <div className="relative flex h-full gap-4 rounded-xl ring-1 ring-panel bg-panel-muted/15 p-4 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
       {/* Left pane: practices list / calendar */}
-      <section className="w-1/3 border-r border-slate-800 pr-4 flex flex-col">
+      <section className="relative w-1/3 flex flex-col rounded-xl bg-panel/70 p-4 ring-1 ring-white/10 shadow-[0_18px_60px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
         <header className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-200">Practice Schedule</h2>
-            <p className="text-xs text-slate-400">
-              Team season: <span className="font-mono">{teamSeasonId}</span>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Practice schedule</h2>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Weekly list for the current team season.
             </p>
           </div>
           <div className="flex items-center gap-1 text-xs">
             <button
-              className="rounded border border-slate-700 px-2 py-1"
+              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
               onClick={() => handleChangeWeek(-7)}
             >
               ◀ Prev
             </button>
             <button
-              className="rounded border border-slate-700 px-2 py-1"
+              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
               onClick={() => setDateRange(getInitialDateRange())}
             >
               Today
             </button>
             <button
-              className="rounded border border-slate-700 px-2 py-1"
+              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
               onClick={() => handleChangeWeek(7)}
             >
               Next ▶
@@ -305,20 +307,20 @@ export default function PracticePageClient({
           </div>
         </header>
 
-        <div className="mb-2 text-xs text-slate-400">
+        <div className="mb-2 text-xs text-[var(--muted-foreground)]">
           Range: {dateRange.from} → {dateRange.to}
         </div>
 
         {isLoadingPractices && (
-          <div className="text-xs text-slate-400">Loading practices…</div>
+          <div className="text-xs text-[var(--muted-foreground)]">Loading practices…</div>
         )}
         {practicesError && (
-          <div className="text-xs text-red-400">Error: {practicesError}</div>
+          <div className="rounded-md border border-dashed border-rose-500/30 bg-rose-500/10 p-2 text-xs text-rose-200 ring-1 ring-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">Error: {practicesError}</div>
         )}
 
-        <div className="mt-2 flex-1 overflow-y-auto space-y-1 text-sm">
+        <div className="mt-3 flex-1 overflow-y-auto space-y-2">
           {practices.length === 0 && !isLoadingPractices ? (
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-[var(--muted-foreground)]">
               No practices in this range. Use the controls above to change dates or create a
               new practice (hook this up later).
             </div>
@@ -330,15 +332,15 @@ export default function PracticePageClient({
                   key={p.id}
                   onClick={() => handleSelectPractice(p.id)}
                   className={[
-                    "w-full rounded px-2 py-1 text-left text-xs",
+                    "w-full rounded-xl px-3 py-2 text-left ring-1 ring-white/10 bg-panel-muted/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/40",
                     isSelected
-                      ? "bg-sky-800/60 border border-sky-500 text-sky-50"
-                      : "bg-slate-900/40 border border-slate-800 text-slate-200 hover:bg-slate-800/60",
+                      ? "ring-[var(--brand)]/55 bg-[var(--brand)]/12"
+                      : "",
                   ].join(" ")}
                 >
                   <div className="flex justify-between">
                     <span className="font-medium">{p.label}</span>
-                    <span className="font-mono text-[10px] text-slate-400">
+                    <span className="text-[10px] text-[var(--muted-foreground)]">
                       {p.practice_date}
                     </span>
                   </div>
@@ -350,19 +352,20 @@ export default function PracticePageClient({
       </section>
 
       {/* Right pane: practice detail */}
-      <section className="flex-1 flex flex-col">
+      <section className="relative flex-1 flex flex-col rounded-xl bg-panel/70 p-4 ring-1 ring-white/10 shadow-[0_18px_60px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
         {!selectedPracticeId ? (
-          <div className="flex h-full items-center justify-center text-sm text-slate-500">
+          <div className="flex h-full items-center justify-center text-sm text-[var(--muted-foreground)]">
             Select a practice on the left to view details.
           </div>
         ) : (
           <>
             <header className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-200">
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">
                   {practiceDetail?.label ?? selectedPractice?.label ?? "Practice"}
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[var(--muted-foreground)]">
                   Date:{" "}
                   <span className="font-mono">
                     {practiceDetail?.practice_date ?? selectedPractice?.practice_date}
@@ -371,10 +374,10 @@ export default function PracticePageClient({
               </div>
               <div className="flex items-center gap-2 text-xs">
                 {generateMessage && (
-                  <span className="text-slate-400">{generateMessage}</span>
+                  <span className="text-[var(--muted-foreground)]">{generateMessage}</span>
                 )}
                 <button
-                  className="rounded border border-slate-700 px-2 py-1 disabled:opacity-50"
+                  className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 disabled:opacity-50"
                   onClick={handleGenerateSessions}
                   disabled={isGeneratingSessions}
                 >
@@ -384,21 +387,21 @@ export default function PracticePageClient({
             </header>
 
             {isLoadingDetail && (
-              <div className="text-xs text-slate-400">Loading practice details…</div>
+              <div className="text-xs text-[var(--muted-foreground)]">Loading practice details…</div>
             )}
             {detailError && (
-              <div className="text-xs text-red-400">Error: {detailError}</div>
+              <div className="text-xs text-rose-400">Error: {detailError}</div>
             )}
 
             {!isLoadingDetail && practiceDetail && (
               <div className="flex-1 overflow-y-auto">
                 {/* Groups section */}
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Groups
                   </h3>
                   <button
-                    className="rounded border border-slate-700 px-2 py-1 text-xs"
+                    className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
                     onClick={() => setShowAddGroupForm((prev) => !prev)}
                   >
                     {showAddGroupForm ? "Cancel" : "+ Add Group"}
@@ -408,29 +411,29 @@ export default function PracticePageClient({
                 {showAddGroupForm && (
                   <form
                     onSubmit={handleCreateGroupSubmit}
-                    className="mb-3 flex flex-col gap-2 rounded border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs"
+                    className="mb-3 flex flex-col gap-3 rounded-xl bg-panel-muted/30 px-4 py-3 ring-1 ring-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl"
                   >
                     {groupError && (
                       <div className="text-[11px] text-red-400">{groupError}</div>
                     )}
                     <div className="flex gap-2">
                       <div className="flex-1">
-                        <label className="mb-1 block text-[11px] text-slate-400">
+                        <label className="mb-1 block text-[11px] text-[var(--muted-foreground)]">
                           Group label
                         </label>
                         <input
-                          className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none"
+                          className="w-full rounded-lg ring-1 ring-panel bg-panel px-3 py-2 text-[11px] text-[var(--foreground)] outline-none"
                           value={newGroupLabel}
                           onChange={(e) => setNewGroupLabel(e.target.value)}
                           placeholder="e.g., Distance – Group A"
                         />
                       </div>
                       <div className="w-40">
-                        <label className="mb-1 block text-[11px] text-slate-400">
+                        <label className="mb-1 block text-[11px] text-[var(--muted-foreground)]">
                           Event group
                         </label>
                         <input
-                          className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none"
+                          className="w-full rounded-lg ring-1 ring-panel bg-panel px-3 py-2 text-[11px] text-[var(--foreground)] outline-none"
                           value={newGroupEventGroup}
                           onChange={(e) => setNewGroupEventGroup(e.target.value)}
                           placeholder="e.g., distance"
@@ -440,7 +443,7 @@ export default function PracticePageClient({
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        className="rounded border border-slate-700 px-2 py-1 text-[11px]"
+                        className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
                         onClick={() => {
                           setShowAddGroupForm(false);
                           setNewGroupLabel("");
@@ -452,7 +455,7 @@ export default function PracticePageClient({
                       </button>
                       <button
                         type="submit"
-                        className="rounded border border-sky-500 px-2 py-1 text-[11px] text-sky-100 disabled:opacity-50"
+                        className="rounded-lg px-3 py-2 text-[11px] font-semibold text-[var(--foreground)] bg-[var(--brand)]/22 ring-1 ring-[var(--brand)]/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] hover:bg-[var(--brand)]/28 hover:ring-[var(--brand)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35 disabled:opacity-50"
                         disabled={isCreatingGroup}
                       >
                         {isCreatingGroup ? "Creating…" : "Create Group"}
@@ -462,7 +465,7 @@ export default function PracticePageClient({
                 )}
 
                 {practiceDetail.groups.length === 0 ? (
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-[var(--muted-foreground)]">
                     No groups yet. Use “+ Add Group” to create your first group for this practice.
                   </div>
                 ) : (
@@ -470,22 +473,22 @@ export default function PracticePageClient({
                     {practiceDetail.groups.map((g) => (
                       <div
                         key={g.id}
-                        className="rounded border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs"
+                        className="rounded-xl bg-panel-muted/30 px-4 py-3 ring-1 ring-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl"
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="font-medium text-slate-100">{g.label}</div>
-                            <div className="mt-0.5 flex gap-2 text-[11px] text-slate-400">
+                            <div className="font-medium text-[var(--foreground)]">{g.label}</div>
+                            <div className="mt-0.5 flex gap-2 text-[11px] text-[var(--muted-foreground)]">
                               {g.event_group && (
-                                <span className="rounded bg-slate-800 px-1.5 py-0.5">
+                                <span className="rounded-full bg-panel-muted/35 px-2 py-0.5 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                                   {g.event_group}
                                 </span>
                               )}
-                              <span className="rounded bg-slate-800 px-1.5 py-0.5">
+                              <span className="rounded-full bg-panel-muted/35 px-2 py-0.5 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                                 {g.athleteCount} athletes
                               </span>
                               {g.workout_id && (
-                                <span className="rounded bg-slate-800 px-1.5 py-0.5">
+                                <span className="rounded-full bg-panel-muted/35 px-2 py-0.5 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                                   Workout: {g.workout_id.slice(0, 8)}…
                                 </span>
                               )}
@@ -493,12 +496,12 @@ export default function PracticePageClient({
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <button
-                              className="text-[11px] text-sky-400 hover:underline"
+                              className="text-[11px] text-[var(--brand)] hover:underline"
                               onClick={() => setActiveGroupForAssignments(g.id)}
                             >
                               Manage Athletes
                             </button>
-                            <button className="text-[11px] text-slate-400 hover:underline">
+                            <button className="text-[11px] text-[var(--muted-foreground)] hover:underline">
                               Edit Group
                             </button>
                           </div>
@@ -513,17 +516,17 @@ export default function PracticePageClient({
         )}
 
         {activeGroupForAssignments && (
-          <div className="fixed bottom-4 right-4 max-w-md rounded border border-slate-800 bg-slate-950/95 px-4 py-3 text-xs shadow-lg">
+          <div className="fixed bottom-4 right-4 z-50 max-w-md rounded-xl ring-1 ring-panel bg-panel px-4 py-3 shadow-lg">
             <div className="mb-2 flex items-center justify-between">
-              <div className="font-semibold text-slate-100">Group assignments (stub)</div>
+              <div className="font-semibold text-[var(--foreground)]">Group assignments (stub)</div>
               <button
-                className="text-[11px] text-slate-400 hover:underline"
+                className="text-[11px] text-[var(--muted-foreground)] hover:underline"
                 onClick={() => setActiveGroupForAssignments(null)}
               >
                 Close
               </button>
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className="text-[11px] text-[var(--muted-foreground)]">
               {activeGroupForAssignments && selectedPracticeId && (
                 <GroupAssignmentsDrawer
                     open={true}

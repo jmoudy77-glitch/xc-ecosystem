@@ -42,6 +42,17 @@ type SchoolLocationRow = {
   longitude: number | null;
 };
 
+type TeamNameRow = {
+  id: string;
+  name: string;
+};
+
+type TeamSeasonLabelRow = {
+  id: string;
+  season_label: string;
+  academic_year: string;
+};
+
 type TeamRosterRow = {
   id: string;
   athlete_id: string;
@@ -498,6 +509,25 @@ export default async function PracticePage({
 }: PracticePageProps) {
   const { programId, teamId, seasonId } = await params; // 👈 seasonId here
 
+  // Resolve simple header context (team + season)
+  const supabaseForHeader = await supabaseServerComponent();
+
+  const { data: teamRow } = await supabaseForHeader
+    .from("teams")
+    .select("id, name")
+    .eq("id", teamId)
+    .maybeSingle<TeamNameRow>();
+
+  const { data: seasonRow } = await supabaseForHeader
+    .from("team_seasons")
+    .select("id, season_label, academic_year")
+    .eq("id", seasonId)
+    .maybeSingle<TeamSeasonLabelRow>();
+
+  const headerTeamName = teamRow?.name ?? "Team";
+  const headerSeasonLabel = seasonRow?.season_label ?? "Season";
+  const headerAcademicYear = seasonRow?.academic_year ?? "";
+
   // Determine startOfWeek from ?week=YYYY-MM-DD search param (from server props)
   const resolvedSearchParams =
     searchParams ? await searchParams : ({} as { [key: string]: string | string[] | undefined });
@@ -525,6 +555,16 @@ export default async function PracticePage({
       : Array.isArray(rawEditTs)
       ? rawEditTs[0]
       : null;
+
+  const rawReturnTo = resolvedSearchParams.returnTo;
+  const returnTo =
+    typeof rawReturnTo === "string"
+      ? rawReturnTo
+      : Array.isArray(rawReturnTo)
+      ? rawReturnTo[0]
+      : null;
+
+  const backHref = returnTo ?? `/programs/${programId}/training`;
 
   const baseDate = weekParam ? parseLocalISODate(weekParam) : new Date();
 
@@ -616,51 +656,51 @@ export default async function PracticePage({
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2 border-b border-slate-800 pb-4">
-        <p className="text-xs uppercase tracking-widest text-slate-400">
-          Team Practice
-        </p>
-        <h1 className="text-2xl md:text-3xl font-semibold text-slate-50">
-          Practice Scheduler
-        </h1>
-        <p className="text-sm text-slate-400 max-w-2xl">
-          Plan practices for this season using a weekly calendar, practice
-          builder, and weather snapshot. Templates and AI-assisted
-          suggestions will be layered in as the system grows.
-        </p>
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-          <span className="rounded-full border border-slate-700/80 px-2 py-0.5">
-            Program: <code className="ml-1">{programId}</code>
-          </span>
-          <span className="rounded-full border border-slate-700/80 px-2 py-0.5">
-            Team: <code className="ml-1">{teamId}</code>
-          </span>
-          <span className="rounded-full border border-slate-700/80 px-2 py-0.5">
-            Season: <code className="ml-1">{seasonId}</code>
-          </span>
+    <div className="flex flex-col gap-3">
+      <div className="relative overflow-hidden rounded-xl panel bg-panel/70 px-4 py-3 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.28)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(900px_120px_at_50%_0%,rgba(255,255,255,0.08),transparent_70%)]" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="mt-0.5 truncate text-sm font-semibold text-[var(--foreground)]">
+              {headerTeamName}
+              <span className="mx-2 text-[var(--muted-foreground)]">•</span>
+              {headerSeasonLabel}
+              {headerAcademicYear ? (
+                <span className="ml-2 text-[12px] font-medium text-[var(--muted-foreground)]">{headerAcademicYear}</span>
+              ) : null}
+            </div>
+          </div>
+          <Link
+            href={backHref}
+            className="inline-flex items-center rounded-lg bg-panel-muted/35 px-3 py-2 text-xs font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
+          >
+            ← Back to Training
+          </Link>
         </div>
-      </header>
+      </div>
 
-      <main className="space-y-4">
+      <main className="space-y-4 w-full">
         {/* Calendar + weather surface */}
-        <section className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+        <section className="relative w-full overflow-visible rounded-xl panel bg-panel/70 p-5 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_22px_90px_rgba(0,0,0,0.30)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(1100px_180px_at_50%_0%,rgba(255,255,255,0.08),transparent_70%)]" />
           <div className="mb-4 flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold text-slate-100">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">
                 Practice calendar
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[var(--muted-foreground)]">
                 High-level weekly view with practice cards and quick access to
                 the builder. Use it to see and adjust the flow of the week.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+            <div className="flex items-center gap-2">
               <Link
                 href={`/programs/${programId}/teams/${teamId}/seasons/${seasonId}/practice?week=${formatISODate(
                   prevWeek
                 )}`}
-                className="rounded-lg border border-slate-700/80 px-2 py-1 text-xs hover:border-slate-500 hover:text-slate-200"
+                className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
               >
                 ‹ Prev
               </Link>
@@ -679,7 +719,7 @@ export default async function PracticePage({
                     return sunday;
                   })()
                 )}`}
-                className="rounded-lg border border-slate-700/80 px-2 py-1 text-xs hover:border-slate-500 hover:text-slate-200"
+                className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
               >
                 Today
               </Link>
@@ -688,7 +728,7 @@ export default async function PracticePage({
                 href={`/programs/${programId}/teams/${teamId}/seasons/${seasonId}/practice?week=${formatISODate(
                   nextWeek
                 )}`}
-                className="rounded-lg border border-slate-700/80 px-2 py-1 text-xs hover:border-slate-500 hover:text-slate-200"
+                className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
               >
                 Next ›
               </Link>
@@ -696,21 +736,21 @@ export default async function PracticePage({
           </div>
 
           {/* Calendar */}
-          <div className="flex flex-col gap-4 rounded-lg border border-dashed border-slate-700/80 bg-slate-950/60 p-4">
-            <div className="mb-2 text-xs text-slate-500">
+          <div className="flex flex-col gap-4 rounded-xl bg-panel-muted/30 p-4 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+            <div className="mb-2 text-xs text-[var(--muted-foreground)]">
               Week of{" "}
-              <span className="font-medium text-slate-200">
+              <span className="font-medium text-[var(--foreground)]">
                 {formatDisplayDate(startOfWeek)}
               </span>{" "}
               –{" "}
-              <span className="font-medium text-slate-200">
+              <span className="font-medium text-[var(--foreground)]">
                 {formatDisplayDate(endOfWeek)}
               </span>
               .
             </div>
 
-            <div className="rounded-lg border border-slate-800/80 bg-slate-950/80">
-              <div className="grid grid-cols-1 divide-y divide-slate-800/80 md:grid-cols-7 md:divide-y-0 md:divide-x">
+            <div className="rounded-xl bg-panel/65 ring-1 ring-white/10 shadow-[0_14px_55px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
+              <div className="grid grid-cols-1 divide-y divide-[var(--border)]/40 md:grid-cols-7 md:divide-y-0 md:divide-x">
                 {Array.from({ length: 7 }).map((_, idx) => {
                   const dayDate = new Date(
                     startOfWeek.getFullYear(),
@@ -736,33 +776,33 @@ export default async function PracticePage({
                   return (
                     <div
                       key={dayKey}
-                      className="flex flex-col border-slate-800/80 last:border-r-0 min-h-[220px]"
+                      className="flex min-h-[220px] flex-col"
                     >
                       {/* Day header */}
                       <div
                         className={`flex items-center justify-between border-b px-2 py-1.5 ${
                           isToday
-                            ? "border-emerald-700/70 bg-emerald-950/60"
-                            : "border-slate-800/80 bg-slate-950"
+                            ? "border-[var(--brand)]/50 bg-[var(--brand)]/10"
+                            : "border-[var(--border)]/50 bg-panel"
                         }`}
                       >
                         <div className="flex flex-col">
-                          <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
                             {dayLabel}
                           </span>
-                          <span className="text-sm font-semibold text-slate-100">
+                          <span className="text-sm font-semibold text-[var(--foreground)]">
                             {dayNum}
                           </span>
                         </div>
                         {isToday && (
-                          <span className="rounded-full border border-emerald-600/80 bg-emerald-900/40 px-2 py-[2px] text-[10px] font-medium uppercase tracking-wide text-emerald-100">
+                          <span className="rounded-full bg-[var(--brand)]/14 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide text-[var(--foreground)] ring-1 ring-[var(--brand)]/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-xl">
                             Today
                           </span>
                         )}
                       </div>
 
                       {/* Day body */}
-                      <div className="flex-1 space-y-1.5 px-1.5 py-1.5 pb-6 text-xs">
+                      <div className="flex-1 space-y-2 px-2 py-2 pb-6 text-xs">
                         <AddPracticeDialogTrigger
                           key={
                             editPractice &&
@@ -774,6 +814,8 @@ export default async function PracticePage({
                           programId={programId}
                           teamId={teamId}
                           seasonId={seasonId}
+                          teamName={headerTeamName}
+                          seasonName={`${headerSeasonLabel}${headerAcademicYear ? ` ${headerAcademicYear}` : ""}`}
                           dateIso={dayKey}
                           groups={rosterGroups}
                           initialPractice={
@@ -794,7 +836,7 @@ export default async function PracticePage({
                         />
 
                         {dayPlans.length === 0 ? (
-                          <div className="mt-1 text-[10px] text-slate-600">
+                          <div className="mt-1 text-[10px] text-[var(--muted-foreground)]">
                             No scheduled practices.
                           </div>
                         ) : (
@@ -826,10 +868,12 @@ export default async function PracticePage({
           </div>
 
           {/* Weather strip aligned with the 7-day calendar */}
-          <div className="mt-4 rounded-lg border border-slate-800/80 bg-slate-950/80 p-3 md:sticky md:bottom-4">
-            <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
+          <div className="relative z-0 mt-4 overflow-visible rounded-xl bg-panel/70 p-4 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.28)] md:sticky md:bottom-4">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(900px_140px_at_50%_0%,rgba(255,255,255,0.08),transparent_70%)]" />
+            <div className="mb-2 flex items-center justify-between text-xs text-[var(--muted-foreground)]">
               <span>Weather snapshot for this week</span>
-              <span className="rounded-full border border-slate-700/80 px-2 py-0.5 text-[10px]">
+              <span className="rounded-full bg-panel-muted/35 px-2 py-0.5 text-[10px] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                 Aligned by calendar day
               </span>
             </div>
@@ -853,7 +897,7 @@ export default async function PracticePage({
 
                 let riskLabel = "";
                 let riskClass =
-                  "border-slate-800 bg-slate-950/90 text-slate-500";
+                  "border-[var(--border)]/50 bg-panel text-[var(--muted-foreground)]";
 
                 // Simple condition-based icon from Tomorrow.io summary
                 const summaryLower = (weather?.summary ?? "").toLowerCase();
@@ -904,6 +948,8 @@ export default async function PracticePage({
                     break;
                   default:
                     riskLabel = "Unknown";
+                    riskClass =
+                      "border-[var(--border)]/50 bg-panel text-[var(--muted-foreground)]";
                     break;
                 }
 
@@ -939,7 +985,7 @@ export default async function PracticePage({
                             {dayLabel}
                           </span>
                         </div>
-                        <span className="rounded-full border border-slate-700/80 bg-slate-950/70 px-2 py-0.5 text-[10px]">
+                        <span className="rounded-full ring-1 ring-panel bg-panel px-2 py-0.5 text-[10px]">
                           {riskLabel || "Unknown"}
                         </span>
                       </div>

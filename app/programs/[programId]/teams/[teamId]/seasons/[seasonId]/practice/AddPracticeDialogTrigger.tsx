@@ -1,12 +1,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import PracticeBuilderModal from "./PracticeBuilderModal";
 
 type AddPracticeDialogTriggerProps = {
   programId: string;
   teamId: string;
   seasonId: string;
+  programName?: string;
+  teamName?: string;
+  seasonName?: string;
   dateIso: string; // YYYY-MM-DD
   groups: {
     name: string;
@@ -51,12 +55,16 @@ export default function AddPracticeDialogTrigger({
   programId,
   teamId,
   seasonId,
+  programName,
+  teamName,
+  seasonName,
   dateIso,
   groups,
   initialPractice,
   initialDetails,
   autoOpen,
 }: AddPracticeDialogTriggerProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   // If invoked in edit mode with autoOpen, open the modal on mount
@@ -66,7 +74,7 @@ export default function AddPracticeDialogTrigger({
     }
   }, [autoOpen]);
 
-  const dateObj = new Date(dateIso);
+  const dateObj = new Date(`${dateIso}T00:00:00`);
   const displayDate = isNaN(dateObj.getTime())
     ? dateIso
     : dateObj.toLocaleDateString("en-US", {
@@ -81,7 +89,7 @@ export default function AddPracticeDialogTrigger({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-between rounded-md border border-dashed border-emerald-600/60 bg-emerald-500/5 px-2 py-1.5 text-left text-[11px] text-emerald-100 hover:border-emerald-400 hover:bg-emerald-500/15"
+        className="flex w-full items-center justify-between rounded-md border border-dashed border-[var(--brand)]/60 bg-[var(--brand)]/5 px-2 py-1.5 text-left text-[11px] text-[var(--foreground)] hover:border-[var(--brand)]/70 hover:bg-[var(--brand)]/15"
       >
         <span className="font-medium">Add new practice</span>
         <span className="text-[13px] leading-none">＋</span>
@@ -90,10 +98,17 @@ export default function AddPracticeDialogTrigger({
       {open && (
         <PracticeBuilderModal
           open={open}
-          onClose={() => setOpen(false)}
+          onClose={() => {
+            setOpen(false);
+            // Ensure the server-rendered calendar re-fetches newly saved practices.
+            router.refresh();
+          }}
           programId={programId}
           teamId={teamId}
           seasonId={seasonId}
+          programName={programName}
+          teamName={teamName}
+          seasonName={seasonName}
           dateIso={dateIso}
           displayDate={displayDate}
           groups={groups}

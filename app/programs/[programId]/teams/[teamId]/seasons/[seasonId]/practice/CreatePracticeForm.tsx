@@ -80,16 +80,16 @@ export default function CreatePracticeForm({
   };
 
   return (
-    <section className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-      <h2 className="mb-2 text-sm font-semibold text-slate-100">
+    <section className="rounded-xl p-4 panel bg-panel-muted/75 ring-1 ring-panel backdrop-blur-xl shadow-sm">
+      <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">
         Create practice
       </h2>
-      <p className="mb-4 text-xs text-slate-400">
+      <p className="mb-4 text-xs text-[var(--muted-foreground)]">
         Define a practice for this team and season. This writes directly into{" "}
         <code className="font-mono text-[10px]">practice_plans</code>.
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-3 text-xs text-slate-200">
+      <form onSubmit={handleSubmit} className="space-y-3 text-xs text-[var(--foreground)]">
         {/* Hidden context */}
         <input type="hidden" name="programId" value={programId} />
         <input type="hidden" name="teamId" value={teamId} />
@@ -97,20 +97,20 @@ export default function CreatePracticeForm({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-300">
+            <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
               Date
             </label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="w-full rounded-md px-2 py-1 text-xs text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted focus:ring-2 focus:ring-[color:var(--brand)]/40"
               required
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-300">
+            <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
               Status
             </label>
             <select
@@ -118,7 +118,7 @@ export default function CreatePracticeForm({
               onChange={(e) =>
                 setStatus(e.target.value as PracticeStatus)
               }
-              className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="w-full rounded-md px-2 py-1 text-xs text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted focus:ring-2 focus:ring-[color:var(--brand)]/40"
             >
               {STATUS_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
@@ -131,32 +131,32 @@ export default function CreatePracticeForm({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-300">
+            <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
               Start time
             </label>
             <input
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="w-full rounded-md px-2 py-1 text-xs text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted focus:ring-2 focus:ring-[color:var(--brand)]/40"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-300">
+            <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
               End time
             </label>
             <input
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="w-full rounded-md px-2 py-1 text-xs text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted focus:ring-2 focus:ring-[color:var(--brand)]/40"
             />
           </div>
         </div>
 
         <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-300">
+          <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
             Label
           </label>
           <input
@@ -164,13 +164,13 @@ export default function CreatePracticeForm({
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="e.g. Interval session, Recovery run"
-            className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-500"
+            className="w-full rounded-md px-2 py-1 text-xs text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted placeholder:text-[var(--muted-foreground)]/60 focus:ring-2 focus:ring-[color:var(--brand)]/40"
             required
           />
         </div>
 
         <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-300">
+          <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
             Location
           </label>
           <input
@@ -178,12 +178,12 @@ export default function CreatePracticeForm({
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="Track, XC course, weight room, etc."
-            className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-500"
+            className="w-full rounded-md px-2 py-1 text-xs text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted placeholder:text-[var(--muted-foreground)]/60 focus:ring-2 focus:ring-[color:var(--brand)]/40"
           />
         </div>
 
         <div className="space-y-1">
-          <label className="block text-[11px] font-medium text-slate-300">
+          <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
             Notes
           </label>
           <textarea
@@ -191,13 +191,13 @@ export default function CreatePracticeForm({
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
             placeholder="Optional details for coaches or athletes."
-            className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-500"
+            className="w-full rounded-md px-2 py-1 text-xs text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted placeholder:text-[var(--muted-foreground)]/60 focus:ring-2 focus:ring-[color:var(--brand)]/40"
           />
         </div>
 
         <div className="flex items-center justify-between pt-2">
           <div className="flex flex-col">
-            <p className="text-[10px] text-slate-500">
+            <p className="text-[10px] text-[var(--muted-foreground)]">
               Saving will create a{" "}
               <code className="font-mono text-[10px]">practice_plans</code> row
               for this season.
@@ -206,7 +206,7 @@ export default function CreatePracticeForm({
               <p className="mt-1 text-[10px] text-red-400">{error}</p>
             )}
             {successMessage && !error && (
-              <p className="mt-1 text-[10px] text-emerald-400">
+              <p className="mt-1 text-[10px] text-[var(--muted-foreground)]">
                 {successMessage}
               </p>
             )}
@@ -214,7 +214,7 @@ export default function CreatePracticeForm({
           <button
             type="submit"
             disabled={isSubmitting || !label.trim()}
-            className="inline-flex items-center rounded-md border border-emerald-500/70 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium text-emerald-100 hover:border-emerald-400 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center rounded-md px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-[color:var(--brand)]/50 bg-[color:var(--brand)]/15 hover:bg-[color:var(--brand)]/22 hover:ring-[color:var(--brand)]/65 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Saving..." : "Save practice"}
           </button>

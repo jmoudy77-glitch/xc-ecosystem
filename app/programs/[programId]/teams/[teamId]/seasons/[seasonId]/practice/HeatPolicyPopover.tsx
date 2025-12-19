@@ -60,7 +60,7 @@ export default function HeatPolicyPopover({
       return <>{children}</>;
     }
     return (
-      <span className="text-[10px] font-medium text-slate-300">
+      <span className="text-[10px] font-medium text-[var(--muted-foreground)]">
         {riskLabel}
       </span>
     );
@@ -136,7 +136,7 @@ export default function HeatPolicyPopover({
       ? "border-orange-500/70 bg-orange-500/10 text-orange-200"
       : activeKey === "extreme"
       ? "border-red-500/70 bg-red-500/10 text-red-200"
-      : "border-slate-500/60 bg-slate-800/60 text-slate-200";
+      : "border-[var(--border)]/60 bg-panel-muted text-[var(--foreground)]";
 
   const cardBorderBgClasses =
     activeKey === "low"
@@ -147,7 +147,7 @@ export default function HeatPolicyPopover({
       ? "border-orange-500/70 bg-orange-500/5"
       : activeKey === "extreme"
       ? "border-red-500/70 bg-red-500/5"
-      : "border-slate-600 bg-slate-900/60";
+      : "border-[var(--border)]/60 bg-panel-muted";
 
   const wetBulbDisplay =
     weather?.wetBulbF != null
@@ -185,14 +185,22 @@ export default function HeatPolicyPopover({
   return (
     <>
       {children ? (
-        <div onClick={() => setOpen(true)} className="h-full">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") setOpen(true);
+          }}
+          className="h-full cursor-pointer select-none"
+        >
           {children}
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-[10px] font-medium underline decoration-dotted underline-offset-2 hover:text-emerald-200"
+          className="cursor-pointer select-none text-[10px] font-medium underline decoration-dotted underline-offset-2 hover:text-[var(--foreground)]"
         >
           {riskLabel}
         </button>
@@ -200,117 +208,129 @@ export default function HeatPolicyPopover({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-lg px-3 py-4"
           onClick={() => setOpen(false)}
         >
+          {/* Layered scrim for dark-on-dark glass */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(1100px_circle_at_50%_10%,rgba(255,255,255,0.08),transparent_58%),linear-gradient(to_bottom,rgba(0,0,0,0.10),rgba(0,0,0,0.55))]" />
+
           <div
-            className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-950 p-4 shadow-xl"
+            className="relative w-full max-w-md overflow-hidden rounded-xl panel bg-panel/85 p-4 backdrop-blur-2xl shadow-[0_35px_110px_rgba(0,0,0,0.70)] ring-1 ring-panel"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-2 flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                  {gbLabel} heat policy
-                </div>
-                <div className="text-sm font-semibold text-slate-50">
-                  {policy.label || "Heat risk guidelines"}
-                </div>
-                <div className="mt-1">
-                  <span
-                    className={`inline-flex items-center rounded-full border px-1.5 py-[1px] text-[10px] uppercase tracking-wide ${badgeClasses}`}
-                  >
-                    {riskLabelText} risk
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300 hover:border-slate-500 hover:text-slate-100"
-              >
-                Close
-              </button>
-            </div>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/12" />
+            {/* Glass edge + soft sheen to separate from dark background */}
+            <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-white/12" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(900px_120px_at_50%_0%,rgba(255,255,255,0.10),transparent_70%)]" />
 
-            <div className="mb-3 text-[11px] text-slate-400">
-              Heat category for this session:{" "}
-              <span className="font-semibold text-slate-100">
-                {activeMeta?.label ?? "Unknown"}
-              </span>
-            </div>
-
-            <div className="space-y-2 text-[11px] text-slate-200">
-              <div className={`rounded-md border px-2 py-1.5 ${cardBorderBgClasses}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold">
-                    {riskLabelText}
-                  </span>
-                  {activeRange && (
-                    <span className="text-[10px] text-slate-400">
-                      {activeRange}
+            <div className="relative cursor-default">
+              <div className="mb-2 relative z-10 flex items-start justify-between gap-3 select-none cursor-default">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
+                    {gbLabel} heat policy
+                  </div>
+                  <div className="text-sm font-semibold text-[var(--foreground)]">
+                    {policy.label || "Heat risk guidelines"}
+                  </div>
+                  <div className="mt-1">
+                    <span
+                      className={`inline-flex items-center rounded-full border px-1.5 py-[1px] text-[10px] uppercase tracking-wide ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl ${badgeClasses}`}
+                    >
+                      {riskLabelText} risk
                     </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="relative z-20 cursor-pointer select-none rounded-md px-2 py-0.5 text-[10px] text-[var(--foreground)] bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mb-3 text-[11px] text-[var(--muted-foreground)]">
+                Heat category for this session:{" "}
+                <span className="font-semibold text-[var(--foreground)]">
+                  {activeMeta?.label ?? "Unknown"}
+                </span>
+              </div>
+
+              <div className="space-y-2 text-[11px] text-[var(--foreground)]">
+                <div
+                  className={`rounded-md border px-2 py-1.5 ring-1 ring-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl ${cardBorderBgClasses}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold">
+                      {riskLabelText}
+                    </span>
+                    {activeRange && (
+                      <span className="text-[10px] text-[var(--muted-foreground)]">
+                        {activeRange}
+                      </span>
+                    )}
+                  </div>
+                  {activeDescription && (
+                    <div className="mt-1 text-[10px] text-[var(--muted-foreground)]">
+                      {activeDescription}
+                    </div>
+                  )}
+                  {!activeDescription && (
+                    <div className="mt-1 text-[10px] text-[var(--muted-foreground)]">
+                      No specific guidelines are configured for this category yet.
+                    </div>
                   )}
                 </div>
-                {activeDescription && (
-                  <div className="mt-1 text-[10px] text-slate-300">
-                    {activeDescription}
-                  </div>
-                )}
-                {!activeDescription && (
-                  <div className="mt-1 text-[10px] text-slate-400">
-                    No specific guidelines are configured for this category yet.
-                  </div>
-                )}
               </div>
-            </div>
 
-            {(wetBulbDisplay ||
-              wbgtDisplay ||
-              tempDisplay ||
-              humidityDisplay ||
-              windDisplay ||
-              weather?.summary) && (
-              <div className="mt-3 space-y-1.5 text-[11px] text-slate-200">
-                <div className="text-[11px] font-semibold text-slate-300">
-                  Session weather snapshot
+              {(wetBulbDisplay ||
+                wbgtDisplay ||
+                tempDisplay ||
+                humidityDisplay ||
+                windDisplay ||
+                weather?.summary) && (
+                <div className="mt-3 space-y-1.5 text-[11px] text-[var(--foreground)]">
+                  <div className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+                    Session weather snapshot
+                  </div>
+                  {wetBulbDisplay && (
+                    <div>
+                      Wet bulb: <span className="text-[var(--foreground)]">{wetBulbDisplay}</span>
+                    </div>
+                  )}
+                  {wbgtDisplay && (
+                    <div>
+                      WBGT: <span className="text-[var(--foreground)]">{wbgtDisplay}</span>
+                    </div>
+                  )}
+                  {tempDisplay && (
+                    <div>
+                      Air temp range: <span className="text-[var(--foreground)]">{tempDisplay}</span>
+                    </div>
+                  )}
+                  {humidityDisplay && (
+                    <div>
+                      Humidity: <span className="text-[var(--foreground)]">{humidityDisplay}</span>
+                    </div>
+                  )}
+                  {windDisplay && (
+                    <div>
+                      Wind: <span className="text-[var(--foreground)]">{windDisplay}</span>
+                    </div>
+                  )}
+                  {weather?.summary && (
+                    <div>
+                      Conditions: <span className="text-[var(--foreground)]">{weather.summary}</span>
+                    </div>
+                  )}
                 </div>
-                {wetBulbDisplay && (
-                  <div>
-                    Wet bulb: <span className="text-slate-100">{wetBulbDisplay}</span>
-                  </div>
-                )}
-                {wbgtDisplay && (
-                  <div>
-                    WBGT: <span className="text-slate-100">{wbgtDisplay}</span>
-                  </div>
-                )}
-                {tempDisplay && (
-                  <div>
-                    Air temp range: <span className="text-slate-100">{tempDisplay}</span>
-                  </div>
-                )}
-                {humidityDisplay && (
-                  <div>
-                    Humidity: <span className="text-slate-100">{humidityDisplay}</span>
-                  </div>
-                )}
-                {windDisplay && (
-                  <div>
-                    Wind: <span className="text-slate-100">{windDisplay}</span>
-                  </div>
-                )}
-                {weather?.summary && (
-                  <div>
-                    Conditions: <span className="text-slate-100">{weather.summary}</span>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
 
-            <div className="mt-3 text-[10px] text-slate-500">
-              Policy data comes from your configured governing body profile for
-              this season. Always follow your institution&apos;s most current
-              written policy when in doubt.
+              <div className="mt-3 text-[10px] text-[var(--muted-foreground)]">
+                Policy data comes from your configured governing body profile for
+                this season. Always follow your institution&apos;s most current
+                written policy when in doubt.
+              </div>
             </div>
           </div>
         </div>

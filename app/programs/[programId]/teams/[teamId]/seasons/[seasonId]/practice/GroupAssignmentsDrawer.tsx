@@ -225,18 +225,18 @@ export default function GroupAssignmentsDrawer({
   // ---------- Render ----------
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-[520px] max-w-full rounded border border-slate-800 bg-slate-950/95 px-4 py-3 text-xs shadow-xl">
+    <div className="fixed bottom-4 right-4 z-40 w-[520px] max-w-full rounded-xl px-4 py-3 text-xs panel bg-panel/85 ring-1 ring-panel backdrop-blur-xl shadow-xl">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
             Group assignments
           </div>
-          <div className="text-[11px] text-slate-500">
+          <div className="text-[11px] text-[var(--muted-foreground)]">
             Assign roster athletes to this practice group.
           </div>
         </div>
         <button
-          className="text-[11px] text-slate-400 hover:underline"
+          className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
           onClick={onClose}
         >
           Close
@@ -245,13 +245,13 @@ export default function GroupAssignmentsDrawer({
 
       <div className="mb-2 flex gap-2">
         <input
-          className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none"
+          className="flex-1 rounded-md px-2 py-1 text-[11px] text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted placeholder:text-[var(--muted-foreground)]/60 focus:ring-2 focus:ring-[color:var(--brand)]/40"
           placeholder="Search roster by name"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          className="w-32 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none"
+          className="w-32 rounded-md px-2 py-1 text-[11px] text-[var(--foreground)] outline-none ring-1 ring-panel bg-panel-muted focus:ring-2 focus:ring-[color:var(--brand)]/40"
           value={eventGroupFilter}
           onChange={(e) => setEventGroupFilter(e.target.value)}
         >
@@ -273,14 +273,14 @@ export default function GroupAssignmentsDrawer({
 
       <div className="flex gap-3">
         {/* Roster column */}
-        <div className="flex-1 rounded border border-slate-800 bg-slate-950/60 p-2">
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+        <div className="flex-1 rounded-lg p-2 ring-1 ring-panel bg-panel-muted">
+          <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
             <span>Roster</span>
             {isLoadingRoster && <span>Loading…</span>}
           </div>
           <div className="max-h-64 overflow-y-auto space-y-1">
             {roster.length === 0 && !isLoadingRoster ? (
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] text-[var(--muted-foreground)]">
                 No roster athletes found for this team season.
               </div>
             ) : (
@@ -293,21 +293,21 @@ export default function GroupAssignmentsDrawer({
                     type="button"
                     disabled={isAssigned || isMutating}
                     onClick={() => handleAddToGroup(athlete)}
-                    className={`flex w-full items-center justify-between rounded px-2 py-1 text-left text-[11px] ${
+                    className={`flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[11px] ring-1 ${
                       isAssigned
-                        ? "cursor-not-allowed bg-slate-800/60 text-slate-500"
-                        : "bg-slate-900/60 text-slate-100 hover:bg-slate-800/80"
+                        ? "cursor-not-allowed ring-panel bg-panel text-[var(--muted-foreground)] opacity-70"
+                        : "ring-panel bg-panel-muted text-[var(--foreground)] hover:bg-panel"
                     }`}
                   >
                     <span className="truncate">{name}</span>
-                    <span className="ml-2 flex gap-1 text-[10px] text-slate-400">
+                    <span className="ml-2 flex gap-1 text-[10px] text-[var(--muted-foreground)]">
                       {athlete.event_group && (
-                        <span className="rounded bg-slate-800 px-1">
+                        <span className="rounded bg-panel px-1 ring-1 ring-panel">
                           {athlete.event_group}
                         </span>
                       )}
                       {athlete.class_year && (
-                        <span className="rounded bg-slate-800 px-1">
+                        <span className="rounded bg-panel px-1 ring-1 ring-panel">
                           {athlete.class_year}
                         </span>
                       )}
@@ -320,14 +320,14 @@ export default function GroupAssignmentsDrawer({
         </div>
 
         {/* Assigned column */}
-        <div className="flex-1 rounded border border-slate-800 bg-slate-950/60 p-2">
-          <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+        <div className="flex-1 rounded-lg p-2 ring-1 ring-panel bg-panel-muted">
+          <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
             <span>Assigned to group</span>
             {isLoadingAssignments && <span>Loading…</span>}
           </div>
           <div className="max-h-64 overflow-y-auto space-y-1">
             {assignedAthletes.length === 0 && !isLoadingAssignments ? (
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] text-[var(--muted-foreground)]">
                 No athletes assigned yet.
               </div>
             ) : (
@@ -341,10 +341,10 @@ export default function GroupAssignmentsDrawer({
                     type="button"
                     disabled={isMutating}
                     onClick={() => handleRemoveAssignment(assignment.id)}
-                    className="flex w-full items-center justify-between rounded bg-slate-900/60 px-2 py-1 text-left text-[11px] text-slate-100 hover:bg-slate-800/80"
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[11px] ring-1 ring-panel bg-panel-muted text-[var(--foreground)] hover:bg-panel"
                   >
                     <span className="truncate">{name}</span>
-                    <span className="ml-2 text-[10px] text-slate-400">Remove</span>
+                    <span className="ml-2 text-[10px] text-[var(--muted-foreground)]">Remove</span>
                   </button>
                 );
               })

@@ -1,4 +1,4 @@
-// app/api/programs/[programId]/training/workouts/[workoutId]/route.ts
+// /Users/joshmoudy/Library/CloudStorage/GoogleDrive-jmoudy77@gmail.com/My Drive/Ecosystem_Live/xc-ecosystem/app/api/programs/[programId]/training/workouts/[workoutId]/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -24,7 +24,7 @@ export async function GET(
   // 1) Fetch workout (RLS will enforce access)
   const { data: workout, error: workoutError } = await supabase
     .from("workouts")
-    .select("id, program_id, label, description, is_system_template, created_at, updated_at")
+    .select("id, program_id, label, description, is_system_template, archived_at, created_at, updated_at")
     .eq("id", workoutId)
     .single();
 
@@ -103,6 +103,7 @@ export async function GET(
     label: workout.label,
     description: workout.description ?? null,
     isGlobal: !!workout.is_system_template,
+    archivedAt: (workout as any).archived_at ?? null,
     createdAt: workout.created_at,
     updatedAt: workout.updated_at,
   };
@@ -110,5 +111,69 @@ export async function GET(
   return jsonOk({
     workout: normalizedWorkout,
     steps: normalizedSteps,
+  });
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ programId: string; workoutId: string }> }
+) {
+  const { programId, workoutId } = await params;
+  const { supabase } = supabaseServer(req);
+
+  let body: any = null;
+  try {
+    body = await req.json();
+  } catch {
+    body = null;
+  }
+
+  const action = String(body?.action ?? "").trim();
+  if (action !== "archive" && action !== "unarchive") {
+    return jsonError("Invalid action", 400, "invalid_action");
+  }
+
+  // Fetch workout (RLS enforced)
+  const { data: workout, error: workoutError } = await supabase
+    .from("workouts")
+    .select("id, program_id, is_system_template, archived_at")
+    .eq("id", workoutId)
+    .single();
+
+  if (workoutError) {
+    const status = workoutError.code === "PGRST116" ? 404 : 500;
+    return jsonError(workoutError.message, status, workoutError.code);
+  }
+
+  // Do not allow archiving/unarchiving system templates
+  if (workout.is_system_template) {
+    return jsonError("System workouts cannot be archived", 400, "system_workout");
+  }
+
+  // Guard against cross-program usage
+  if (workout.program_id !== programId) {
+    return jsonError("Not found", 404);
+  }
+
+  const patch: Record<string, any> =
+    action === "archive"
+      ? { archived_at: new Date().toISOString() }
+      : { archived_at: null };
+
+  const { data: updated, error: updateError } = await supabase
+    .from("workouts")
+    .update(patch)
+    .eq("id", workoutId)
+    .select("id, archived_at, updated_at")
+    .single();
+
+  if (updateError) {
+    return jsonError(updateError.message, 500, updateError.code);
+  }
+
+  return jsonOk({
+    id: updated.id,
+    archivedAt: (updated as any).archived_at ?? null,
+    updatedAt: updated.updated_at,
   });
 }

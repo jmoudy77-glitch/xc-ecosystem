@@ -280,6 +280,7 @@ export async function POST(req: NextRequest) {
       // One planned session per athlete per group workout.
 
       const sessionRows: {
+        program_id: string;
         athlete_id: string;
         source: string;
         coach_member_id: string | null;
@@ -300,6 +301,7 @@ export async function POST(req: NextRequest) {
 
         for (const athlete of g.athletes) {
           sessionRows.push({
+            program_id: programId,
             athlete_id: athlete.id,
             source: "coach_assigned",
             coach_member_id: createdByProgramMemberId ?? null,
@@ -335,6 +337,7 @@ export async function POST(req: NextRequest) {
     // These are per-athlete workouts that may or may not be tied to a group.
 
     const individualSessionRows: {
+      program_id: string;
       athlete_id: string;
       source: string;
       coach_member_id: string | null;
@@ -386,6 +389,7 @@ export async function POST(req: NextRequest) {
         const groupInfo = groupInfoMap.get(lane.fromGroupName);
 
         individualSessionRows.push({
+          program_id: programId,
           athlete_id: lane.athleteId,
           source: "coach_assigned",
           coach_member_id: createdByProgramMemberId ?? null,

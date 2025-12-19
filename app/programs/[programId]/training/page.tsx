@@ -33,6 +33,13 @@ type TrainingExercisePreview = {
   is_active: boolean;
 };
 
+type PracticeNavContext = {
+  teamId: string | null;
+  teamSeasonId: string | null;
+  href: string | null;
+  reason: string | null;
+};
+
 export default async function ProgramTrainingPage({ params }: PageProps) {
   const { programId } = await params;
 
@@ -139,6 +146,81 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   const isManager =
     actingRole !== null &&
     MANAGER_ROLES.includes(actingRole.toLowerCase() as any);
+
+  //
+  // 3b) Resolve practice scheduler navigation context (team + current season)
+  //
+  let practiceNav: PracticeNavContext = {
+    teamId: null,
+    teamSeasonId: null,
+    href: null,
+    reason: null,
+  };
+
+  try {
+    // Prefer primary team, fallback to first team.
+    const { data: primaryTeam, error: primaryTeamError } = await supabaseAdmin
+      .from("teams")
+      .select("id, is_primary")
+      .eq("program_id", programId)
+      .order("is_primary", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (primaryTeamError) {
+      throw primaryTeamError;
+    }
+
+    const teamId = (primaryTeam?.id as string) ?? null;
+    if (!teamId) {
+      practiceNav = {
+        teamId: null,
+        teamSeasonId: null,
+        href: `/programs/${programId}/teams`,
+        reason: "No team found yet — create a team to start planning practices.",
+      };
+    } else {
+      // Prefer current season, fallback to most recent active season.
+      const { data: currentSeason, error: seasonError } = await supabaseAdmin
+        .from("team_seasons")
+        .select("id, is_current, is_active, created_at")
+        .eq("program_id", programId)
+        .eq("team_id", teamId)
+        .order("is_current", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (seasonError) {
+        throw seasonError;
+      }
+
+      const teamSeasonId = (currentSeason?.id as string) ?? null;
+      if (!teamSeasonId) {
+        practiceNav = {
+          teamId,
+          teamSeasonId: null,
+          href: `/programs/${programId}/teams/${teamId}`,
+          reason: "No team season found yet — create a season to start planning practices.",
+        };
+      } else {
+        practiceNav = {
+          teamId,
+          teamSeasonId,
+          href: `/programs/${programId}/teams/${teamId}/seasons/${teamSeasonId}/practice`,
+          reason: null,
+        };
+      }
+    }
+  } catch (err: any) {
+    console.error("[ProgramTraining] practice nav context error:", err);
+    practiceNav = {
+      teamId: null,
+      teamSeasonId: null,
+      href: `/programs/${programId}/teams`,
+      reason: "Unable to resolve team/season for practice scheduler.",
+    };
+  }
 
   //
   // 4) Resolve base URL + cookie header once for internal API calls
@@ -288,11 +370,24 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
                   to your season roster. Future: integrate weather snapshots and
                   WBGT-based heat policies directly into each practice.
                 </p>
+                {practiceNav.reason ? (
+                  <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                    {practiceNav.reason}
+                  </p>
+                ) : null}
               </div>
-              <div className="hidden text-[11px] text-[var(--muted-foreground)] sm:flex sm:flex-col sm:items-end">
-                <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5 text-[var(--muted-foreground)]">
-                  Roadmap: full practice scheduler
+              <div className="hidden sm:flex sm:flex-col sm:items-end sm:gap-2">
+                <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5 text-[11px] text-[var(--muted-foreground)]">
+                  Practice scheduler
                 </span>
+                {practiceNav.href ? (
+                  <Link
+                    href={practiceNav.href}
+                    className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
+                  >
+                    Open
+                  </Link>
+                ) : null}
               </div>
             </div>
 

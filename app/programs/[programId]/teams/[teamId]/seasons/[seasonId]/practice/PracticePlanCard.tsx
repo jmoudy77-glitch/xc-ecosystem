@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { GlassModalShell }  from "@/components/ui/GlassModalShell";
 
 type PracticePlan = {
   id: string;
@@ -90,7 +91,7 @@ export default function PracticePlanCard({
 
   const timeRange = formatTimeRange(plan.start_time, plan.end_time);
 
-    const dateLabel = plan.practice_date
+  const dateLabel = plan.practice_date
     ? new Date(plan.practice_date).toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
@@ -98,15 +99,6 @@ export default function PracticePlanCard({
         year: "numeric",
       })
     : "Unknown date";
-
-    console.log(
-        "[PracticePlanCard] details",
-        plan.id,
-        "groups:",
-        groups.length,
-        "individual:",
-        individualSessions.length
-        );
 
   const handleCancelClick = () => {
     setIsCancelDialogOpen(true);
@@ -158,12 +150,12 @@ export default function PracticePlanCard({
         );
     };
 
-    const isCanceled = plan.status.toLowerCase() === "canceled";
+  const isCanceled = plan.status.toLowerCase() === "canceled";
 
-    const statusLabel = plan.status;
-    const statusChipClasses = isCanceled
-      ? "border-red-500/80 bg-red-900/60 text-red-100"
-      : "border-emerald-500/60 bg-emerald-900/30 text-emerald-100";
+  const statusLabel = plan.status;
+  const statusChipClasses = isCanceled
+    ? "border-red-500/60 bg-red-900/40 text-red-100"
+    : "border-[color:var(--brand)]/50 bg-[color:var(--brand)]/15 text-[color:var(--foreground)]";
 
   return (
     <>
@@ -172,58 +164,57 @@ export default function PracticePlanCard({
         type="button"
         onClick={() => setIsOpen(true)}
         className={
-            "w-full rounded-md px-2 py-1.5 text-left " +
-            (isCanceled
-            ? "border border-red-700/80 bg-red-900/40 hover:border-red-500/80 hover:bg-red-900/60"
-            : "border border-slate-700/80 bg-slate-900/80 hover:border-emerald-500/80 hover:bg-slate-900")
+          "w-full rounded-md px-2 py-1.5 text-left ring-1 transition-colors " +
+          (isCanceled
+            ? "ring-red-500/45 bg-red-950/18 hover:bg-red-950/28"
+            : "bg-panel-muted/35 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50")
         }
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col">
             {timeRange && (
-              <div className="text-[10px] text-slate-400">{timeRange}</div>
+              <div className="text-[10px] text-[var(--muted-foreground)]">{timeRange}</div>
             )}
-            <span className="text-[11px] font-medium text-slate-100">
+            <span className="text-[11px] font-medium text-[var(--foreground)]">
               {plan.label}
             </span>
           </div>
           <span
             className={
-                "rounded-full px-1.5 py-[1px] text-[9px] uppercase tracking-wide " +
-                (isCanceled
-                ? "border border-red-500/80 bg-red-900/60 text-red-100"
-                : "border border-slate-700/80 text-slate-400")
+              "rounded-full px-1.5 py-[1px] text-[9px] uppercase tracking-wide ring-1 " +
+              (isCanceled
+                ? "ring-red-500/50 bg-red-950/25 text-red-100"
+                : "bg-panel-muted/35 text-[var(--muted-foreground)] ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl")
             }
-            >
+          >
             {plan.status}
           </span>
         </div>
         {plan.location && (
-          <div className="mt-0.5 text-[10px] text-slate-500">
+          <div className="mt-0.5 text-[10px] text-[var(--muted-foreground)]">
             {plan.location}
           </div>
         )}
       </button>
 
       {/* Popover with details */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 px-3"
-          onClick={() => setIsOpen(false)}
-        >
-          <div
-            className="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+      <GlassModalShell
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        maxWidthClassName="max-w-lg"
+        heightClassName="h-auto"
+      >
+        <div className="relative w-full overflow-hidden rounded-xl p-4 text-xs">
+          <div className="relative">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
                   Practice details
                 </div>
-                <div className="text-base font-semibold text-slate-50">
+                <div className="text-base font-semibold text-[var(--foreground)]">
                   {plan.label}
                 </div>
-                <div className="mt-0.5 text-[11px] text-slate-400">
+                <div className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
                   <span>{dateLabel}</span>
                   {timeRange && (
                     <>
@@ -233,9 +224,9 @@ export default function PracticePlanCard({
                   )}
                 </div>
                 {plan.location && (
-                  <div className="mt-0.5 text-[11px] text-slate-400">
+                  <div className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
                     Location:{" "}
-                    <span className="font-medium text-slate-200">
+                    <span className="font-medium text-[var(--foreground)]">
                       {plan.location}
                     </span>
                   </div>
@@ -251,7 +242,7 @@ export default function PracticePlanCard({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="rounded-md border border-slate-700 px-2 py-1 text-[10px] text-slate-300 hover:border-slate-500 hover:text-slate-50"
+                className="rounded-md px-2 py-1 text-[10px] text-[var(--foreground)] bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
               >
                 Close
               </button>
@@ -259,11 +250,11 @@ export default function PracticePlanCard({
 
             {/* Status / notes */}
             <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="rounded-full border border-slate-700/80 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">
+              <span className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)] bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                 Status: {plan.status}
               </span>
               {plan.notes && (
-                <span className="rounded-md border border-slate-700/70 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-200">
+                <span className="rounded-md px-2 py-1 text-[11px] text-[var(--foreground)] bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                   Notes: {plan.notes}
                 </span>
               )}
@@ -272,51 +263,51 @@ export default function PracticePlanCard({
             {/* Sections: general, groups, individual */}
             <div className="space-y-3">
               <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                   General
                 </div>
-                <div className="rounded-md border border-slate-800 bg-slate-950/80 p-2 text-[11px] text-slate-200">
+                <div className="rounded-md p-2 text-[11px] text-[var(--foreground)] bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                   <div>Program ID: {plan.program_id}</div>
                   <div>Team season ID: {plan.team_season_id ?? "—"}</div>
                 </div>
               </div>
 
               <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                   Groups{" "}
                   {groups.length > 0 && (
-                    <span className="text-[10px] font-normal text-slate-500">
+                    <span className="text-[10px] font-normal text-[var(--muted-foreground)]">
                       ({groups.length})
                     </span>
                   )}
                 </div>
                 <div className="space-y-1.5 text-[11px]">
                   {groups.length === 0 ? (
-                    <div className="rounded-md border border-slate-800 bg-slate-950/80 p-2 text-slate-500">
+                    <div className="rounded-md p-2 text-[var(--muted-foreground)] bg-panel-muted/25 ring-1 ring-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl">
                       No group workouts for this practice.
                     </div>
                   ) : (
                     groups.map((group) => (
                       <div
                         key={group.id}
-                        className="rounded-md border border-slate-800 bg-slate-950/80 p-2"
+                        className="rounded-md p-2 bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
                       >
                         <div className="mb-1 flex items-center justify-between">
-                          <div className="font-medium text-slate-100">
+                          <div className="font-medium text-[var(--foreground)]">
                             {group.label}
                           </div>
                           {group.event_group && (
-                            <div className="rounded-full bg-slate-900 px-2 py-[1px] text-[10px] uppercase tracking-wide text-slate-400">
+                            <div className="rounded-full bg-panel-muted/35 px-2 py-[1px] text-[10px] uppercase tracking-wide text-[var(--muted-foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                               {group.event_group}
                             </div>
                           )}
                         </div>
                         {group.athletes.length === 0 ? (
-                          <div className="text-[10px] text-slate-500">
+                          <div className="text-[10px] text-[var(--muted-foreground)]">
                             No athletes assigned to this group.
                           </div>
                         ) : (
-                          <ul className="space-y-0.5 text-[10px] text-slate-300">
+                          <ul className="space-y-0.5 text-[10px] text-[var(--foreground)]">
                             {group.athletes.map((ath) => (
                               <li
                                 key={ath.id}
@@ -324,7 +315,7 @@ export default function PracticePlanCard({
                               >
                                 <span>{ath.name}</span>
                                 {ath.event_group && (
-                                  <span className="ml-2 rounded bg-slate-900 px-1 py-[1px] text-[9px] uppercase tracking-wide text-slate-500">
+                                  <span className="ml-2 rounded bg-panel-muted/35 px-1 py-[1px] text-[9px] uppercase tracking-wide text-[var(--muted-foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                                     {ath.event_group}
                                   </span>
                                 )}
@@ -339,40 +330,40 @@ export default function PracticePlanCard({
               </div>
 
               <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                   Individual assignments{" "}
                   {individualSessions.length > 0 && (
-                    <span className="text-[10px] font-normal text-slate-500">
+                    <span className="text-[10px] font-normal text-[var(--muted-foreground)]">
                       ({individualSessions.length})
                     </span>
                   )}
                 </div>
                 <div className="space-y-1.5 text-[11px]">
                   {individualSessions.length === 0 ? (
-                    <div className="rounded-md border border-slate-800 bg-slate-950/80 p-2 text-slate-500">
+                    <div className="rounded-md p-2 text-[var(--muted-foreground)] bg-panel-muted/25 ring-1 ring-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl">
                       No individual training sessions for this practice.
                     </div>
                   ) : (
                     individualSessions.map((session) => (
                       <div
                         key={session.id}
-                        className="rounded-md border border-slate-800 bg-slate-950/80 p-2"
+                        className="rounded-md p-2 bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
                       >
                         <div className="mb-1 flex items-center justify-between">
-                          <div className="font-medium text-slate-100">
+                          <div className="font-medium text-[var(--foreground)]">
                             {session.title || "Session"}
                           </div>
                           {session.event_group && (
-                            <div className="rounded-full bg-slate-900 px-2 py-[1px] text-[10px] uppercase tracking-wide text-slate-400">
+                            <div className="rounded-full bg-panel-muted/35 px-2 py-[1px] text-[10px] uppercase tracking-wide text-[var(--muted-foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                               {session.event_group}
                             </div>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-300">
+                        <div className="text-[10px] text-[var(--foreground)]">
                           Athlete: {session.athleteName}
                         </div>
                         {session.workout_category && (
-                          <div className="mt-0.5 text-[10px] text-slate-400">
+                          <div className="mt-0.5 text-[10px] text-[var(--muted-foreground)]">
                             Category: {session.workout_category}
                           </div>
                         )}
@@ -388,30 +379,35 @@ export default function PracticePlanCard({
               <button
                 type="button"
                 onClick={handleCancelClick}
-                className="rounded-md border border-red-700/80 bg-red-950/40 px-3 py-1.5 text-[11px] font-semibold text-red-100 hover:border-red-500 hover:bg-red-900/40"
+                className="rounded-md px-3 py-1.5 text-[11px] font-semibold text-red-100 ring-1 ring-red-500/60 bg-red-950/30 hover:bg-red-950/45"
               >
                 Cancel practice
               </button>
               <button
                 type="button"
                 onClick={handleEditClick}
-                className="rounded-md border border-emerald-600/80 bg-emerald-900/30 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 hover:border-emerald-400 hover:bg-emerald-800/40"
+                className="rounded-md px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] ring-1 ring-[color:var(--brand)]/50 bg-[color:var(--brand)]/15 hover:bg-[color:var(--brand)]/22"
               >
                 Edit practice
               </button>
             </div>
           </div>
         </div>
-      )}
+      </GlassModalShell>
 
       {/* Cancel note dialog overlay */}
-      {isCancelDialogOpen && (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/80 px-3">
-          <div className="w-full max-w-md rounded-lg border border-slate-800 bg-slate-950 p-4 text-xs shadow-2xl">
-            <div className="mb-2 text-sm font-semibold text-slate-50">
+      <GlassModalShell
+        open={isCancelDialogOpen}
+        onClose={() => setIsCancelDialogOpen(false)}
+        maxWidthClassName="max-w-md"
+        heightClassName="h-auto"
+      >
+        <div className="relative w-full overflow-hidden rounded-xl p-4 text-xs">
+          <div className="relative">
+            <div className="mb-2 text-sm font-semibold text-[var(--foreground)]">
               Cancel this practice?
             </div>
-            <p className="mb-2 text-[11px] text-slate-300">
+            <p className="mb-2 text-[11px] text-[var(--muted-foreground)]">
               You can optionally leave a note explaining the cancellation (for
               example, weather, facility conflict, or travel).
             </p>
@@ -419,7 +415,7 @@ export default function PracticePlanCard({
               value={cancelNote}
               onChange={(e) => setCancelNote(e.target.value)}
               rows={4}
-              className="mb-3 w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] text-slate-100 outline-none ring-0 focus:border-emerald-500"
+              className="mb-3 w-full rounded-md bg-panel-muted/35 px-3 py-2 text-[11px] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/45 focus:ring-2 focus:ring-[var(--brand)]/35 focus:outline-none"
               placeholder="Add a note for athletes and staff..."
             />
             <div className="flex justify-end gap-2">
@@ -427,7 +423,7 @@ export default function PracticePlanCard({
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setIsCancelDialogOpen(false)}
-                className="rounded-md border border-slate-700 px-3 py-1.5 text-[11px] text-slate-300 hover:border-slate-500 hover:text-slate-50 disabled:opacity-60"
+                className="rounded-md px-3 py-1.5 text-[11px] text-[var(--foreground)] bg-panel-muted/35 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35 disabled:opacity-60"
               >
                 Back
               </button>
@@ -435,14 +431,14 @@ export default function PracticePlanCard({
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleConfirmCancel}
-                className="rounded-md border border-red-700/80 bg-red-900/40 px-3 py-1.5 text-[11px] font-semibold text-red-100 hover:border-red-500 hover:bg-red-900/60 disabled:opacity-60"
+                className="rounded-md px-3 py-1.5 text-[11px] font-semibold text-red-100 ring-1 ring-red-500/60 bg-red-950/30 hover:bg-red-950/50 disabled:opacity-60"
               >
                 {isSubmitting ? "Saving..." : "Confirm cancel"}
               </button>
             </div>
           </div>
         </div>
-      )}
+      </GlassModalShell>
     </>
   );
 }

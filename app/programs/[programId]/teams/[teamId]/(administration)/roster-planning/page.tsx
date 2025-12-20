@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import RosterSandboxClient from "../RosterSandboxClient";
+import RosterSandboxClient from "../../RosterSandboxClient";
 
 export default function RosterPlanningPage() {
   const params = useParams<{ programId: string; teamId: string }>();

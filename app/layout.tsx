@@ -145,12 +145,107 @@ export default async function RootLayout({
                 </p>
               </div>
             </div>
-            <nav className="flex items-center gap-2">
-              <NavLink href="/dashboard" label="Dashboard" />
-              <NavLink href="/onboarding/coach" label="Coach Onboarding" />
-              <NavLink href="/onboarding/athlete" label="Athlete Onboarding" />
-              <NavLink href="/athletes/ffd7f622-aead-416f-8ff6-3cca7dd22b1d" label="Test Athlete" />
-            </nav>
+            <details className="group relative" id="ai-presence">
+              <summary className="list-none cursor-pointer select-none rounded-full border border-subtle bg-panel px-2 py-1 text-[11px] text-muted hover:bg-panel-muted focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]">
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--brand-soft)] ring-1 ring-panel">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/ai/avatars/william-carey.png"
+                      alt="AI avatar"
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
+                  <span className="hidden sm:inline">Assistant</span>
+                  <span className="text-subtle">▾</span>
+                </span>
+              </summary>
+
+              {/* Drop-down tray (UI-only presence). */}
+              <div className="absolute right-0 z-[10000] mt-2 w-[min(360px,92vw)]">
+                <div className="rounded-2xl border border-subtle bg-panel/70 p-3 shadow-xl backdrop-blur">
+                  {/* Primary presence row */}
+                  <div className="relative flex items-start px-3">
+                    {/* Avatar (1:1.85), aligned left */}
+                    <div
+                      className="relative overflow-hidden rounded-3xl bg-[var(--brand-soft)] ring-1 ring-panel"
+                      style={{ width: 140, aspectRatio: "1 / 1.85" }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/ai/avatars/william-carey.png"
+                        alt="AI avatar"
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    </div>
+
+                    {/* Listening indicator (top-right) */}
+                    <div className="relative left-3 top-0 inline-flex items-center gap-2 rounded-full border border-subtle bg-panel px-2.5 py-1 text-[10px] text-subtle">
+                      <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+                      Listening
+                    </div>
+                  </div>
+
+                  {/* Secondary tray (collapsed by default). Opens when the coach requests details, and can be auto-opened later during voice interactions. */}
+                  <details className="mt-3 w-full" id="ai-secondary-tray" open>
+                    <summary className="list-none cursor-pointer select-none rounded-full border border-subtle bg-panel px-2.5 py-1 text-[10px] text-subtle hover:bg-panel-muted focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]">
+                      <span className="inline-flex w-full items-center justify-between">
+                        <span>Details</span>
+                        <span className="text-subtle">▾</span>
+                      </span>
+                    </summary>
+
+                    <div className="mt-2 rounded-2xl border border-subtle bg-panel/60 p-3 shadow-sm backdrop-blur">
+                      {/* Athlete Context Card (no visible border) */}
+                      <div className="flex gap-">
+                        {/* Avatar (1:1.85), 33% width */}
+                        <div className="w-1/3">
+                          <div
+                            className="relative w-full overflow-hidden rounded-2xl bg-panel-muted/60 ring-1 ring-panel"
+                            style={{ aspectRatio: "1 / 1.85" }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`/api/athletes/53f8eeaf-8d78-42b5-b383-483117922f2a/avatar`}
+                              alt="Athlete avatar"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Primary data + warnings */}
+                        <div className="flex-1 pl-4">
+                          <p className="text-sm font-semibold text-[var(--text)]">Athlete Name</p>
+                          <div className="mt-1 space-y-0.5 text-[11px]">
+                            <p className="text-muted">
+                              Event group: <span className="text-[var(--text)]">Distance</span>
+                            </p>
+                            <p className="text-muted">
+                              Context: <span className="text-[var(--text)]">Current team · Current season</span>
+                            </p>
+                          </div>
+
+                          {/* Warnings / alerts */}
+                          <div className="mt-2 space-y-1 text-[11px]">
+                            <p className="text-[var(--danger)]">On injury watch</p>
+                            <p className="text-[var(--danger)]">Elevated fatigue risk</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pinned contextual data (below card) */}
+                      <div className="mt-4">
+                        <p className="text-[10px] uppercase tracking-wide text-subtle">Pinned context</p>
+                        <div className="mt-2 rounded-xl border border-subtle bg-panel-muted/60 p-3 text-[11px] text-muted">
+                          <p className="text-[var(--text)] font-medium">Nothing pinned yet.</p>
+                          <p className="mt-1">This area will show proposed outcomes for your approval.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </details>
           </div>
         </header>
 

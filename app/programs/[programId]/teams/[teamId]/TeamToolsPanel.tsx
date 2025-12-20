@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import RosterSandboxClient from "./RosterSandboxClient";
-import ScenarioEntriesClient from "./scenarios/[scenarioId]/ScenarioEntriesClient";
+import ScenarioEntriesClient from "./(administration)/scenarios/[scenarioId]/ScenarioEntriesClient";
 
 
 export const ACTIVE_ROSTER_TOOLS_EVENT = "xc:active-roster:tools";

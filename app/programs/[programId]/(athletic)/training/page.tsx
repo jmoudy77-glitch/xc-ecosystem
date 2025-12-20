@@ -1,4 +1,4 @@
-// app/programs/[programId]/training/page.tsx
+// app/programs/[programId]/(athletic)/training/page.tsx
 // Program Training hub (server component)
 
 import Link from "next/link";
@@ -39,6 +39,28 @@ type PracticeNavContext = {
   href: string | null;
   reason: string | null;
 };
+
+type PersistedProgramContext = {
+  teamId?: string | null;
+  teamName?: string | null;
+  seasonId?: string | null;
+  seasonName?: string | null;
+  seasonStatus?: string | null;
+};
+
+async function readPersistedProgramContext(programId: string): Promise<PersistedProgramContext> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(`xc_ctx_${programId}`)?.value;
+    if (!raw) return {};
+    const decoded = decodeURIComponent(raw);
+    const parsed = JSON.parse(decoded);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as PersistedProgramContext;
+  } catch {
+    return {};
+  }
+}
 
 export default async function ProgramTrainingPage({ params }: PageProps) {
   const { programId } = await params;
@@ -157,21 +179,30 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
     reason: null,
   };
 
-  try {
-    // Prefer primary team, fallback to first team.
-    const { data: primaryTeam, error: primaryTeamError } = await supabaseAdmin
-      .from("teams")
-      .select("id, is_primary")
-      .eq("program_id", programId)
-      .order("is_primary", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  const persistedCtx = await readPersistedProgramContext(programId);
 
-    if (primaryTeamError) {
-      throw primaryTeamError;
+  try {
+    // Prefer persisted context (team/season) chosen in the global Context Bar.
+    // If not set, fallback to primary team.
+    let teamId: string | null = (persistedCtx.teamId as string) ?? null;
+
+    if (!teamId) {
+      // Prefer primary team, fallback to first team.
+      const { data: primaryTeam, error: primaryTeamError } = await supabaseAdmin
+        .from("teams")
+        .select("id, is_primary")
+        .eq("program_id", programId)
+        .order("is_primary", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (primaryTeamError) {
+        throw primaryTeamError;
+      }
+
+      teamId = (primaryTeam?.id as string) ?? null;
     }
 
-    const teamId = (primaryTeam?.id as string) ?? null;
     if (!teamId) {
       practiceNav = {
         teamId: null,
@@ -180,22 +211,29 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
         reason: "No team found yet — create a team to start planning practices.",
       };
     } else {
-      // Prefer current season, fallback to most recent active season.
-      const { data: currentSeason, error: seasonError } = await supabaseAdmin
-        .from("team_seasons")
-        .select("id, is_current, is_active, created_at")
-        .eq("program_id", programId)
-        .eq("team_id", teamId)
-        .order("is_current", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Prefer persisted season chosen in the global Context Bar.
+      // If not set, fallback to current season (or most recent).
+      let teamSeasonId: string | null = (persistedCtx.seasonId as string) ?? null;
 
-      if (seasonError) {
-        throw seasonError;
+      if (!teamSeasonId) {
+        // Prefer current season, fallback to most recent active season.
+        const { data: currentSeason, error: seasonError } = await supabaseAdmin
+          .from("team_seasons")
+          .select("id, is_current, is_active, created_at")
+          .eq("program_id", programId)
+          .eq("team_id", teamId)
+          .order("is_current", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (seasonError) {
+          throw seasonError;
+        }
+
+        teamSeasonId = (currentSeason?.id as string) ?? null;
       }
 
-      const teamSeasonId = (currentSeason?.id as string) ?? null;
       if (!teamSeasonId) {
         practiceNav = {
           teamId,

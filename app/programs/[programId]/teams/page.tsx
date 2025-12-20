@@ -1,5 +1,3 @@
-// app/programs/[programId]/teams/page.tsx
-
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
@@ -163,17 +161,11 @@ export default async function ProgramTeamsPage({ params, searchParams }: PagePro
     season: (row.season as string | null) ?? null,
   }));
 
-  // Minimal-touch: If there is exactly one team, jump straight into it.
-  // Use `?manage=1` to force the list view (e.g., to add/manage multiple teams).
-  if (!forceManage && teams.length === 1) {
-    redirect(`/programs/${programId}/teams/${teams[0].id}`);
-  }
-
   //
   // 5) Render inside ProgramLayout shell
   //
   return (
-    <div className="flex flex-col gap-4 md:h-[calc(100vh-220px)] md:overflow-hidden">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 md:h-[calc(100vh-220px)] md:overflow-hidden">
       {/* Context (lightweight; avoids competing with the program hero) */}
       <section className="shrink-0 rounded-xl border border-subtle bg-surface/40 p-4">
         <div className="flex items-start justify-between gap-4">
@@ -197,20 +189,11 @@ export default async function ProgramTeamsPage({ params, searchParams }: PagePro
               Teams
             </h1>
             <p className="mt-1 text-[11px] text-muted">
-              Manage teams and jump into their seasons, roster builder, and active roster. If you only have one team, you’ll be taken directly into it (use <span className="font-mono">?manage=1</span> to view this list).
+              Manage the teams that make up your program. Create, edit, or review team structure here before working with seasons, rosters, and day-to-day operations.
             </p>
           </div>
 
           <div className="flex flex-col items-end gap-2 text-right text-[11px] text-muted">
-            {isManager ? (
-              <Link
-                href={`/programs/${programId}/teams?manage=1`}
-                className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 shadow-sm transition hover:bg-sky-400"
-              >
-                Add Team
-              </Link>
-            ) : null}
-
             <div className="hidden sm:block">
               <p>
                 Your role:{" "}

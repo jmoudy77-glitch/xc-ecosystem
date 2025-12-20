@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { loadProgramTheme } from "@/lib/branding";
-import { ProgramNav } from "./ProgramNav";
+import { ProgramNav, ProgramContextBar } from "./ProgramNav";
 
 type LayoutProps = {
   children: ReactNode;
@@ -55,11 +55,6 @@ function formatGenderTag(gender: string | null): string {
   if (g === "m" || g === "men" || g === "male") return "Men";
   if (g === "w" || g === "women" || g === "female") return "Women";
   return gender;
-}
-
-function formatSeasonTag(season: string | null): string {
-  if (!season) return "Season not set";
-  return season;
 }
 
 export default async function ProgramLayout({ children, params }: LayoutProps) {
@@ -236,8 +231,9 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
         color: "var(--text)",
       }}
     >
+      <div className="xc-program-shell">
       {/* Program hero header (non-negotiable for coach app) */}
-      <header className="border-b border-subtle bg-panel-muted backdrop-blur">
+      <header className="relative z-[9999] border-b border-subtle bg-panel-muted backdrop-blur">
         <div className="flex w-full items-center justify-between px-4 py-3 lg:px-8">
               <div className="flex items-center gap-3">
                 {theme.logoUrl && (
@@ -259,20 +255,10 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
                   </h1>
                 </div>
               </div>
-          <div className="flex flex-wrap justify-end gap-1 text-[11px] text-muted">
-            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-              {formatLevelTag(program.level)}
-            </span>
-            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-              {formatSportTag(program.sport)}
-            </span>
-            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-              {formatGenderTag(program.gender)}
-            </span>
-            <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-              {formatSeasonTag(program.season)}
-            </span>
-          </div>
+          <ProgramContextBar
+            programId={programId}
+            programName={program.name ?? "Program"}
+          />
         </div>
       </header>
 
@@ -286,6 +272,22 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
           {children}
         </main>
       </div>
+      </div>
+      <style>{`
+        /* Reserve space for the system-header AI tray so it never overlaps program header or workspace.
+           Uses :has() to detect the open <details id="ai-presence"> in app/layout.tsx.
+           We only reserve space on large screens; on small screens the tray can overlay. */
+        @media (min-width: 1024px) {
+          body:has(#ai-presence[open]) .xc-program-shell {
+            padding-right: 380px;
+            transition: padding-right 220ms ease;
+          }
+          body:not(:has(#ai-presence[open])) .xc-program-shell {
+            padding-right: 0px;
+            transition: padding-right 220ms ease;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -280,15 +280,7 @@ export default function TeamListClient({
                   </div>
 
                   <div className="mt-3 flex items-center justify-between text-[11px]">
-                    <p className="text-muted">
-                      Manage seasons, rosters, and scholarships.
-                    </p>
-                    <Link
-                      href={`/programs/${programId}/teams/${team.id}`}
-                      className="rounded-full border border-subtle px-2 py-1 text-[11px] text-slate-100 hover:bg-brand-soft"
-                    >
-                      Seasons &amp; rosters →
-                    </Link>
+                    <p className="text-muted">Team settings</p>
                   </div>
                 </div>
               );

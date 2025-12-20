@@ -2,7 +2,7 @@
 
 // app/claim/[inviteToken]/page.tsx
 
-import AthleteOnboardingPage from "@/app/onboarding/athlete/page";
+import AthleteOnboardingPage from "@/app/(system)/onboarding/athlete/page";
 
 export default function ClaimInvitePage() {
   // For now we reuse the canonical onboarding modal surface.

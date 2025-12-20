@@ -5,7 +5,7 @@
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
-import TeamSeasonsClient, { type TeamSeasonSummary } from "../TeamSeasonsClient";
+import TeamSeasonsClient, { type TeamSeasonSummary } from "../../TeamSeasonsClient";
 
 type PageProps = {
   params: Promise<{

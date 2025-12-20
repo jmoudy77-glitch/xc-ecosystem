@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ACTIVE_ROSTER_TOOLS_EVENT,
   type ActiveRosterToolsState,
-} from "../TeamToolsPanel";
+} from "../../TeamToolsPanel";
 import { useParams } from "next/navigation";
 import type React from "react";
 

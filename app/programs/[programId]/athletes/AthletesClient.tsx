@@ -224,7 +224,7 @@ export default function AthletesClient({
     >
       {/* No inner padding: page container controls horizontal gutters to match the program header */}
       {/* Athlete profile surface (center panel) */}
-      <WorkspacePanel className="flex-1 min-w-0 max-h-full overflow-hidden rounded-2xl">
+      <WorkspacePanel className="flex-1 min-w-0 max-h-full overflow-hidden rounded-2xl px-0 py-0">
         <div className="relative max-h-full overflow-hidden">
           {selectedAthlete ? (
             <AthleteProfileShell programId={programId} athlete={selectedAthlete} />
@@ -241,7 +241,7 @@ export default function AthletesClient({
       </WorkspacePanel>
 
       {/* Athlete list (selection rail panel) */}
-      <WorkspacePanel className="w-[360px] shrink-0 max-h-full overflow-hidden rounded-2xl">
+      <WorkspacePanel className="w-[360px] shrink-0 max-h-full overflow-hidden rounded-2xl px-0 py-0">
         <div className="flex max-h-full min-h-0 flex-col">
           {/* Top controls: search + program/season selector */}
           <div className="relative bg-black/25 backdrop-blur-md px-4 py-4 ring-1 ring-inset ring-white/8 shadow-sm shadow-black/30">
@@ -313,7 +313,7 @@ export default function AthletesClient({
           </div>
 
           {/* Grouped list */}
-          <div className="relative flex-1 min-h-0 overflow-hidden px-4 pr-5 py-2 flex flex-col max-h-full">
+          <div className="relative flex-1 min-h-0 overflow-hidden px-1 pr-2 py-1 flex flex-col max-h-full">
             <div className="pointer-events-none sticky top-0 z-10 h-4 bg-gradient-to-b from-surface/60 to-transparent" />
             <div
               className={[

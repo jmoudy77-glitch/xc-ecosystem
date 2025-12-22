@@ -36,7 +36,7 @@ export default function AthleteProfileShell({ programId, athlete }: Props) {
         {/* Header band (module header + tabs) */}
         <div className="bg-transparent">
           {/* Header */}
-          <div className="flex items-center gap-4 px-6 py-4 min-w-0 border-b border-white/8 bg-transparent">
+          <div className="flex items-center gap-4 px-2 py-4 min-w-0 border-b border-white/8 bg-transparent">
             <div className="h-12 w-12 rounded-full bg-black/25 backdrop-blur-xl flex items-center justify-center text-sm font-semibold ring-1 ring-inset ring-white/8">
               {athlete.athlete.firstName[0]}
               {athlete.athlete.lastName[0]}
@@ -66,7 +66,7 @@ export default function AthleteProfileShell({ programId, athlete }: Props) {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 bg-transparent border-b border-white/8">
+          <div className="px-4 bg-transparent border-b border-white/8">
             <div className="flex gap-6 text-sm">
               <Tab
                 label="Overview"
@@ -98,7 +98,7 @@ export default function AthleteProfileShell({ programId, athlete }: Props) {
         </div>
 
         {/* Content */}
-        <div className={"flex-1 overflow-y-auto px-6 pb-6 pt-4 " + GLASS_SCROLLBAR}>
+        <div className={"flex-1 overflow-y-auto px-2 pb-6 pt-4 " + GLASS_SCROLLBAR}>
           <div className="min-h-full">
             {activeTab === "overview" && <OverviewTab athlete={athlete} />}
             {activeTab === "performance" && (

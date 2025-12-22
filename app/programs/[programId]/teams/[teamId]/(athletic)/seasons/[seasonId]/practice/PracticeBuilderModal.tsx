@@ -383,6 +383,8 @@ type PracticeBuilderModalProps = {
   seasonName?: string;
   dateIso: string;
   displayDate: string;
+  /** Optional start time seed when creating a new practice from a calendar timeslot (ISO string). */
+  initialStartTimeIso?: string;
   groups: PracticeGroupUI[];
   // When editing an existing practice, we can seed initial values
   initialPractice?: {
@@ -429,6 +431,7 @@ export default function PracticeBuilderModal({
   seasonName,
   dateIso,
   displayDate,
+  initialStartTimeIso,
   groups,
   initialPractice,
   initialDetails,
@@ -436,15 +439,47 @@ export default function PracticeBuilderModal({
   // Helper to normalize DB timestamps or time strings into `HH:MM` for <input type="time">
   const extractTime = (value: string | null | undefined): string => {
     if (!value) return "";
+
+    const raw = String(value).trim();
+    if (!raw) return "";
+
     // If already looks like HH:MM, return as-is
-    if (/^\d{2}:\d{2}$/.test(value)) return value;
-    // If it's an ISO-like string, grab the time portion
-    const tIndex = value.indexOf("T");
-    if (tIndex !== -1 && value.length >= tIndex + 5) {
-      return value.slice(tIndex + 1, tIndex + 6);
+    if (/^\d{2}:\d{2}$/.test(raw)) return raw;
+
+    // If it's an ISO (or ISO-like) datetime, parse and return LOCAL HH:MM.
+    if (raw.includes("T")) {
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) {
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        return `${hh}:${mm}`;
+      }
+
+      // Fallback: try to grab the time portion.
+      const tIndex = raw.indexOf("T");
+      if (tIndex !== -1 && raw.length >= tIndex + 5) {
+        return raw.slice(tIndex + 1, tIndex + 6);
+      }
     }
+
     return "";
   };
+
+  // Helper to add minutes to an HH:MM string.
+  const addMinutesToHHMM = (hhmm: string, minutesToAdd: number): string => {
+    if (!/^\d{2}:\d{2}$/.test(hhmm)) return "";
+    const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
+    const total = h * 60 + m + minutesToAdd;
+    const clamped = ((total % (24 * 60)) + (24 * 60)) % (24 * 60);
+    const nh = Math.floor(clamped / 60);
+    const nm = clamped % 60;
+    return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
+  };
+
+  const seededStartHHMM = useMemo(() => {
+    if (!initialStartTimeIso) return "";
+    return extractTime(initialStartTimeIso);
+  }, [initialStartTimeIso]);
 
   const [showIndividualPanel, setShowIndividualPanel] = useState(false);
   const safeGroups = groups ?? [];
@@ -754,7 +789,13 @@ export default function PracticeBuilderModal({
     if (dateIso) {
       setPracticeDate(dateIso);
     }
-  }, [open, dateIso, initialPractice?.practice_date]);
+
+    // Creating: seed start/end time from a clicked timeslot if provided.
+    if (!initialPractice && seededStartHHMM) {
+      setStartTime(seededStartHHMM);
+      setEndTime((prev) => prev || addMinutesToHHMM(seededStartHHMM, 90));
+    }
+  }, [open, dateIso, initialPractice, initialPractice?.practice_date, seededStartHHMM]);
   const headerDisplayDate = useMemo(() => {
   const iso = (practiceDate || dateIso || "").trim();
   if (!iso) return displayDate;
@@ -770,10 +811,10 @@ export default function PracticeBuilderModal({
   }).format(d);
 }, [practiceDate, dateIso, displayDate]);
   const [startTime, setStartTime] = useState(
-    extractTime(initialPractice?.start_time ?? "")
+    extractTime(initialPractice?.start_time ?? "") || seededStartHHMM
   );
   const [endTime, setEndTime] = useState(
-    extractTime(initialPractice?.end_time ?? "")
+    extractTime(initialPractice?.end_time ?? "") || (seededStartHHMM ? addMinutesToHHMM(seededStartHHMM, 90) : "")
   );
   const [location, setLocation] = useState(initialPractice?.location ?? "");
   const [notes, setNotes] = useState(initialPractice?.notes ?? "");
@@ -897,6 +938,14 @@ export default function PracticeBuilderModal({
 
     setIsSaving(true);
     try {
+      // Convert local HH:MM inputs into ISO timestamps so the server/DB stores the correct moment.
+      // (If we send bare HH:MM, the server currently treats it as UTC and it displays ~6 hours early.)
+      const startTimeIso = startTime
+        ? new Date(`${practiceDate}T${startTime}:00`).toISOString()
+        : null;
+      const endTimeIso = endTime
+        ? new Date(`${practiceDate}T${endTime}:00`).toISOString()
+        : null;
       const payload = {
         // ✅ send both camel + snake so the route can read either
         programId,
@@ -910,8 +959,8 @@ export default function PracticeBuilderModal({
 
         practiceLabel,
         practiceDate,
-        startTime,
-        endTime,
+        startTime: startTimeIso,
+        endTime: endTimeIso,
         location,
         notes,
         groups: uiGroups,

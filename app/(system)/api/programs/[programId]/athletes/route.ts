@@ -1,4 +1,4 @@
-// app/api/programs/[programId]/athletes/route.ts
+// app/(system)/api/programs/[programId]/athletes/route.ts
 // Program-level athletes endpoint: list and attach athletes to a program.
 // This is the backbone for the recruiting board & roster views at the program level.
 
@@ -139,70 +139,33 @@ export async function GET(
   }
 
   const { searchParams } = new URL(req.url);
+
+  // Filters
   const relationshipType = searchParams.get(
     "relationshipType",
   ) as RelationshipType | null;
-  const status = searchParams.get("status") ?? null;
+  const status = searchParams.get("status")?.trim() || null;
+  const eventGroup = searchParams.get("eventGroup")?.trim() || null;
+  const gradYear = searchParams.get("gradYear")?.trim() || null;
+
+  // Search
   const q = searchParams.get("q")?.trim() || null;
 
+  // Options
+  const include = (searchParams.get("include") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const includeScore = include.includes("score");
+
+  const limit = Math.min(
+    Math.max(parseInt(searchParams.get("limit") || "50", 10), 1),
+    200,
+  );
+  const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10), 0);
+
   try {
-    // SEARCH MODE (used by Scenario Add modal)
-    if (q) {
-      const { data, error } = await supabaseAdmin
-        .from("program_athletes")
-        .select(
-          `
-          id,
-          athlete_id,
-          relationship_type,
-          status,
-          athlete:athletes!inner(
-            id,
-            first_name,
-            last_name,
-            grad_year,
-            event_group
-          )
-        `
-        )
-        .eq("program_id", programId)
-        .is("archived_at", null)
-        .not("athlete_id", "is", null)
-        .or(
-          `first_name.ilike.%${q}%,last_name.ilike.%${q}%`, { foreignTable: "athletes" }
-        )
-        .order("created_at", { ascending: false })
-        .limit(25);
-
-      if (error) {
-        console.error(
-          "[/api/programs/[programId]/athletes] search error:",
-          error,
-        );
-        return NextResponse.json(
-          { error: "Failed to search program athletes" },
-          { status: 500 },
-        );
-      }
-
-      const results = (data || []).filter((row: any) => row?.athlete).map((row: any) => ({
-        id: row.athlete.id,
-        programAthleteId: row.id,
-        first_name: row.athlete.first_name,
-        last_name: row.athlete.last_name,
-        grad_year: row.athlete.grad_year,
-        event_group: row.athlete.event_group ?? null,
-        relationship_type: row.relationship_type,
-        status: row.status,
-      }));
-
-      return NextResponse.json(
-        { programId, athletes: results },
-        { status: 200 },
-      );
-    }
-
-    // DEFAULT LIST MODE (existing behavior)
+    // Base select: always include athlete fields so UI never has to “guess” how to join
     let query = supabaseAdmin
       .from("program_athletes")
       .select(
@@ -217,12 +180,28 @@ export async function GET(
         created_by_program_member_id,
         created_at,
         updated_at,
-        archived_at
+        archived_at,
+        athlete:athletes!inner(
+          id,
+          first_name,
+          last_name,
+          grad_year,
+          event_group,
+          avatar_url,
+          gender,
+          hs_school_name,
+          hs_city,
+          hs_state,
+          hs_country,
+          is_claimed
+        )
       `,
       )
       .eq("program_id", programId)
       .is("archived_at", null)
-      .order("created_at", { ascending: false });
+      .not("athlete_id", "is", null)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (relationshipType) {
       query = query.eq("relationship_type", relationshipType);
@@ -230,6 +209,25 @@ export async function GET(
 
     if (status) {
       query = query.eq("status", status);
+    }
+
+    if (eventGroup) {
+      query = query.eq("athlete.event_group", eventGroup);
+    }
+
+    if (gradYear) {
+      const gy = parseInt(gradYear, 10);
+      if (!Number.isNaN(gy)) {
+        query = query.eq("athlete.grad_year", gy);
+      }
+    }
+
+    if (q) {
+      // Name search on joined athletes table
+      query = query.or(
+        `first_name.ilike.%${q}%,last_name.ilike.%${q}%`,
+        { foreignTable: "athletes" },
+      );
     }
 
     const { data, error } = await query;
@@ -245,12 +243,93 @@ export async function GET(
       );
     }
 
-    const results: ProgramAthlete[] = (data as any[]) ?? [];
+    const rows = (data as any[]) ?? [];
+
+    // Shape normalization
+    const athletes = rows
+      .filter((row) => row?.athlete)
+      .map((row) => ({
+        programAthleteId: row.id as string,
+        programId: row.program_id as string,
+        athleteId: row.athlete_id as string,
+        relationshipType: row.relationship_type as RelationshipType,
+        status: (row.status ?? null) as ProgramAthleteStatus,
+        level: (row.level ?? null) as string | null,
+        source: (row.source ?? null) as string | null,
+        createdAt: row.created_at as string,
+        updatedAt: row.updated_at as string,
+        archivedAt: (row.archived_at ?? null) as string | null,
+        athlete: {
+          id: row.athlete.id as string,
+          firstName: row.athlete.first_name as string,
+          lastName: row.athlete.last_name as string,
+          gradYear: row.athlete.grad_year as number,
+          eventGroup: (row.athlete.event_group ?? null) as string | null,
+          avatarUrl: (row.athlete.avatar_url ?? null) as string | null,
+          gender: (row.athlete.gender ?? null) as string | null,
+          hsSchoolName: (row.athlete.hs_school_name ?? null) as string | null,
+          hsCity: (row.athlete.hs_city ?? null) as string | null,
+          hsState: (row.athlete.hs_state ?? null) as string | null,
+          hsCountry: (row.athlete.hs_country ?? null) as string | null,
+          isClaimed: !!row.athlete.is_claimed,
+        },
+        score: null as null | {
+          globalOverall: number;
+          academicScore: number;
+          performanceScore: number;
+          availabilityScore: number;
+          conductScore: number;
+          coachableScore: number;
+        },
+      }));
+
+    // Optional: include athlete_scores in list payload (one extra query, deterministic mapping)
+    if (includeScore && athletes.length > 0) {
+      const athleteIds = athletes.map((a) => a.athleteId);
+
+      const { data: scoreRows, error: scoreError } = await supabaseAdmin
+        .from("athlete_scores")
+        .select(
+          "athlete_id, global_overall, academic_score, performance_score, availability_score, conduct_score, coachable_score",
+        )
+        .in("athlete_id", athleteIds);
+
+      if (scoreError) {
+        console.error(
+          "[/api/programs/[programId]/athletes] athlete_scores select error:",
+          scoreError,
+        );
+        // Do not fail the entire request — return list without scores.
+      } else {
+        const scoreByAthleteId = new Map<string, any>();
+        for (const s of (scoreRows as any[]) ?? []) {
+          scoreByAthleteId.set(s.athlete_id, s);
+        }
+        for (const a of athletes) {
+          const s = scoreByAthleteId.get(a.athleteId);
+          if (s) {
+            a.score = {
+              globalOverall: Number(s.global_overall ?? 0),
+              academicScore: Number(s.academic_score ?? 0),
+              performanceScore: Number(s.performance_score ?? 0),
+              availabilityScore: Number(s.availability_score ?? 0),
+              conductScore: Number(s.conduct_score ?? 0),
+              coachableScore: Number(s.coachable_score ?? 0),
+            };
+          }
+        }
+      }
+    }
 
     return NextResponse.json(
       {
         programId,
-        athletes: results,
+        athletes,
+        meta: {
+          limit,
+          offset,
+          returned: athletes.length,
+        },
       },
       { status: 200 },
     );

@@ -2,8 +2,9 @@
 //app/programs/[programId]/teams/[teamId]/seasons/[seasonId]/practice/PracticePageClient.tsx
 import { useEffect, useMemo, useState } from "react";
 import GroupAssignmentsDrawer from "./GroupAssignmentsDrawer";
+import PracticeBuilderModal from "./PracticeBuilderModal";
 
-type PracticeSummary = {
+export type PracticeSummary = {
   id: string;
   program_id: string;
   team_season_id: string;
@@ -29,7 +30,7 @@ type PracticeWithGroups = {
   }>;
 };
 
-type DateRange = {
+export type DateRange = {
   from: string; // YYYY-MM-DD
   to: string;   // YYYY-MM-DD
 };
@@ -39,6 +40,116 @@ type PracticePageClientProps = {
   teamId: string;
   teamSeasonId: string;
 };
+
+export function PracticeWeekList({
+  dateRange,
+  practices,
+  selectedPracticeId,
+  isLoading,
+  error,
+  onSelectPractice,
+  onPrevWeek,
+  onToday,
+  onNextWeek,
+  onCreatePractice,
+  headerSubtitle,
+}: {
+  dateRange: DateRange;
+  practices: PracticeSummary[];
+  selectedPracticeId: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onSelectPractice: (id: string) => void;
+  onPrevWeek: () => void;
+  onToday: () => void;
+  onNextWeek: () => void;
+  onCreatePractice?: () => void;
+  headerSubtitle?: string;
+}) {
+  return (
+    <section className="relative flex flex-col rounded-xl bg-panel/70 p-4 ring-1 ring-white/10 shadow-[0_18px_60px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+      <header className="mb-3 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Practice schedule</h2>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            {headerSubtitle ?? "Weekly list for the current team season."}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          {onCreatePractice ? (
+            <button
+              className="rounded-lg px-3 py-2 text-[11px] font-semibold text-[var(--foreground)] bg-[var(--brand)]/22 ring-1 ring-[var(--brand)]/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] hover:bg-[var(--brand)]/28 hover:ring-[var(--brand)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
+              onClick={onCreatePractice}
+            >
+              + Practice
+            </button>
+          ) : null}
+          <div className="flex items-center gap-1 text-xs">
+            <button
+              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+              onClick={onPrevWeek}
+            >
+              ◀ Prev
+            </button>
+            <button
+              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+              onClick={onToday}
+            >
+              Today
+            </button>
+            <button
+              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+              onClick={onNextWeek}
+            >
+              Next ▶
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="mb-2 text-xs text-[var(--muted-foreground)]">
+        Range: {dateRange.from} → {dateRange.to}
+      </div>
+
+      {isLoading ? (
+        <div className="text-xs text-[var(--muted-foreground)]">Loading practices…</div>
+      ) : null}
+      {error ? (
+        <div className="rounded-md border border-dashed border-rose-500/30 bg-rose-500/10 p-2 text-xs text-rose-200 ring-1 ring-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          Error: {error}
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex-1 overflow-y-auto space-y-2">
+        {practices.length === 0 && !isLoading ? (
+          <div className="text-xs text-[var(--muted-foreground)]">
+            No practices in this range.
+          </div>
+        ) : (
+          practices.map((p) => {
+            const isSelected = p.id === selectedPracticeId;
+            return (
+              <button
+                key={p.id}
+                onClick={() => onSelectPractice(p.id)}
+                className={[
+                  "w-full rounded-xl px-3 py-2 text-left ring-1 ring-white/10 bg-panel-muted/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/40",
+                  isSelected ? "ring-[var(--brand)]/55 bg-[var(--brand)]/12" : "",
+                ].join(" ")}
+              >
+                <div className="flex justify-between">
+                  <span className="font-medium">{p.label}</span>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.practice_date}</span>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </section>
+  );
+}
 
 function getInitialDateRange(): DateRange {
   const today = new Date();
@@ -78,6 +189,28 @@ export default function PracticePageClient({
 
   // Group assignments drawer state (stub for now)
   const [activeGroupForAssignments, setActiveGroupForAssignments] = useState<string | null>(null);
+
+  // Practice builder modal state (create)
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [builderDateIso, setBuilderDateIso] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [builderInitialStartTimeIso, setBuilderInitialStartTimeIso] = useState<string | undefined>(undefined);
+
+  const builderDisplayDate = useMemo(() => {
+    try {
+      // Display in a friendly local format; keep it stable even if locale differs.
+      const [y, m, d] = builderDateIso.split("-").map((n) => parseInt(n, 10));
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return builderDateIso;
+    }
+  }, [builderDateIso]);
+
+  function openBuilderForDate(dateIso: string, initialStartTimeIso?: string) {
+    setBuilderDateIso(dateIso);
+    setBuilderInitialStartTimeIso(initialStartTimeIso);
+    setIsBuilderOpen(true);
+  }
 
   // ------- Data fetching helpers -------
 
@@ -276,80 +409,20 @@ return (
     <div className="relative flex h-full gap-4 rounded-xl ring-1 ring-panel bg-panel-muted/15 p-4 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
       {/* Left pane: practices list / calendar */}
-      <section className="relative w-1/3 flex flex-col rounded-xl bg-panel/70 p-4 ring-1 ring-white/10 shadow-[0_18px_60px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
-        <header className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--foreground)]">Practice schedule</h2>
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Weekly list for the current team season.
-            </p>
-          </div>
-          <div className="flex items-center gap-1 text-xs">
-            <button
-              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
-              onClick={() => handleChangeWeek(-7)}
-            >
-              ◀ Prev
-            </button>
-            <button
-              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
-              onClick={() => setDateRange(getInitialDateRange())}
-            >
-              Today
-            </button>
-            <button
-              className="rounded-lg bg-panel-muted/35 px-2.5 py-1.5 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
-              onClick={() => handleChangeWeek(7)}
-            >
-              Next ▶
-            </button>
-          </div>
-        </header>
-
-        <div className="mb-2 text-xs text-[var(--muted-foreground)]">
-          Range: {dateRange.from} → {dateRange.to}
-        </div>
-
-        {isLoadingPractices && (
-          <div className="text-xs text-[var(--muted-foreground)]">Loading practices…</div>
-        )}
-        {practicesError && (
-          <div className="rounded-md border border-dashed border-rose-500/30 bg-rose-500/10 p-2 text-xs text-rose-200 ring-1 ring-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">Error: {practicesError}</div>
-        )}
-
-        <div className="mt-3 flex-1 overflow-y-auto space-y-2">
-          {practices.length === 0 && !isLoadingPractices ? (
-            <div className="text-xs text-[var(--muted-foreground)]">
-              No practices in this range. Use the controls above to change dates or create a
-              new practice (hook this up later).
-            </div>
-          ) : (
-            practices.map((p) => {
-              const isSelected = p.id === selectedPracticeId;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => handleSelectPractice(p.id)}
-                  className={[
-                    "w-full rounded-xl px-3 py-2 text-left ring-1 ring-white/10 bg-panel-muted/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/40",
-                    isSelected
-                      ? "ring-[var(--brand)]/55 bg-[var(--brand)]/12"
-                      : "",
-                  ].join(" ")}
-                >
-                  <div className="flex justify-between">
-                    <span className="font-medium">{p.label}</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)]">
-                      {p.practice_date}
-                    </span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </section>
+      <div className="w-1/3">
+        <PracticeWeekList
+          dateRange={dateRange}
+          practices={practices}
+          selectedPracticeId={selectedPracticeId}
+          isLoading={isLoadingPractices}
+          error={practicesError}
+          onSelectPractice={handleSelectPractice}
+          onPrevWeek={() => handleChangeWeek(-7)}
+          onToday={() => setDateRange(getInitialDateRange())}
+          onNextWeek={() => handleChangeWeek(7)}
+          onCreatePractice={() => openBuilderForDate(new Date().toISOString().slice(0, 10))}
+        />
+      </div>
 
       {/* Right pane: practice detail */}
       <section className="relative flex-1 flex flex-col rounded-xl bg-panel/70 p-4 ring-1 ring-white/10 shadow-[0_18px_60px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
@@ -541,6 +614,21 @@ return (
           </div>
         )}
       </section>
+      <PracticeBuilderModal
+        open={isBuilderOpen}
+        onClose={() => {
+          setIsBuilderOpen(false);
+          // refresh practices after close so newly created practices appear
+          fetchPractices(dateRange);
+        }}
+        programId={programId}
+        teamId={teamId}
+        seasonId={teamSeasonId}
+        dateIso={builderDateIso}
+        displayDate={builderDisplayDate}
+        groups={[]}
+        initialStartTimeIso={builderInitialStartTimeIso}
+      />
     </div>
   );
 }

@@ -33,8 +33,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-50">
-      <header className="border-b border-slate-800">
+    <div className="min-h-screen flex flex-col bg-transparent text-[var(--foreground)]">
+      <header className="border-b border-[var(--border)] panel-muted">
         <div className="mx-auto max-w-6xl flex items-center justify-between px-4 py-3">
           <Link href="/dashboard" className="font-semibold tracking-tight text-sm">
             XC Ecosystem
@@ -53,8 +53,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                     "px-3 py-1.5 rounded-full border transition",
                     "font-medium",
                     isActive
-                      ? "bg-slate-100 text-slate-900 border-slate-100"
-                      : "border-slate-700 text-slate-200 hover:border-slate-300 hover:text-white",
+                      ? "bg-panel-muted text-[var(--foreground)] border-[var(--border)]"
+                      : "border-[var(--border)]/70 text-[var(--muted-foreground)] hover:border-[var(--border)] hover:text-[var(--foreground)]",
                   ].join(" ")}
                 >
                   {link.label}

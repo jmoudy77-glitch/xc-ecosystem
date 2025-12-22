@@ -420,9 +420,8 @@ const NAV_ITEMS: NavItem[] = [
     href: (programId) => `/programs/${programId}/dashboard`,
   },
   {
-    // Program-scoped Athletes page is not yet a first-class route; use global Athletes landing.
     label: "Athletes",
-    href: () => `/athletes/me`,
+    href: (programId) => `/programs/${programId}/athletes`,
   },
   {
     label: "Training",
@@ -433,8 +432,12 @@ const NAV_ITEMS: NavItem[] = [
     href: (programId) => `/programs/${programId}/recruiting`,
   },
   {
+    label: "Performance",
+    href: (programId) => `/programs/${programId}/scoring`,
+  },
+  {
     label: "Resources",
-    href: () => `/knowledge`,
+    href: () => `#`,
   },
 ];
 
@@ -443,14 +446,29 @@ export function ProgramNav() {
   const programId = params?.programId;
   const pathname = usePathname();
   const [adminOpen, setAdminOpen] = useState(false);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [navCtx, setNavCtx] = useState<PersistedContext>({});
 
   if (!programId) return null;
+
+  useEffect(() => {
+    setNavCtx(readCtx(programId));
+  }, [programId, pathname]);
+
+  useEffect(() => {
+    setAdminOpen(false);
+    setResourcesOpen(false);
+  }, [programId, pathname]);
 
   const billingHref = `/programs/${programId}/billing`;
   const brandingHref = `/programs/${programId}/settings/branding`;
   const staffHref = `/programs/${programId}/staff`;
   const accountHref = `/programs/${programId}/account`;
-  const rosterHref = `/programs/${programId}/teams`;
+  const teamsHref = `/programs/${programId}/teams`;
+  const facilitiesHref = `/programs/${programId}/facilities`;
+  const rosterPlanningHref = navCtx.teamId
+    ? `/programs/${programId}/teams/${navCtx.teamId}/roster-planning`
+    : teamsHref;
 
   const isBillingActive =
     pathname === billingHref || pathname.startsWith(billingHref);
@@ -459,33 +477,89 @@ export function ProgramNav() {
   const isStaffActive = pathname === staffHref || pathname.startsWith(staffHref);
   const isAccountActive =
     pathname === accountHref || pathname.startsWith(accountHref);
-  const isRosterActive =
-    pathname === rosterHref ||
-    pathname.startsWith(rosterHref + "/") ||
+  const isTeamsActive = pathname === teamsHref || pathname.startsWith(teamsHref + "/");
+  const isFacilitiesActive =
+    pathname === facilitiesHref || pathname.startsWith(facilitiesHref + "/");
+
+  const isRosterPlanningActive =
     pathname.includes("/roster-planning") ||
+    pathname.startsWith(rosterPlanningHref + "/") ||
     pathname.includes("/scenarios/") ||
-    (pathname.includes("/seasons/") && (pathname.includes("/roster") || pathname.includes("/scholarship-history"))) ||
+    (pathname.includes("/seasons/") &&
+      (pathname.includes("/roster") || pathname.includes("/scholarship-history"))) ||
     pathname.includes("/active-roster");
 
   return (
-    <div className="flex flex-col gap-4 text-[11px]">
+    <div className="flex flex-col gap-4 bg-transparent text-[11px]">
       {/* Primary program navigation */}
-      <nav className="space-y-1">
+      <nav className="space-y-1 bg-transparent">
         {NAV_ITEMS.map((item) => {
           const href = item.href(programId);
           const isActive =
             pathname === href ||
             (href !== `/programs/${programId}` && pathname.startsWith(href));
 
+          if (item.label === "Resources") {
+            return (
+              <div key={item.label} className="space-y-1 bg-transparent">
+                <button
+                  type="button"
+                  onClick={() => setResourcesOpen((open) => !open)}
+                  className="glass-pill glass-pill--brand-soft flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 text-[11px] text-muted transition-colors"
+                  aria-expanded={resourcesOpen}
+                >
+                  <span>Resources</span>
+                  <span className="text-[9px] opacity-60">{resourcesOpen ? "▾" : "▸"}</span>
+                </button>
+
+                {resourcesOpen && (
+                  <div className="space-y-1 pl-3 bg-transparent">
+                    <Link
+                      href="/knowledge"
+                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
+                    >
+                      <span>Knowledge</span>
+                      <span className="text-[9px] opacity-60">→</span>
+                    </Link>
+
+                    <Link
+                      href="/files"
+                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
+                    >
+                      <span>Files</span>
+                      <span className="text-[9px] opacity-60">→</span>
+                    </Link>
+
+                    <Link
+                      href="/media"
+                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
+                    >
+                      <span>Media</span>
+                      <span className="text-[9px] opacity-60">→</span>
+                    </Link>
+
+                    <Link
+                      href="/gear"
+                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
+                    >
+                      <span>Gear</span>
+                      <span className="text-[9px] opacity-60">→</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <Link
               key={item.label}
               href={href}
               className={[
-                "flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
                 isActive
-                  ? "bg-brand"
-                  : "bg-brand-soft hover:bg-brand-soft/80 text-muted",
+                  ? "glass-pill--brand glass-pill--active"
+                  : "glass-pill--brand-soft text-muted",
               ].join(" ")}
             >
               <span>{item.label}</span>
@@ -494,17 +568,17 @@ export function ProgramNav() {
           );
         })}
 
-        <div className="flex items-center justify-between rounded-lg border border-subtle bg-brand-soft px-3 py-2 text-muted opacity-60 cursor-not-allowed">
+        <div className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted opacity-60 cursor-not-allowed">
           <span>Meets (Coming Soon)</span>
           <span className="text-[9px] opacity-60">•</span>
         </div>
 
         {/* Administration group (collapsible) */}
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 space-y-1 bg-transparent">
           <button
             type="button"
             onClick={() => setAdminOpen((open) => !open)}
-            className="flex w-full items-center justify-between rounded-lg border border-subtle bg-brand-soft px-3 py-2 text-[11px] text-muted transition-colors hover:bg-brand-soft/80"
+            className="glass-pill glass-pill--brand-soft flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 text-[11px] text-muted transition-colors"
             aria-expanded={adminOpen}
           >
             <span>Administration</span>
@@ -512,27 +586,51 @@ export function ProgramNav() {
           </button>
 
           {adminOpen && (
-            <div className="space-y-1 pl-3">
+            <div className="space-y-1 pl-3 bg-transparent">
               <Link
-                href={rosterHref}
+                href={teamsHref}
                 className={[
-                  "flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isRosterActive
-                    ? "bg-brand"
-                    : "bg-brand-soft hover:bg-brand-soft/80 text-muted",
+                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                  isTeamsActive
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
                 ].join(" ")}
               >
-                <span>Roster</span>
+                <span>Teams</span>
+                <span className="text-[9px] opacity-60">→</span>
+              </Link>
+              <Link
+                href={facilitiesHref}
+                className={[
+                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                  isFacilitiesActive
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
+                ].join(" ")}
+              >
+                <span>Facilities</span>
+                <span className="text-[9px] opacity-60">→</span>
+              </Link>
+              <Link
+                href={rosterPlanningHref}
+                className={[
+                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                  isRosterPlanningActive
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
+                ].join(" ")}
+              >
+                <span>Roster Planning</span>
                 <span className="text-[9px] opacity-60">→</span>
               </Link>
 
               <Link
                 href={staffHref}
                 className={[
-                  "flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
                   isStaffActive
-                    ? "bg-brand"
-                    : "bg-brand-soft hover:bg-brand-soft/80 text-muted",
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
                 ].join(" ")}
               >
                 <span>Staff</span>
@@ -542,10 +640,10 @@ export function ProgramNav() {
               <Link
                 href={brandingHref}
                 className={[
-                  "flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
                   isBrandingActive
-                    ? "bg-brand"
-                    : "bg-brand-soft hover:bg-brand-soft/80 text-muted",
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
                 ].join(" ")}
               >
                 <span>Branding</span>
@@ -555,10 +653,10 @@ export function ProgramNav() {
               <Link
                 href={billingHref}
                 className={[
-                  "flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
                   isBillingActive
-                    ? "bg-brand"
-                    : "bg-brand-soft hover:bg-brand-soft/80 text-muted",
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
                 ].join(" ")}
               >
                 <span>Billing</span>
@@ -568,10 +666,10 @@ export function ProgramNav() {
               <Link
                 href={accountHref}
                 className={[
-                  "flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
                   isAccountActive
-                    ? "bg-brand"
-                    : "bg-brand-soft hover:bg-brand-soft/80 text-muted",
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
                 ].join(" ")}
               >
                 <span>Account</span>

@@ -503,6 +503,433 @@ async function getPracticePlansForSeason(args: {
   return (data ?? []) as PracticePlan[];
 }
 
+export function PracticePlannerWeeklySurface({
+  mode,
+  programId,
+  teamId,
+  seasonId,
+  headerTeamName,
+  headerSeasonLabel,
+  headerAcademicYear,
+  startOfWeek,
+  endOfWeek,
+  prevWeek,
+  nextWeek,
+  todayKey,
+  practicePlans,
+  rosterGroups,
+  editPractice,
+  editDetails,
+  editPracticeDateKey,
+  editTs,
+  weeklyWeather,
+  heatPolicy,
+  weekNavBaseHref,
+  daySelectBaseHref,
+  scope,
+}: {
+  mode: "practice" | "training";
+  programId: string;
+  teamId: string;
+  seasonId: string;
+  headerTeamName: string;
+  headerSeasonLabel: string;
+  headerAcademicYear: string;
+  startOfWeek: Date;
+  endOfWeek: Date;
+  prevWeek: Date;
+  nextWeek: Date;
+  todayKey: string;
+  practicePlans: PracticePlan[];
+  rosterGroups: PracticeGroupUI[];
+  editPractice: PracticePlan | null;
+  editDetails: PracticePopoverData | null;
+  editPracticeDateKey: string | null;
+  editTs: string | null;
+  weeklyWeather: any[];
+  heatPolicy: any;
+  weekNavBaseHref?: string;
+  daySelectBaseHref?: string;
+  scope?: "team" | "program";
+}) {
+  const isTrainingMode = mode === "training";
+
+  const resolvedScope: "team" | "program" = scope ?? "team";
+
+  const defaultPracticeBaseHref = `/programs/${programId}/teams/${teamId}/seasons/${seasonId}/practice`;
+  const defaultTrainingBaseHref = `/programs/${programId}/training`;
+
+  const navBase = weekNavBaseHref ?? (isTrainingMode ? defaultTrainingBaseHref : defaultPracticeBaseHref);
+  const dayBase = daySelectBaseHref ?? navBase;
+
+  const weekKey = formatISODate(startOfWeek);
+
+  const withQuery = (base: string, q: Record<string, string | undefined>) => {
+    const entries = Object.entries(q).filter(([, v]) => v != null && v !== "");
+    const qs = entries
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v as string)}`)
+      .join("&");
+    return qs ? `${base}?${qs}` : base;
+  };
+
+  return (
+    <section className="relative w-full overflow-visible rounded-xl panel bg-panel/70 p-5 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_22px_90px_rgba(0,0,0,0.30)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(1100px_180px_at_50%_0%,rgba(255,255,255,0.08),transparent_70%)]" />
+
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">
+            Practice calendar
+          </h2>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            High-level weekly view with practice cards and quick access to the builder. Use it
+            to see and adjust the flow of the week.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isTrainingMode ? (
+            <div className="mr-2 inline-flex items-center gap-1 rounded-lg bg-panel-muted/35 p-1 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+              <Link
+                href={withQuery(navBase, { week: weekKey, scope: "team" })}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35 ${
+                  resolvedScope === "team"
+                    ? "bg-panel/70 text-[var(--foreground)] ring-1 ring-white/10"
+                    : "text-[var(--muted-foreground)] hover:bg-panel/40"
+                }`}
+              >
+                Team
+              </Link>
+              <Link
+                href={withQuery(navBase, { week: weekKey, scope: "program" })}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35 ${
+                  resolvedScope === "program"
+                    ? "bg-panel/70 text-[var(--foreground)] ring-1 ring-white/10"
+                    : "text-[var(--muted-foreground)] hover:bg-panel/40"
+                }`}
+              >
+                Program
+              </Link>
+            </div>
+          ) : null}
+          <Link
+            href={withQuery(navBase, { week: formatISODate(prevWeek), scope: resolvedScope })}
+            className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
+          >
+            ‹ Prev
+          </Link>
+
+          <Link
+            href={withQuery(navBase, { week: formatISODate((() => {
+              const today = new Date();
+              const day = today.getDay();
+              const diffToSunday = day;
+              return new Date(today.getFullYear(), today.getMonth(), today.getDate() - diffToSunday);
+            })()), scope: resolvedScope })}
+            className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
+          >
+            Today
+          </Link>
+
+          <Link
+            href={withQuery(navBase, { week: formatISODate(nextWeek), scope: resolvedScope })}
+            className="rounded-lg bg-panel-muted/35 px-3 py-2 text-[11px] font-medium text-[var(--foreground)] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl hover:bg-panel-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35"
+          >
+            Next ›
+          </Link>
+        </div>
+      </div>
+
+      {/* Calendar */}
+      <div className="flex flex-col gap-4 rounded-xl bg-panel-muted/30 p-4 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+        <div className="mb-2 text-xs text-[var(--muted-foreground)]">
+          Week of{" "}
+          <span className="font-medium text-[var(--foreground)]">
+            {formatDisplayDate(startOfWeek)}
+          </span>{" "}
+          –{" "}
+          <span className="font-medium text-[var(--foreground)]">
+            {formatDisplayDate(endOfWeek)}
+          </span>
+          .
+        </div>
+
+        <div className="rounded-xl bg-panel/65 ring-1 ring-white/10 shadow-[0_14px_55px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
+          <div className="grid grid-cols-1 divide-y divide-[var(--border)]/40 md:grid-cols-7 md:divide-y-0 md:divide-x">
+            {Array.from({ length: 7 }).map((_, idx) => {
+              const dayDate = new Date(
+                startOfWeek.getFullYear(),
+                startOfWeek.getMonth(),
+                startOfWeek.getDate() + idx
+              );
+              const dayKey = formatISODate(dayDate);
+
+              const dayPlans = practicePlans.filter((plan) => {
+                if (!plan.practice_date) return false;
+                const dateOnly = plan.practice_date.slice(0, 10);
+                return dateOnly === dayKey;
+              });
+
+              const dayLabel = dayDate.toLocaleDateString("en-US", { weekday: "short" });
+              const dayNum = dayDate.getDate();
+              const isToday = dayKey === todayKey;
+
+              return (
+                <div key={dayKey} className="flex min-h-[220px] flex-col">
+                  {/* Day header */}
+                  {isTrainingMode ? (
+                    <Link
+                      href={withQuery(dayBase, { week: weekKey, date: dayKey, scope: resolvedScope })}
+                      className={`flex items-center justify-between border-b px-2 py-1.5 hover:bg-panel-muted/30 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/35 ${
+                        isToday
+                          ? "border-[var(--brand)]/50 bg-[var(--brand)]/10"
+                          : "border-[var(--border)]/50 bg-panel"
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
+                          {dayLabel}
+                        </span>
+                        <span className="text-sm font-semibold text-[var(--foreground)]">
+                          {dayNum}
+                        </span>
+                      </div>
+                      {isToday ? (
+                        <span className="rounded-full bg-[var(--brand)]/14 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide text-[var(--foreground)] ring-1 ring-[var(--brand)]/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-xl">
+                          Today
+                        </span>
+                      ) : null}
+                    </Link>
+                  ) : (
+                    <div
+                      className={`flex items-center justify-between border-b px-2 py-1.5 ${
+                        isToday
+                          ? "border-[var(--brand)]/50 bg-[var(--brand)]/10"
+                          : "border-[var(--border)]/50 bg-panel"
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
+                          {dayLabel}
+                        </span>
+                        <span className="text-sm font-semibold text-[var(--foreground)]">
+                          {dayNum}
+                        </span>
+                      </div>
+                      {isToday ? (
+                        <span className="rounded-full bg-[var(--brand)]/14 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide text-[var(--foreground)] ring-1 ring-[var(--brand)]/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-xl">
+                          Today
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Day body */}
+                  <div className="flex-1 space-y-2 px-2 py-2 pb-6 text-xs">
+                    {!isTrainingMode ? (
+                      <AddPracticeDialogTrigger
+                        key={
+                          editPractice && editPracticeDateKey === dayKey && editTs
+                            ? `${dayKey}-${editPractice.id}-${editTs}`
+                            : dayKey
+                        }
+                        programId={programId}
+                        teamId={teamId}
+                        seasonId={seasonId}
+                        teamName={headerTeamName}
+                        seasonName={`${headerSeasonLabel}${headerAcademicYear ? ` ${headerAcademicYear}` : ""}`}
+                        dateIso={dayKey}
+                        groups={rosterGroups}
+                        initialPractice={
+                          editPractice && editPracticeDateKey === dayKey ? editPractice : undefined
+                        }
+                        initialDetails={
+                          editPractice && editPracticeDateKey === dayKey && editDetails
+                            ? editDetails
+                            : undefined
+                        }
+                        autoOpen={!!editPractice && editPracticeDateKey === dayKey}
+                      />
+                    ) : null}
+
+                    {dayPlans.length === 0 ? (
+                      <div className="mt-1 text-[10px] text-[var(--muted-foreground)]">
+                        No scheduled practices.
+                      </div>
+                    ) : isTrainingMode ? (
+                      dayPlans.map((plan) => {
+                        const timeLabel = formatTimeRange(plan.start_time, plan.end_time);
+                        return (
+                          <div
+                            key={plan.id}
+                            className="rounded-lg bg-panel-muted/35 px-2.5 py-2 ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate text-[11px] font-semibold text-[var(--foreground)]">
+                                  {plan.label}
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--muted-foreground)]">
+                                  {timeLabel ? <span>{timeLabel}</span> : null}
+                                  {plan.location ? <span>• {plan.location}</span> : null}
+                                </div>
+                              </div>
+                              <span className="rounded-full bg-panel/60 px-2 py-0.5 text-[10px] text-[var(--muted-foreground)] ring-1 ring-white/10">
+                                Planned
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      dayPlans.map((plan) => {
+                        const details =
+                          (editPractice != null && plan.id === editPractice.id ? editDetails : null) ??
+                          (undefined as any);
+
+                        return (
+                          <PracticePlanCard
+                            key={plan.id}
+                            plan={plan}
+                            programId={programId}
+                            teamId={teamId}
+                            seasonId={seasonId}
+                            groups={(details?.groups ?? []) as any}
+                            individualSessions={(details?.individualSessions ?? []) as any}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Weather strip aligned with the 7-day calendar */}
+      <div className="relative z-0 mt-4 overflow-visible rounded-xl bg-panel/70 p-4 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.28)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(900px_140px_at_50%_0%,rgba(255,255,255,0.08),transparent_70%)]" />
+
+        <div className="mb-2 flex items-center justify-between text-xs text-[var(--muted-foreground)]">
+          <span>Weather snapshot for this week</span>
+          <span className="rounded-full bg-panel-muted/35 px-2 py-0.5 text-[10px] ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+            Aligned by calendar day
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 text-[11px] md:grid-cols-7">
+          {Array.from({ length: 7 }).map((_, idx) => {
+            const dayDate = new Date(
+              startOfWeek.getFullYear(),
+              startOfWeek.getMonth(),
+              startOfWeek.getDate() + idx
+            );
+            const dayLabel = dayDate.toLocaleDateString("en-US", { weekday: "short" });
+            const dateIso = formatISODate(dayDate);
+
+            const weather = weeklyWeather.find((w: any) => {
+              if (!w.dateIso) return false;
+              return w.dateIso.slice(0, 10) === dateIso;
+            });
+
+            let riskLabel = "Unknown";
+            let riskClass =
+              "border-[var(--border)]/50 bg-panel text-[var(--muted-foreground)]";
+
+            const summaryLower = (weather?.summary ?? "").toLowerCase();
+            let conditionIcon = "☀️";
+
+            if (!weather?.summary) conditionIcon = "▫️";
+            else if (summaryLower.includes("thunder")) conditionIcon = "⛈️";
+            else if (summaryLower.includes("snow")) conditionIcon = "🌨️";
+            else if (summaryLower.includes("rain") || summaryLower.includes("drizzle"))
+              conditionIcon = "🌧️";
+            else if (summaryLower.includes("fog")) conditionIcon = "🌫️";
+            else if (summaryLower.includes("cloud") || summaryLower.includes("overcast"))
+              conditionIcon = "☁️";
+
+            switch (weather?.heatRisk) {
+              case "low":
+                riskLabel = "Low";
+                riskClass = "border-emerald-700/70 bg-emerald-500/5 text-emerald-200";
+                break;
+              case "moderate":
+                riskLabel = "Moderate";
+                riskClass = "border-yellow-600/70 bg-yellow-500/5 text-yellow-200";
+                break;
+              case "high":
+                riskLabel = "High";
+                riskClass = "border-orange-600/70 bg-orange-500/5 text-orange-200";
+                break;
+              case "extreme":
+                riskLabel = "Extreme";
+                riskClass = "border-red-700/70 bg-red-500/5 text-red-200";
+                break;
+            }
+
+            return (
+              <HeatPolicyPopover
+                key={`weather-${dateIso}`}
+                riskLabel={`${riskLabel} heat risk`}
+                riskLevel={weather?.heatRisk ?? "unknown"}
+                policy={heatPolicy}
+                weather={
+                  weather
+                    ? {
+                        wetBulbF: weather.wetBulbF,
+                        wbgtF: weather.wbgtF,
+                        tempMinF: weather.tempMinF,
+                        tempMaxF: weather.tempMaxF,
+                        humidityPercent: weather.humidityPercent,
+                        windMph: weather.windMph,
+                        summary: weather.summary,
+                      }
+                    : undefined
+                }
+              >
+                <div className={`cursor-pointer rounded-md border px-2 py-1.5 ${riskClass}`}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[12px]" aria-hidden="true">
+                        {conditionIcon}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wide">{dayLabel}</span>
+                    </div>
+                    <span className="rounded-full ring-1 ring-panel bg-panel px-2 py-0.5 text-[10px]">
+                      {riskLabel}
+                    </span>
+                  </div>
+
+                  <div className="space-y-0.5 text-[10px]">
+                    <div>
+                      Wet bulb:{" "}
+                      {weather?.wetBulbF != null ? `${weather.wetBulbF.toFixed(1)}°F` : "—"}
+                    </div>
+                    <div>
+                      Temp:{" "}
+                      {weather?.tempMinF != null && weather?.tempMaxF != null
+                        ? `${weather.tempMinF.toFixed(0)}–${weather.tempMaxF.toFixed(0)}°F`
+                        : "—"}
+                    </div>
+                    <div>
+                      Wind: {weather?.windMph != null ? `${weather.windMph.toFixed(0)} mph` : "—"}
+                    </div>
+                    <div>Conditions: {weather?.summary ?? "—"}</div>
+                  </div>
+                </div>
+              </HeatPolicyPopover>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default async function PracticePage({
   params,
   searchParams,

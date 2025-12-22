@@ -4,12 +4,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { classifyHeatRiskFromPolicy } from "@/lib/heatPolicies";
+import { getWeeklyWeatherFromTomorrowIo } from "@/lib/weather/tomorrow";
+import type { HeatRiskLevel, WeeklyWeatherDay as TomorrowWeeklyWeatherDay } from "@/lib/weather/tomorrow";
+import TrainingWorkspaceClient from "./TrainingWorkspaceClient";
 
 type PageProps = {
   params: Promise<{
     programId: string;
+  }>;
+  searchParams?: Promise<{
+    week?: string;
+    date?: string;
+    scope?: string;
   }>;
 };
 
@@ -33,6 +43,21 @@ type TrainingExercisePreview = {
   is_active: boolean;
 };
 
+type CalendarEvent = {
+  id: string;
+  type: "training";
+  date: string; // YYYY-MM-DD
+  startTime: string | null; // ISO
+  endTime: string | null; // ISO
+  title: string;
+  location: string | null;
+  status: "planned" | "published" | "completed" | "canceled";
+  teamId: string | null;
+  teamLabel: string | null;
+  ownerProgramMemberId: string | null;
+  isSelectable: boolean; // strict ownership
+};
+
 type PracticeNavContext = {
   teamId: string | null;
   teamSeasonId: string | null;
@@ -48,6 +73,181 @@ type PersistedProgramContext = {
   seasonStatus?: string | null;
 };
 
+type WeeklyWeatherDay = {
+  dateIso: string;
+  wbgtF: number | null;
+  wbgtC: number | null;
+  tempF: number | null;
+  humidityPercent: number | null;
+  windMph: number | null;
+  summary: string | null;
+  heatRisk: any | null;
+};
+
+type PrefetchPracticeWeatherResult = {
+  plans: any[];
+  weatherByDate: Record<string, WeeklyWeatherDay>;
+  heatPolicy: any | null;
+};
+
+// Cache practice + weather data for the current week + next week (14 days) to reduce external weather calls.
+// Even when the underlying data is already snapshotted in DB, caching avoids repeated heavy queries and any
+// downstream weather-service fetches the planner surface may trigger when data is missing.
+const getPrefetchedPracticeWeather = unstable_cache(
+  async (args: {
+    programId: string;
+    teamSeasonId: string;
+    scope: "team" | "program";
+    rangeFrom: string; // YYYY-MM-DD
+    rangeTo: string; // YYYY-MM-DD
+  }): Promise<PrefetchPracticeWeatherResult> => {
+    const { programId, teamSeasonId, scope, rangeFrom, rangeTo } = args;
+
+    // Practice plans
+    let q = supabaseAdmin
+      .from("practice_plans")
+      .select(
+        "id, program_id, team_season_id, practice_date, start_time, end_time, location, label, status, weather_snapshot, wbgt_f, wbgt_c, heat_risk, created_at",
+      )
+      .eq("program_id", programId)
+      .gte("practice_date", rangeFrom)
+      .lte("practice_date", rangeTo)
+      .order("practice_date", { ascending: true });
+
+    if (scope === "team") {
+      q = q.eq("team_season_id", teamSeasonId);
+    }
+
+    const { data: plans, error: plansError } = await q;
+    if (plansError) throw plansError;
+
+    const practicePlans = (plans ?? []) as any[];
+
+    // Heat policy (from team season)
+    let heatPolicy: any | null = null;
+    const { data: seasonRow, error: seasonErr } = await supabaseAdmin
+      .from("team_seasons")
+      .select("heat_policy_id")
+      .eq("id", teamSeasonId)
+      .maybeSingle();
+
+    if (seasonErr) throw seasonErr;
+
+    const heatPolicyId = (seasonRow?.heat_policy_id as string) ?? null;
+    if (heatPolicyId) {
+      const { data: policy, error: policyErr } = await supabaseAdmin
+        .from("heat_policies")
+        .select("*")
+        .eq("id", heatPolicyId)
+        .maybeSingle();
+
+      if (policyErr) throw policyErr;
+      heatPolicy = policy ?? null;
+    }
+
+    // Latest snapshot per day across plans in range.
+    const planIds = practicePlans.map((p) => p.id).filter(Boolean);
+
+    const weatherByDate: Record<string, WeeklyWeatherDay> = {};
+    if (planIds.length > 0) {
+      const { data: snaps, error: snapsErr } = await supabaseAdmin
+        .from("practice_weather_snapshots")
+        .select(
+          "practice_plan_id, captured_at, wbgt_f, wbgt_c, temp_f, humidity_percent, wind_mph, weather_summary, heat_risk, practice_plans!inner(practice_date)",
+        )
+        .in("practice_plan_id", planIds)
+        .order("captured_at", { ascending: false });
+
+      if (snapsErr) throw snapsErr;
+
+      for (const s of snaps ?? []) {
+        const dateIso = (s as any)?.practice_plans?.practice_date?.slice(0, 10);
+        if (!dateIso) continue;
+        if (weatherByDate[dateIso]) continue; // first is latest due to captured_at desc
+
+        weatherByDate[dateIso] = {
+          dateIso,
+          wbgtF: (s as any)?.wbgt_f ?? null,
+          wbgtC: (s as any)?.wbgt_c ?? null,
+          tempF: (s as any)?.temp_f ?? null,
+          humidityPercent: (s as any)?.humidity_percent ?? null,
+          windMph: (s as any)?.wind_mph ?? null,
+          summary: (s as any)?.weather_summary ?? null,
+          heatRisk: (s as any)?.heat_risk ?? null,
+        };
+      }
+    }
+
+    return { plans: practicePlans, weatherByDate, heatPolicy };
+  },
+  // keyParts: stable cache key namespace
+  ["training_prefetch_practice_weather_v1"],
+  {
+    // 30 minutes is a good starting point; snapshotted weather can change, but we want to avoid bursty calls.
+    revalidate: 60 * 30,
+  },
+);
+
+
+function deriveHeatRiskFromForecast(policy: any | null, wetBulbF: number | null): HeatRiskLevel | null {
+  if (!policy) return null;
+  if (wetBulbF == null) return null;
+
+  try {
+    return (classifyHeatRiskFromPolicy(policy as any, wetBulbF) as HeatRiskLevel | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map((x) => Number(x));
+  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Program-level forecast cache (independent of practice plans).
+// Uses school lat/lon as the default location anchor.
+// Returns a 14-day map (this week + next week) in the exact TomorrowWeeklyWeatherDay shape
+// expected by PracticePlannerWeeklySurface.
+const getCachedProgramForecast = unstable_cache(
+  async (args: {
+    programId: string;
+    startDateIso: string; // YYYY-MM-DD (week start)
+    lat: number;
+    lon: number;
+  }): Promise<Record<string, TomorrowWeeklyWeatherDay>> => {
+    const { startDateIso, lat, lon } = args;
+
+    const week1 = await getWeeklyWeatherFromTomorrowIo({
+      lat,
+      lon,
+      startDateIso,
+    });
+
+    const week2StartIso = addDaysIso(startDateIso, 7);
+    const week2 = await getWeeklyWeatherFromTomorrowIo({
+      lat,
+      lon,
+      startDateIso: week2StartIso,
+    });
+
+    const map: Record<string, TomorrowWeeklyWeatherDay> = {};
+    for (const day of [...(week1 ?? []), ...(week2 ?? [])]) {
+      if (!day?.dateIso) continue;
+      map[day.dateIso] = day as TomorrowWeeklyWeatherDay;
+    }
+
+    return map;
+  },
+  ["training_program_forecast_v2"],
+  {
+    // Forecast is OK to be a bit stale; we prefer fewer calls.
+    revalidate: 60 * 45,
+  },
+);
+
 async function readPersistedProgramContext(programId: string): Promise<PersistedProgramContext> {
   try {
     const cookieStore = await cookies();
@@ -62,8 +262,14 @@ async function readPersistedProgramContext(programId: string): Promise<Persisted
   }
 }
 
-export default async function ProgramTrainingPage({ params }: PageProps) {
+export default async function ProgramTrainingPage({ params, searchParams }: PageProps) {
   const { programId } = await params;
+  const sp = (await searchParams) ?? {};
+
+  const requestedWeek = typeof sp.week === "string" ? sp.week : null;
+  const requestedDate = typeof sp.date === "string" ? sp.date : null;
+  const requestedScopeRaw = typeof sp.scope === "string" ? sp.scope : null;
+  const requestedScope: "team" | "program" = requestedScopeRaw === "program" ? "program" : "team";
 
   const supabase = await supabaseServerComponent();
 
@@ -163,6 +369,40 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
     : programsRel;
 
   const programName = (programRecord?.name as string) ?? "Program";
+
+  // Default location anchor for program-level forecast (school lat/lon)
+  let programLat: number | null = null;
+  let programLon: number | null = null;
+
+  try {
+    const { data: progRow, error: progErr } = await supabaseAdmin
+      .from("programs")
+      .select("school_id")
+      .eq("id", programId)
+      .maybeSingle();
+
+    if (progErr) throw progErr;
+
+    const schoolId = (progRow?.school_id as string) ?? null;
+    if (schoolId) {
+      const { data: schoolRow, error: schoolErr } = await supabaseAdmin
+        .from("schools")
+        .select("latitude, longitude")
+        .eq("id", schoolId)
+        .maybeSingle();
+
+      if (schoolErr) throw schoolErr;
+
+      const lat = (schoolRow?.latitude as number) ?? null;
+      const lon = (schoolRow?.longitude as number) ?? null;
+      if (typeof lat === "number" && typeof lon === "number") {
+        programLat = lat;
+        programLon = lon;
+      }
+    }
+  } catch (err: any) {
+    console.warn("[ProgramTraining] unable to load school lat/lon for forecast:", err?.message ?? err);
+  }
 
   const actingRole: string | null = (membershipRow.role as string) ?? null;
   const isManager =
@@ -282,6 +522,186 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
     console.error("[ProgramTraining] baseUrl/cookies init error:", err);
   }
 
+  function dateOnly(d: Date) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function parseISODateUTC(iso: string) {
+    // iso: YYYY-MM-DD
+    const [y, m, d] = iso.split("-").map((x) => Number(x));
+    if (!y || !m || !d) return null;
+    return new Date(Date.UTC(y, m - 1, d));
+  }
+
+  function startOfWeekSunday(d: Date) {
+    const copy = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const day = copy.getUTCDay(); // 0=Sun
+    copy.setUTCDate(copy.getUTCDate() - day); // move back to Sunday
+    return copy;
+  }
+
+  function addDays(d: Date, days: number) {
+    const copy = new Date(d.getTime());
+    copy.setUTCDate(copy.getUTCDate() + days);
+    return copy;
+  }
+
+  function toLocalNoon(dUtc: Date) {
+    return new Date(
+      dUtc.getUTCFullYear(),
+      dUtc.getUTCMonth(),
+      dUtc.getUTCDate(),
+      12,
+      0,
+      0,
+    );
+  }
+
+
+  //
+  // 4b) Load program-wide training calendar events (practice plans) for the current week
+  //
+  const now = new Date();
+  const today = dateOnly(now);
+
+  // Training week navigation expects `week` to be the week-start key (Sunday, YYYY-MM-DD) to match the calendar UI (Sun–Sat).
+  // Parse it as UTC to avoid server/runtime timezone shifts.
+  const requestedWeekUTC = requestedWeek ? parseISODateUTC(requestedWeek) : null;
+
+  const weekStartUtc = requestedWeekUTC ? requestedWeekUTC : startOfWeekSunday(now);
+  const weekEndUtc = addDays(weekStartUtc, 6);
+  const weekFrom = dateOnly(weekStartUtc);
+  const weekTo = dateOnly(weekEndUtc);
+
+  // Local-noon dates for UI components that use local date math (prevents timezone drift).
+  const weekStartUi = toLocalNoon(weekStartUtc);
+  const weekEndUi = toLocalNoon(weekEndUtc);
+  const prevWeekUi = toLocalNoon(addDays(weekStartUtc, -7));
+  const nextWeekUi = toLocalNoon(addDays(weekStartUtc, 7));
+
+  // Selected day for the daily agenda (must be inside this week to apply).
+  const selectedDateKey =
+    requestedDate && requestedDate >= weekFrom && requestedDate <= weekTo
+      ? requestedDate
+      : null;
+
+  let calendarEvents: CalendarEvent[] = [];
+  let calendarError: string | null = null;
+
+  try {
+    if (!baseUrl) throw new Error("Missing base URL for internal API calls");
+
+    const res = await fetch(
+      `${baseUrl}/api/programs/${programId}/training/calendar?from=${weekFrom}&to=${weekTo}`,
+      {
+        cache: "no-store",
+        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${text}`);
+    }
+
+    const json = (await res.json()) as { events?: CalendarEvent[] };
+    calendarEvents = (json.events ?? []) as CalendarEvent[];
+  } catch (err: any) {
+    calendarError = err?.message ?? "Failed to load calendar";
+    console.error("[ProgramTraining] calendar error:", err);
+  }
+
+  //
+  // 4c) Load practice plans + aligned weekly weather strip data for the Practice Planner weekly surface
+  //      Prefetch/cached for this week + next week (14 days) to reduce repeated calls.
+  //
+  let weeklyPracticePlans: any[] = [];
+  let weeklyWeather: any[] = [];
+  let heatPolicy: any = null;
+
+  try {
+    if (practiceNav.teamId && practiceNav.teamSeasonId) {
+      const rangeFrom = weekFrom;
+      const rangeTo = dateOnly(addDays(weekStartUtc, 13)); // current week + next week
+
+      const prefetched = await getPrefetchedPracticeWeather({
+        programId,
+        teamSeasonId: practiceNav.teamSeasonId,
+        scope: requestedScope,
+        rangeFrom,
+        rangeTo,
+      });
+      heatPolicy = prefetched.heatPolicy ?? null;
+
+      // Slice to the currently displayed week for the embedded weekly surface.
+      weeklyPracticePlans = (prefetched.plans ?? []).filter((p: any) => {
+        const d = (p?.practice_date as string) ?? "";
+        return d >= weekFrom && d <= weekTo;
+      });
+
+      // Build a full 7-day weather strip independent of practice plans.
+      // Start with cached program forecast, then overlay latest per-practice snapshot values if present.
+      let forecastMap: Record<string, TomorrowWeeklyWeatherDay> = {};
+
+      if (programLat !== null && programLon !== null) {
+        forecastMap = await getCachedProgramForecast({
+          programId,
+          startDateIso: rangeFrom,
+          lat: programLat,
+          lon: programLon,
+        });
+      }
+
+      const weatherArr: TomorrowWeeklyWeatherDay[] = [];
+      for (let i = 0; i < 7; i++) {
+        const dateIso = dateOnly(addDays(weekStartUtc, i));
+
+        const base = forecastMap?.[dateIso] ?? null;
+        const snap = (prefetched.weatherByDate ?? {})[dateIso] ?? null;
+
+        // Practice snapshot values override forecast when present.
+        const wetBulbF = snap?.wbgtF ?? base?.wetBulbF ?? null;
+        const wetBulbC = snap?.wbgtC ?? base?.wetBulbC ?? null;
+
+        const tempMinF = snap?.tempF ?? base?.tempMinF ?? null;
+        const tempMaxF = snap?.tempF ?? base?.tempMaxF ?? null;
+
+        const windMph = snap?.windMph ?? base?.windMph ?? null;
+        const windKph = base?.windKph ?? (windMph != null ? windMph / 0.621371 : null);
+
+        const summary = snap?.summary ?? base?.summary ?? null;
+        const weatherCode = base?.weatherCode ?? null;
+
+        const derivedHeatRisk =
+          (snap?.heatRisk as HeatRiskLevel | null) ??
+          deriveHeatRiskFromForecast(heatPolicy, wetBulbF) ??
+          (base?.heatRisk as HeatRiskLevel | null) ??
+          "low";
+
+        weatherArr.push({
+          dateIso,
+          tempMaxC: base?.tempMaxC ?? null,
+          tempMinC: base?.tempMinC ?? null,
+          wetBulbC,
+          tempMaxF,
+          tempMinF,
+          wetBulbF,
+          windKph,
+          windMph,
+          weatherCode,
+          summary,
+          heatRisk: derivedHeatRisk,
+        } satisfies TomorrowWeeklyWeatherDay);
+      }
+
+      weeklyWeather = weatherArr;
+    }
+  } catch (err: any) {
+    console.error("[ProgramTraining] weekly practice/weather prefetch error:", err);
+    // Non-fatal: the training page should still render.
+  }
+
+
   //
   // 4) Load training sessions preview via canonical API (no direct DB query)
   //
@@ -345,7 +765,7 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   }
 
   return (
-    <div className="bg-canvas">
+    <div className="bg-transparent">
       <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-4 sm:px-6">
       {/* Header / context card */}
       <section className="rounded-xl ring-1 ring-panel panel-muted p-5 text-[var(--foreground)]">
@@ -393,261 +813,41 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* Main training panels */}
-      <section className="grid gap-4 md:grid-cols-3">
-        {/* Practice planner */}
-        <div className="md:col-span-2 space-y-4">
-          <div className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-[var(--foreground)]">
-                  Practice planner
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                  Plan daily practices by group, assign workouts, and tie them
-                  to your season roster. Future: integrate weather snapshots and
-                  WBGT-based heat policies directly into each practice.
-                </p>
-                {practiceNav.reason ? (
-                  <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-                    {practiceNav.reason}
-                  </p>
-                ) : null}
-              </div>
-              <div className="hidden sm:flex sm:flex-col sm:items-end sm:gap-2">
-                <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5 text-[11px] text-[var(--muted-foreground)]">
-                  Practice scheduler
-                </span>
-                {practiceNav.href ? (
-                  <Link
-                    href={practiceNav.href}
-                    className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
-                  >
-                    Open
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 text-[11px] text-[var(--muted-foreground)] sm:grid-cols-2">
-              <div className="rounded-lg ring-1 ring-panel panel-muted p-3">
-                <p className="text-[11px] font-semibold text-[var(--foreground)]">
-                  Today&apos;s / upcoming practices
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                  Future: list of upcoming practices with quick access to
-                  groups, assigned workouts, and weather snapshots.
-                </p>
-              </div>
-              <div className="rounded-lg ring-1 ring-panel panel-muted p-3">
-                <p className="text-[11px] font-semibold text-[var(--foreground)]">
-                  Group assignments
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                  Future: drag-and-drop grouping by event group or training
-                  focus, linked directly to your team season rosters.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Athlete training logs */}
-          <div className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
+      {/* Main training workspace */}
+      <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
             <p className="text-xs font-semibold text-[var(--foreground)]">
-              Athlete training logs
+              Training calendar
             </p>
             <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-              This area will surface individual sessions from{" "}
-              <code className="font-mono text-[10px]">
-                athlete_training_sessions
-              </code>{" "}
-              as an at-a-glance view of what your athletes are actually doing
-              (coach-assigned and self-assigned).
+              Program-wide view of training events (shared facilities awareness). Only practices you created are selectable in this view.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--muted-foreground)]">
-              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-                Coach-assigned vs self-assigned
-              </span>
-              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-                RPE &amp; volume trends
-              </span>
-              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-                Availability &amp; injury flags
-              </span>
-              <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-                Showing {sessions.length} recent sessions
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {sessionsError ? (
-                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
-                  Failed to load sessions preview. {sessionsError}
-                </div>
-              ) : sessions.length === 0 ? (
-                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
-                  No training sessions yet.
-                </div>
-              ) : (
-                sessions.map((s) => {
-                  const athleteLabel = s.athlete_id
-                    ? `Athlete ${s.athlete_id.slice(0, 8)}`
-                    : "Athlete";
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between gap-3 rounded-lg ring-1 ring-panel panel-muted p-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-[11px] font-semibold text-[var(--foreground)]">
-                          {s.title ?? athleteLabel}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
-                          {s.workout_category}
-                          {s.scheduled_date ? ` • ${s.scheduled_date}` : ""}
-                          {s.completed_at ? " • completed" : ""}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-[11px] text-[var(--muted-foreground)]">
-                        <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5">
-                          {athleteLabel || "Athlete"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
           </div>
+          {/*<span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5 text-[11px] text-[var(--muted-foreground)]">
+            Week {weekFrom}–{weekTo}
+          </span>*/}
         </div>
 
-        {/* Right column: workouts/templates */}
-        <aside className="space-y-4">
-          <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold text-[var(--foreground)]">
-                  Exercise library
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                  Foundational catalog (system + program) that workouts and practice plans are built from.
-                </p>
-              </div>
-              <div className="shrink-0">
-                <Link
-                  href={`/programs/${programId}/training/exercises`}
-                  className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
-                >
-                  Manage
-                </Link>
-              </div>
-            </div>
+        {calendarError ? (
+          <div className="mt-4 rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
+            Failed to load training calendar. {calendarError}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-6">
+            <TrainingWorkspaceClient
+              programId={programId}
+              weekFrom={weekFrom}
+              weekTo={weekTo}
+              events={calendarEvents}
+              teamId={practiceNav.teamId}
+              teamSeasonId={practiceNav.teamSeasonId}
+              initialSelectedDate={selectedDateKey ?? undefined}
+              weeklyWeather={weeklyWeather as any}
+            />
 
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg ring-1 ring-panel panel-muted p-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-[var(--foreground)]">Workout library</p>
-                <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
-                  Build quantified workouts from your exercise catalog.
-                </p>
-              </div>
-              <div className="shrink-0">
-                <Link
-                  href={`/programs/${programId}/training/workouts`}
-                  className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
-                >
-                  Manage
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {exercisesError ? (
-                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
-                  Failed to load exercises. {exercisesError}
-                </div>
-              ) : exercises.length === 0 ? (
-                <div className="rounded-lg ring-1 ring-panel panel-muted p-3 text-[11px] text-[var(--muted-foreground)]">
-                  No exercises yet. Add your first program exercise or seed your catalog.
-                </div>
-              ) : (
-                exercises.map((ex) => {
-                  const scopeLabel = ex.program_id ? "program" : "system";
-                  return (
-                    <div
-                      key={ex.id}
-                      className="flex items-center justify-between gap-3 rounded-lg ring-1 ring-panel panel-muted p-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-[11px] font-semibold text-[var(--foreground)]">
-                          {ex.label}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
-                          {ex.workout_category} • {ex.measurement_unit}
-                        </p>
-                      </div>
-                      <div className="shrink-0">
-                        <span className="rounded-full ring-1 ring-panel bg-panel-muted px-2 py-0.5 text-[11px] text-[var(--muted-foreground)]">
-                          {scopeLabel}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="mt-3">
-              <Link
-                href={`/programs/${programId}/training/exercises`}
-                className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
-              >
-                Open exercise library
-              </Link>
-            </div>
-          </section>
-
-          <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
-            <p className="text-xs font-semibold text-[var(--foreground)]">
-              Workouts &amp; templates
-            </p>
-            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-              Library of reusable workouts and training event templates for this
-              program. In the roadmap, these tie directly into your practice
-              planner and athlete sessions.
-            </p>
-            <ul className="mt-2 space-y-1 text-[11px] text-[var(--muted-foreground)]">
-              <li>• System and program-specific workouts</li>
-              <li>• Event-specific training blocks</li>
-              <li>• Copy / adapt for new seasons</li>
-            </ul>
-            <div className="mt-3">
-              <Link
-                href="#"
-                className="inline-flex items-center rounded-full ring-1 ring-panel bg-panel-muted px-3 py-1.5 text-[11px] font-medium text-[var(--foreground)] hover:bg-panel"
-              >
-                Open workouts library
-              </Link>
-            </div>
-          </section>
-
-          <section className="rounded-xl ring-1 ring-panel panel p-5 text-[var(--foreground)]">
-            <p className="text-xs font-semibold text-[var(--foreground)]">
-              Weather &amp; heat policies (roadmap)
-            </p>
-            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-              Future: snapshot WBGT readings, heat policy recommendations, and
-              practice adjustments for each session, using{" "}
-              <code className="font-mono text-[10px]">
-                practice_weather_snapshots
-              </code>{" "}
-              and{" "}
-              <code className="font-mono text-[10px]">
-                heat_policies
-              </code>
-              .
-            </p>
-          </section>
-        </aside>
+          </div>
+        )}
       </section>
       </div>
     </div>

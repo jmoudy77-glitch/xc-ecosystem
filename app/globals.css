@@ -1,3 +1,49 @@
+  /* =========================
+     Glass Pills (brand-tinted, container-safe)
+     Use on buttons/links; keep parent containers transparent.
+     ========================= */
+
+  .glass-pill {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background-color: var(--panel-glass-bg);
+    backdrop-filter: var(--panel-backdrop-glass);
+    -webkit-backdrop-filter: var(--panel-backdrop-glass);
+    --tw-ring-color: var(--panel-ring);
+    box-shadow: var(--shadow-elev-1);
+  }
+
+  /* Ensure content sits above overlays */
+  .glass-pill > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Soft brand tint (inactive / default) */
+  .glass-pill--brand-soft::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: color-mix(in oklab, transparent 92%, var(--brand) 8%);
+  }
+
+  /* Stronger brand tint (active / emphasized) */
+  .glass-pill--brand::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: color-mix(in oklab, transparent 82%, var(--brand) 18%);
+  }
+
+  /* Active state polish: subtle brand ring without filling containers */
+  .glass-pill--active {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--brand) 55%, var(--panel-ring)),
+      var(--shadow-elev-1);
+  }
 /* /Users/joshmoudy/Library/CloudStorage/GoogleDrive-jmoudy77@gmail.com/My Drive/Ecosystem_Live/xc-ecosystem/app/globals.css */
 @import "tailwindcss";
 
@@ -189,9 +235,38 @@
   }
 
   /* Surface System utilities */
+  /* Canvas = global “liquid glass” atmosphere layer.
+     Pages/components should only compose surfaces (panel/panel-muted) on top. */
   .bg-canvas {
     background-color: var(--canvas-bg);
+    position: relative;
+    isolation: isolate;
+
+    /* Subtle ambient glow so glass surfaces have something to refract/blur.
+       Kept neutral so program theming still reads cleanly. */
+    background-image:
+      radial-gradient(900px 420px at 50% 0%, rgba(255, 255, 255, 0.08), transparent 70%),
+      radial-gradient(700px 380px at 18% 22%, rgba(37, 99, 235, 0.10), transparent 70%),
+      radial-gradient(640px 360px at 82% 26%, rgba(56, 189, 248, 0.08), transparent 72%),
+      radial-gradient(900px 520px at 50% 120%, rgba(0, 0, 0, 0.55), transparent 65%);
+    background-repeat: no-repeat;
+    background-size: cover;
   }
+
+  /* Optional ultra-light grain (kept very subtle). */
+  .bg-canvas::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.06;
+    mix-blend-mode: overlay;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.10) 0px, rgba(255, 255, 255, 0.10) 1px, transparent 1px, transparent 3px),
+      repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0px, rgba(0, 0, 0, 0.12) 1px, transparent 1px, transparent 4px);
+  }
+
   .bg-panel {
     background-color: var(--panel-bg);
   }
@@ -255,117 +330,115 @@
   }
 
   /* --- Glass scrollbars (scoped via class) --- */
-.glass-scrollbar {
-  /* Firefox */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.06);
-}
+  .glass-scrollbar {
+    /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.06);
+  }
 
-/* Chromium / Safari */
-.glass-scrollbar::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
+  /* Chromium / Safari */
+  .glass-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
 
-.glass-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
+  .glass-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
 
-.glass-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.22),
-    rgba(255, 255, 255, 0.12)
-  );
-  border-radius: 999px;
+  .glass-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.22),
+      rgba(255, 255, 255, 0.12)
+    );
+    border-radius: 999px;
 
-  /* “liquid” edge */
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 10px 30px rgba(0, 0, 0, 0.35);
+    /* “liquid” edge */
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 10px 30px rgba(0, 0, 0, 0.35);
 
-  /* keeps thumb from feeling chunky */
-  border: 2px solid rgba(0, 0, 0, 0);
-  background-clip: padding-box;
-}
+    /* keeps thumb from feeling chunky */
+    border: 2px solid rgba(0, 0, 0, 0);
+    background-clip: padding-box;
+  }
 
-.glass-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.28),
-    rgba(255, 255, 255, 0.16)
-  );
-}
+  .glass-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.28),
+      rgba(255, 255, 255, 0.16)
+    );
+  }
 
-.glass-scrollbar::-webkit-scrollbar-corner {
-  background: transparent;
-}
-  
+  .glass-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   /* ========== Badges / Chips (theme-cohesive) ========== */
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
 
-  padding: 0.16rem 0.55rem;
-  border-radius: 9999px;
+    padding: 0.16rem 0.55rem;
+    border-radius: 9999px;
 
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-  background: color-mix(in oklab, var(--surface) 82%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    background: color-mix(in oklab, var(--surface) 82%, transparent);
 
-  /* force readable text (this fixes the “blank pill” issue in dark themes) */
-  color: color-mix(in oklab, var(--foreground) 92%, white) !important;
+    /* force readable text (this fixes the “blank pill” issue in dark themes) */
+    color: color-mix(in oklab, var(--foreground) 92%, white) !important;
 
-  font-size: 0.75rem;
-  line-height: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .badge--brand,
+  .badge-brand {
+    border-color: color-mix(in oklab, var(--brand, var(--primary)) 55%, var(--border));
+    background: color-mix(in oklab, var(--brand, var(--primary)) 22%, var(--surface));
+  }
+
+  .badge--secondary,
+  .badge-secondary {
+    border-color: color-mix(in oklab, var(--secondary, var(--muted)) 60%, var(--border));
+    background: color-mix(in oklab, var(--secondary, var(--muted)) 18%, var(--surface));
+  }
+
+  .badge--danger,
+  .badge-danger {
+    border-color: color-mix(in oklab, var(--danger, #ef4444) 60%, var(--border));
+    background: color-mix(in oklab, var(--danger, #ef4444) 18%, var(--surface));
+  }
+
+  /* Chip style for params */
+  .badge--chip,
+  .badge-chip {
+    font-weight: 500;
+    padding: 0.14rem 0.5rem;
+
+    /* make chips feel “inset” instead of empty outlines */
+    background: color-mix(in oklab, var(--foreground) 6%, var(--surface));
+    border-color: color-mix(in oklab, var(--foreground) 18%, var(--border));
+  }
+
+  /* Optional: tiny hover polish (helps buttons/labels feel intentional) */
+  .badge--chip:hover,
+  .badge-chip:hover {
+    background: color-mix(in oklab, var(--foreground) 9%, var(--surface));
+    border-color: color-mix(in oklab, var(--foreground) 24%, var(--border));
+  }
 }
-
-.badge--brand,
-.badge-brand {
-  border-color: color-mix(in oklab, var(--brand, var(--primary)) 55%, var(--border));
-  background: color-mix(in oklab, var(--brand, var(--primary)) 22%, var(--surface));
-}
-
-.badge--secondary,
-.badge-secondary {
-  border-color: color-mix(in oklab, var(--secondary, var(--muted)) 60%, var(--border));
-  background: color-mix(in oklab, var(--secondary, var(--muted)) 18%, var(--surface));
-}
-
-.badge--danger,
-.badge-danger {
-  border-color: color-mix(in oklab, var(--danger, #ef4444) 60%, var(--border));
-  background: color-mix(in oklab, var(--danger, #ef4444) 18%, var(--surface));
-}
-
-/* Chip style for params */
-.badge--chip,
-.badge-chip {
-  font-weight: 500;
-  padding: 0.14rem 0.5rem;
-
-  /* make chips feel “inset” instead of empty outlines */
-  background: color-mix(in oklab, var(--foreground) 6%, var(--surface));
-  border-color: color-mix(in oklab, var(--foreground) 18%, var(--border));
-}
-
-/* Optional: tiny hover polish (helps buttons/labels feel intentional) */
-.badge--chip:hover,
-.badge-chip:hover {
-  background: color-mix(in oklab, var(--foreground) 9%, var(--surface));
-  border-color: color-mix(in oklab, var(--foreground) 24%, var(--border));
-}
-}
-
-
 
 .coach-panel-slide-out {
   animation: coach-panel-slide-out 0.38s ease-in forwards;
@@ -375,4 +448,23 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+
+  /* add these */
+  position: relative;
+  isolation: isolate;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  /* move your hue/light recipe here */
+  background:
+    radial-gradient(900px 420px at 50% 0%, rgba(255, 255, 255, 0.08), transparent 70%),
+    radial-gradient(700px 380px at 18% 22%, rgba(37, 99, 235, 0.10), transparent 70%),
+    radial-gradient(640px 360px at 82% 26%, rgba(56, 189, 248, 0.08), transparent 72%),
+    radial-gradient(900px 520px at 50% 120%, rgba(0, 0, 0, 0.55), transparent 65%);
 }

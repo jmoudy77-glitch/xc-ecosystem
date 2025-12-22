@@ -183,7 +183,7 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen bg-transparent"
       style={{
         // v1 core neutrals
         ["--app-bg" as any]: theme.appBg,
@@ -227,13 +227,12 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
         ["--border-subtle" as any]: theme.border,
         ["--muted-foreground" as any]: theme.textMuted,
 
-        backgroundColor: "var(--app-bg)",
         color: "var(--text)",
       }}
     >
-      <div className="xc-program-shell">
+      <div className="xc-program-shell bg-transparent">
       {/* Program hero header (non-negotiable for coach app) */}
-      <header className="relative z-[9999] border-b border-subtle bg-panel-muted backdrop-blur">
+      <header className="relative z-[9999] border-b border-subtle panel-muted">
         <div className="flex w-full items-center justify-between px-4 py-3 lg:px-8">
               <div className="flex items-center gap-3">
                 {theme.logoUrl && (
@@ -263,12 +262,12 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
       </header>
 
       {/* Body: left menu + main content, program-scoped */}
-      <div className="flex w-full gap-4 px-4 py-4 lg:px-8">
-        <aside className="w-56 shrink-0">
+      <div className="flex w-full gap-4 bg-transparent px-4 py-4 lg:px-8">
+        <aside className="w-56 shrink-0 bg-transparent">
           <ProgramNav />
         </aside>
 
-        <main className="flex-1 pb-8">
+        <main className="flex-1 bg-transparent pb-8">
           {children}
         </main>
       </div>

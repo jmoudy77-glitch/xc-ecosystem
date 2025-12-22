@@ -79,7 +79,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className="min-h-screen antialiased"
+        className="min-h-screen antialiased bg-canvas"
         style={{
           // Canonical base tokens
           ["--app-bg" as any]: appBg,
@@ -130,7 +130,7 @@ export default async function RootLayout({
         }}
       >
         {/* Global top nav */}
-        <header className="border-b border-subtle bg-panel-muted backdrop-blur">
+        <header className="relative z-[20000] border-b border-subtle bg-panel-muted backdrop-blur">
           <div className="mx-auto flex max-w-[6xl] items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-brand flex items-center justify-center text-xs font-semibold">
@@ -145,7 +145,7 @@ export default async function RootLayout({
                 </p>
               </div>
             </div>
-            <details className="group relative" id="ai-presence">
+            <details className="group relative z-[20001]" id="ai-presence">
               <summary className="list-none cursor-pointer select-none rounded-full border border-subtle bg-panel px-2 py-1 text-[11px] text-muted hover:bg-panel-muted focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]">
                 <span className="inline-flex items-center gap-2">
                   <span className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--brand-soft)] ring-1 ring-panel">
@@ -250,7 +250,7 @@ export default async function RootLayout({
         </header>
 
         {/* Page content */}
-        <main className="mx-auto max-w-[95vw] px-4 py-6">{children}</main>
+        <main className="relative z-0 mx-auto max-w-[95vw] px-4 py-6">{children}</main>
       </body>
     </html>
   );

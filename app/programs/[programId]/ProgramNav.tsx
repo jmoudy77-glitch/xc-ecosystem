@@ -433,7 +433,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     label: "Performance",
-    href: (programId) => `/programs/${programId}/scoring`,
+    href: (programId) => `/programs/${programId}/performance`,
   },
   {
     label: "Resources",

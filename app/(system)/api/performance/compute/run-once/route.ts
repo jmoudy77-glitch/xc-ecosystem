@@ -6,7 +6,8 @@ import crypto from "crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
+  void req;
   const locker = `api:${process.env.VERCEL_REGION ?? "local"}:${process.pid}`;
 
   // Track state so we can reliably fail the job/run on any thrown error.
@@ -52,7 +53,7 @@ export async function POST(_req: NextRequest) {
           status: "running",
           summary_json: {
             note:
-              "Compute pipeline executed. Prime v1 computes deterministic normalized_index values and upserts performance_primes; Team Rollups v1 upserts team_performance_rollups; athlete rollups/signals remain scaffolded.",
+              "Compute pipeline executed. Prime v1 computes deterministic normalized_index values and upserts performance_primes; Team Rollups v1 upserts team_performance_rollups; athlete rollups/signals remain scaffolded. Balance snapshots run when targets.balance_snapshots is enabled.",
           },
         },
       ])
@@ -577,6 +578,138 @@ export async function POST(_req: NextRequest) {
     const teamSeasonKeys = await resolveTeamSeasonScopes();
     const teamRollupsSummary = await computeTeamRollupsV1(teamSeasonKeys);
 
+    // 3g) BALANCE SNAPSHOTS v1 (program-scope, deterministic scaffold)
+    // Contract: snapshots are read-model rows for the Performance map. They should be explainable,
+    // versioned, and derived from existing computed outputs (team rollups/primes) — never ad hoc UI logic.
+    const shouldWriteBalanceSnapshots = (() => {
+      const v = (job as any)?.details_json?.targets?.balance_snapshots;
+      // Accept boolean true, string "true", number 1, etc. (JSONB can arrive with type drift).
+      return v === true || v === "true" || v === 1 || v === "1";
+    })();
+
+    // Record the optional stage in the run ledger for observability (does not affect execution).
+    if (shouldWriteBalanceSnapshots && Array.isArray(run?.stages) && !run.stages.includes("balance_snapshots")) {
+      run.stages = [...run.stages, "balance_snapshots"];
+    }
+
+    const clamp = (n: number, min = -1, max = 1) =>
+      Math.max(min, Math.min(max, n));
+
+    const toNum = (v: any) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const mean = (nums: Array<number | null>) => {
+      const xs = nums.filter((n): n is number => typeof n === "number" && Number.isFinite(n));
+      if (xs.length === 0) return null;
+      return xs.reduce((a, b) => a + b, 0) / xs.length;
+    };
+
+    if (shouldWriteBalanceSnapshots && scopeType === "program" && scopeId) {
+      // Prefer season lens if present; otherwise fall back to a single season write.
+      const lensCodes: string[] = (() => {
+        const v = (job as any)?.details_json?.lens_codes;
+        if (Array.isArray(v)) return v.map((x: any) => String(x));
+        // Sometimes stored as JSON string in details_json; tolerate that.
+        if (typeof v === "string") {
+          try {
+            const parsed = JSON.parse(v);
+            if (Array.isArray(parsed)) return parsed.map((x: any) => String(x));
+          } catch {
+            // fall through
+          }
+        }
+        return [];
+      })();
+
+      const requested = lensCodes.length > 0 ? lensCodes : ["season"];
+
+      for (const lens_code of requested) {
+        // Pull the most recent team rollups for this program/lens, and aggregate deterministically.
+        const { data: rollups, error: rollupsErr } = await supabaseAdmin
+          .from("team_performance_rollups")
+          .select(
+            "lens_code, scoring_capacity_json, coverage_depth_json, team_volatility_index, computed_at"
+          )
+          .eq("program_id", scopeId)
+          .eq("lens_code", lens_code)
+          .order("computed_at", { ascending: false })
+          .limit(50);
+
+        if (rollupsErr) throw rollupsErr;
+
+        // Aggregate the newest signals we have. v1 uses coarse heuristics to produce non-flat, stable tensions.
+        const coveragePct = mean(
+          (rollups ?? []).map((r: any) => toNum(r?.coverage_depth_json?.coverage_pct))
+        );
+        const avgBest = mean(
+          (rollups ?? []).map((r: any) =>
+            toNum(r?.scoring_capacity_json?.avg_best_normalized_index)
+          )
+        );
+        const top5Avg = mean(
+          (rollups ?? []).map((r: any) =>
+            toNum(r?.scoring_capacity_json?.top5_avg_best_normalized_index)
+          )
+        );
+        const volatility = mean((rollups ?? []).map((r: any) => toNum(r?.team_volatility_index)));
+
+        // Map aggregate metrics -> five dichotomous tensions in [-1, 1].
+        // NOTE: these are deterministic scaffolds; replace with formal rulesets as you operationalize signals.
+        const t_load_readiness = clamp(((avgBest ?? 100) - 100) / 25);
+        const t_individual_team = clamp(((top5Avg ?? 100) - (avgBest ?? 100)) / 20);
+        const t_consistency_adaptation = clamp(-((volatility ?? 0) / 30));
+        const t_discipline_instinct = clamp(((coveragePct ?? 50) - 50) / 35);
+        const t_sustain_pressure = clamp(
+          -(
+            Math.abs(t_load_readiness) * 0.4 +
+            Math.abs(t_consistency_adaptation) * 0.4 +
+            Math.abs(t_individual_team) * 0.2
+          )
+        );
+
+        const pairs_json = {
+          training_load_vs_competitive_readiness: { tension: t_load_readiness },
+          individual_development_vs_team_performance: { tension: t_individual_team },
+          consistency_vs_adaptation: { tension: t_consistency_adaptation },
+          program_discipline_vs_competitive_instinct: { tension: t_discipline_instinct },
+          sustainability_vs_pressure: { tension: t_sustain_pressure },
+        };
+
+        const is_out_of_equilibrium =
+          Math.max(
+            Math.abs(t_load_readiness),
+            Math.abs(t_individual_team),
+            Math.abs(t_consistency_adaptation),
+            Math.abs(t_discipline_instinct),
+            Math.abs(t_sustain_pressure)
+          ) >= 0.35;
+
+        const snapshotRow: any = {
+          program_id: scopeId,
+          team_id: null,
+          team_season_id: null,
+          lens_code,
+          window_start_date: null,
+          window_end_date: null,
+          pairs_json,
+          aggregate_percentile: null,
+          is_out_of_equilibrium,
+          rollup_ruleset_code: PRIME_RULESET_CODE,
+          prime_ruleset_code: PRIME_RULESET_CODE,
+          computed_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+
+        const { error: snapErr } = await supabaseAdmin
+          .from("performance_balance_snapshots")
+          .insert([snapshotRow]);
+
+        if (snapErr) throw snapErr;
+      }
+    }
+
     const { error: runUpdateErr } = await supabaseAdmin
       .from("performance_compute_runs")
       .update({
@@ -589,6 +722,14 @@ export async function POST(_req: NextRequest) {
             note:
               "Team Rollups v1 upserts team_performance_rollups for lens_code=season (team_season) when available and lens_code=three_year (team window).",
           },
+          ...(shouldWriteBalanceSnapshots
+            ? {
+                balance_snapshots: {
+                  note:
+                    "Balance Snapshots v1 inserts program-scope rows into performance_balance_snapshots for requested lens codes using deterministic scaffold heuristics.",
+                },
+              }
+            : {}),
         },
       })
       .eq("id", run.id);

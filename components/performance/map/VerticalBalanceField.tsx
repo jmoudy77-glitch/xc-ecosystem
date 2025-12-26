@@ -1,7 +1,9 @@
 "use client";
 // components/performance/map/VerticalBalanceField.tsx
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { HoverBriefPopover } from "./BalanceGlob";
 
 export type VerticalBalanceFieldProps = {
   /** Signed distribution in [-1, +1]. + = toward top pole, - = toward bottom pole */
@@ -19,6 +21,12 @@ export type VerticalBalanceFieldProps = {
   /** Visual size in px */
   width?: number;
   height?: number;
+  
+  /** Optional hover/focus popover brief (intermediate context layer). */
+  briefHeader?: string;
+  briefBody?: string;
+  /** Optional positioning override for the popover container. */
+  briefPopoverClassName?: string;
 };
 
 /**
@@ -30,7 +38,7 @@ export default function VerticalBalanceField(props: VerticalBalanceFieldProps) {
     distributionX,
     strainHeat01,
     strainTarget,
-    suppressStrain = true, // default ON for Step 2
+    suppressStrain = false, // default OFF now that strainHeat01 is wired
     width = 200,
     height = 330,
   } = props;
@@ -42,11 +50,14 @@ export default function VerticalBalanceField(props: VerticalBalanceFieldProps) {
   const x = useMemo(() => clamp(distributionX, -1, 1), [distributionX]);
   const heat = useMemo(() => clamp(strainHeat01, 0, 1), [strainHeat01]);
 
+  const [showBrief, setShowBrief] = useState(false);
+  const hasBrief = Boolean(props.briefHeader && props.briefBody);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     const overscanScale = 1.5;
     const renderH = Math.round(height * overscanScale);
     const bleedY = (renderH - height) / 2;
@@ -63,8 +74,7 @@ export default function VerticalBalanceField(props: VerticalBalanceFieldProps) {
 
     if (!t0Ref.current) t0Ref.current = performance.now();
 
-    const draw = (now: number) => {
-      const t = (now - t0Ref.current) / 1000;
+    const draw = () => {
 
       // Clear
       ctx.clearRect(0, 0, width, renderH);
@@ -80,10 +90,10 @@ export default function VerticalBalanceField(props: VerticalBalanceFieldProps) {
       // --- Layer 2: Distribution Field (calm, desaturated) ---
       drawDistribution(ctx, width, height, x, bleedY);
 
-      // --- Layer 3: Strain (suppressed in Step 2 by default) ---
-      // if (!suppressStrain) {
-      //   drawStrain(ctx, width, height, heat, strainTarget);
-      // }
+      // --- Layer 3: Strain (heat overlay; can be suppressed via prop) ---
+      if (!suppressStrain) {
+        drawStrain(ctx, width, height, heat, strainTarget);
+      }
 
       // --- Layer 4: Liveness (intensity/breadth modulation only) ---
       // drawLiveness(ctx, width, height, x, t);
@@ -105,11 +115,31 @@ export default function VerticalBalanceField(props: VerticalBalanceFieldProps) {
   }, [width, height, x, heat, strainTarget, suppressStrain]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none select-none"
-      aria-hidden="true"
-    />
+    <div
+      className="relative"
+      onMouseEnter={() => hasBrief && setShowBrief(true)}
+      onMouseLeave={() => setShowBrief(false)}
+      onFocus={() => hasBrief && setShowBrief(true)}
+      onBlur={() => setShowBrief(false)}
+      tabIndex={hasBrief ? 0 : -1}
+      aria-label={hasBrief ? props.briefHeader : undefined}
+    >
+      {/* Hover/focus popover brief (intermediate, intentionally lightweight) */}
+      {hasBrief && (
+        <HoverBriefPopover
+          show={showBrief}
+          header={props.briefHeader as string}
+          body={props.briefBody as string}
+          className={props.briefPopoverClassName}
+        />
+      )}
+
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none select-none"
+        aria-hidden="true"
+      />
+    </div>
   );
 }
 
@@ -117,6 +147,7 @@ export default function VerticalBalanceField(props: VerticalBalanceFieldProps) {
 // Drawing helpers
 // ---------------------------
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function applySoftFieldMask(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -196,6 +227,7 @@ function roundedRect(
   ctx.closePath();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function drawBaseField(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -232,8 +264,8 @@ function drawDistribution(
   const N = 30; // emitters along Y (modest for perf)
 
   // Radius envelope (hard constraint). Prevent any bloom from touching container edges.
-  const minR = w * 0.14;
-  const maxR = w * 0.42;
+  const minR = w * 0.12;
+  const maxR = w * 0.36;
 
   // Lobe model: mu in [0..1] top->bottom, sigma controls spread, w is contribution.
   // These are intentionally conservative; we can tune after seeing shape.
@@ -290,13 +322,55 @@ function drawDistribution(
     return [sr / sw, sg / sw, sb / sw] as const;
   };
 
+  // Precompute normalizers once so both passes share consistent scaling.
+  const normA = mixStrength(0.10, lobesA) || 1;
+  const normB = mixStrength(0.90, lobesB) || 1;
+
+  // Core pass: adds a firmer, more definitive nucleus so the field reads as “solid”
+  // without becoming a chart. We draw a smaller-radius, higher-alpha bloom using
+  // normal compositing, then let the existing additive pass provide atmosphere.
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+
+  for (let i = 0; i < N; i++) {
+    const yN = i / (N - 1);
+    const y = yN * h;
+
+    const eA = mixStrength(yN, lobesA) / normA;
+    const eB = mixStrength(yN, lobesB) / normB;
+
+    const cA = mixRGB(yN, colorLobesA);
+    const cB = mixRGB(yN, colorLobesB);
+
+    const iA = clamp(wA * eA + 0.08 * wA * (1 - eB), 0, 1);
+    const iB = clamp(wB * eB + 0.08 * wB * (1 - eA), 0, 1);
+
+    if (iA > 0.002) {
+      const r = lerp(minR * 0.55, maxR * 0.75, ease01(iA));
+      const g = ctx.createRadialGradient(w * 0.5, y, 0, w * 0.5, y, r);
+      g.addColorStop(0.0, `rgba(${cA[0]},${cA[1]},${cA[2]},${0.22 * iA})`);
+      g.addColorStop(0.35, `rgba(${cA[0]},${cA[1]},${cA[2]},${0.10 * iA})`);
+      g.addColorStop(1.0, `rgba(${cA[0]},${cA[1]},${cA[2]},0.00)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, -bleedY, w, h + bleedY * 2);
+    }
+
+    if (iB > 0.002) {
+      const r = lerp(minR * 0.55, maxR * 0.75, ease01(iB));
+      const g = ctx.createRadialGradient(w * 0.5, y, 0, w * 0.5, y, r);
+      g.addColorStop(0.0, `rgba(${cB[0]},${cB[1]},${cB[2]},${0.20 * iB})`);
+      g.addColorStop(0.35, `rgba(${cB[0]},${cB[1]},${cB[2]},${0.09 * iB})`);
+      g.addColorStop(1.0, `rgba(${cB[0]},${cB[1]},${cB[2]},0.00)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, -bleedY, w, h + bleedY * 2);
+    }
+  }
+
+  ctx.restore();
+
   // Additive accumulation so cast builds naturally
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-
-  // Precompute normalizers so intensity stays in 0..1
-  const normA = mixStrength(0.10, lobesA) || 1;
-  const normB = mixStrength(0.90, lobesB) || 1;
 
   for (let i = 0; i < N; i++) {
     const yN = i / (N - 1);
@@ -317,8 +391,8 @@ function drawDistribution(
     if (iA > 0.002) {
       const r = lerp(minR, maxR, ease01(iA));
       const g = ctx.createRadialGradient(w * 0.5, y, 0, w * 0.5, y, r);
-      g.addColorStop(0.0, `rgba(${cA[0]},${cA[1]},${cA[2]},${0.21 * iA})`);
-      g.addColorStop(0.50, `rgba(${cA[0]},${cA[1]},${cA[2]},${0.105 * iA})`);
+      g.addColorStop(0.0, `rgba(${cA[0]},${cA[1]},${cA[2]},${0.30 * iA})`);
+      g.addColorStop(0.35, `rgba(${cA[0]},${cA[1]},${cA[2]},${0.16 * iA})`);
       g.addColorStop(1.0, `rgba(${cA[0]},${cA[1]},${cA[2]},0.00)`);
       ctx.fillStyle = g;
       ctx.fillRect(0, -bleedY, w, h + bleedY * 2);
@@ -327,8 +401,8 @@ function drawDistribution(
     if (iB > 0.002) {
       const r = lerp(minR, maxR, ease01(iB));
       const g = ctx.createRadialGradient(w * 0.5, y, 0, w * 0.5, y, r);
-      g.addColorStop(0.0, `rgba(${cB[0]},${cB[1]},${cB[2]},${0.161 * iB})`);
-      g.addColorStop(0.50, `rgba(${cB[0]},${cB[1]},${cB[2]},${0.081 * iB})`);
+      g.addColorStop(0.0, `rgba(${cB[0]},${cB[1]},${cB[2]},${0.24 * iB})`);
+      g.addColorStop(0.35, `rgba(${cB[0]},${cB[1]},${cB[2]},${0.12 * iB})`);
       g.addColorStop(1.0, `rgba(${cB[0]},${cB[1]},${cB[2]},0.00)`);
       ctx.fillStyle = g;
       ctx.fillRect(0, -bleedY, w, h + bleedY * 2);
@@ -368,6 +442,7 @@ function drawStrain(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function drawLiveness(
   ctx: CanvasRenderingContext2D,
   w: number,

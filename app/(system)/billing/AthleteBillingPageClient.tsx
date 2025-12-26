@@ -17,6 +17,11 @@ type Props = {
 
 type BillingState = "idle" | "starting_checkout" | "opening_portal";
 
+type BillingSessionResponse = {
+  url?: string;
+  error?: string;
+};
+
 const ATHLETE_PLANS = [
   {
     code: "hs_athlete_basic",
@@ -80,25 +85,25 @@ export default function AthleteBillingPageClient({
         }),
       });
 
-      const body = await res.json().catch(() => ({} as any));
+      const body = (await res
+        .json()
+        .catch(() => ({}))) as Partial<BillingSessionResponse>;
 
       if (!res.ok) {
-        const message =
-          (body && (body as any).error) ||
-          `Failed to start checkout (status ${res.status})`;
+        const message = body.error || `Failed to start checkout (status ${res.status})`;
         setError(message);
         setBillingState("idle");
         return;
       }
 
-      const url = (body as any).url as string | undefined;
+      const url = body.url;
       if (!url) {
         setError("No checkout URL returned from server.");
         setBillingState("idle");
         return;
       }
 
-      window.location.href = url;
+      window.location.assign(url);
     } catch (err: unknown) {
       console.error("[AthleteBillingPage] startCheckout error:", err);
       setError(
@@ -126,25 +131,25 @@ export default function AthleteBillingPageClient({
         }),
       });
 
-      const body = await res.json().catch(() => ({} as any));
+      const body = (await res
+        .json()
+        .catch(() => ({}))) as Partial<BillingSessionResponse>;
 
       if (!res.ok) {
-        const message =
-          (body && (body as any).error) ||
-          `Failed to open billing portal (status ${res.status})`;
+        const message = body.error || `Failed to open billing portal (status ${res.status})`;
         setError(message);
         setBillingState("idle");
         return;
       }
 
-      const url = (body as any).url as string | undefined;
+      const url = body.url;
       if (!url) {
         setError("No portal URL returned from server.");
         setBillingState("idle");
         return;
       }
 
-      window.location.href = url;
+      window.location.assign(url);
     } catch (err: unknown) {
       console.error("[AthleteBillingPage] openPortal error:", err);
       setError(
@@ -156,7 +161,7 @@ export default function AthleteBillingPageClient({
     }
   }
 
-    const status = subscription?.status ?? "unknown";
+  const status = subscription?.status ?? "unknown";
 
   const hasActiveSub: boolean =
     !!subscription &&

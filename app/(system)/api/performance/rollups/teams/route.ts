@@ -115,8 +115,15 @@ export async function GET(req: NextRequest) {
         .limit(limit + 1);
 
       if (lensCode) qb = qb.eq("lens_code", lensCode);
-      if (teamId) qb = qb.eq("team_id", teamId);
-      if (teamSeasonId) qb = qb.eq("team_season_id", teamSeasonId);
+
+      // If team filters are not provided, explicitly target program-scope snapshots
+      // (team_id/team_season_id NULL). This prevents returning unrelated team rows
+      // and enables the map to render using the latest program-scope balance.
+      qb = teamId ? qb.eq("team_id", teamId) : qb.is("team_id", null);
+      qb = teamSeasonId
+        ? qb.eq("team_season_id", teamSeasonId)
+        : qb.is("team_season_id", null);
+
       if (before) qb = qb.lt("computed_at", before);
 
       const { data: balRows, error: balErr } = await qb;

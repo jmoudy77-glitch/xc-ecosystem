@@ -156,7 +156,7 @@ export async function GET(
       )
     );
 
-    let eventMeta: Record<string, any> = {};
+    const eventMeta: Record<string, any> = {};
     if (eventCodes.length) {
       const { data: defs, error: defsError } = await supabase
         .from("event_definitions")

@@ -26,6 +26,40 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+type HoverBriefPopoverProps = {
+  show: boolean;
+  header: string;
+  body: string;
+  /** Optional footer line shown below a divider */
+  footer?: string;
+  /** Tailwind class overrides for positioning if needed */
+  className?: string;
+};
+
+export function HoverBriefPopover({
+  show,
+  header,
+  body,
+  footer = "Understand how this impacts your system in the Brief.",
+  className,
+}: HoverBriefPopoverProps) {
+  return (
+    <div
+      className={`pointer-events-none absolute left-1/2 top-1/2 z-30 w-[320px] -translate-x-full -translate-y-1/2 rounded-xl border border-white/10 bg-black/70 p-3 text-left text-sm text-slate-100 shadow-2xl backdrop-blur transition-opacity duration-150 ${
+        show ? "opacity-100" : "opacity-0"
+      } ${className || ""}`}
+      role="note"
+      aria-hidden={!show}
+    >
+      <div className="text-[13px] font-semibold text-slate-50">{header}</div>
+      <div className="mt-2 text-[12.5px] leading-5 text-slate-200">{body}</div>
+      <div className="mt-3 border-t border-white/10 pt-2 text-[12px] font-medium text-slate-200">
+        {footer}
+      </div>
+    </div>
+  );
+}
+
 export default function BalanceGlob({
   tension,
   severity,
@@ -147,19 +181,12 @@ export default function BalanceGlob({
     >
       {/* Hover/focus popover brief (intermediate, intentionally lightweight) */}
       {hasBrief && (
-        <div
-          className={`pointer-events-none absolute left-1/2 top-1/2 z-30 w-[320px] -translate-x-full -translate-y-1/2 rounded-xl border border-white/10 bg-black/70 p-3 text-left text-sm text-slate-100 shadow-2xl backdrop-blur transition-opacity duration-150 ${
-            showBrief ? "opacity-100" : "opacity-0"
-          }`}
-          role="note"
-          aria-hidden={!showBrief}
-        >
-          <div className="text-[13px] font-semibold text-slate-50">{briefHeader}</div>
-          <div className="mt-2 text-[12.5px] leading-5 text-slate-200">{briefBody}</div>
-          <div className="mt-3 border-t border-white/10 pt-2 text-[12px] font-medium text-slate-200">
-            Understand how this impacts your program in the Program Brief.
-          </div>
-        </div>
+        <HoverBriefPopover
+          show={showBrief}
+          header={briefHeader}
+          body={briefBody}
+          footer="Understand how this impacts your system in the Brief."
+        />
       )}
 
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img">
@@ -309,7 +336,7 @@ export default function BalanceGlob({
       {/* goo silhouette (paint once), then apply glass effects inside that silhouette */}
       <g mask={`url(#${gooMaskId})`}>
         {/* subtle bluish backdrop constrained to the glob silhouette (helps the water read on dark UI) */}
-        <g style={{ mixBlendMode: "screen" as any }} opacity={0.11}>
+        <g style={{ mixBlendMode: "screen" }} opacity={0.11}>
           <rect x={0} y={0} width={width} height={height} fill="rgba(55,110,185,0.12)" />
         </g>
 
@@ -335,7 +362,7 @@ export default function BalanceGlob({
         </g>
 
         {/* transmitted light: thin core bar + side-cast beams at ~45° */}
-        <g style={{ mixBlendMode: "screen" as any }} opacity={0.92}>
+        <g style={{ mixBlendMode: "screen" }} opacity={0.92}>
           {/* thin core bar */}
           <g filter={`url(#${lightBarBlurId})`} opacity={0.95}>
             <rect

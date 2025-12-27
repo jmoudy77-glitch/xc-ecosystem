@@ -11,7 +11,7 @@ import {
 } from "../../../lib/performance/equilibriumState";
 import { useParams } from "next/navigation";
 import { GlassModalShell } from "@/components/ui/GlassModalShell";
-import BrainstormModal, { type BrainstormContext } from "./BrainstormModal";
+import BrainstormModal, { type BrainstormContext } from "@/app/programs/[programId]/brainstorm/BrainstormModal";
 
 type Pair = {
   top: string;
@@ -293,8 +293,9 @@ export default function ExecutionBalanceMapPanel({
     setPanelState(nextPanelState);
   }, [tensions]);
 
-  const brainstormContext: BrainstormContext | null = useMemo(() => {
+const brainstormContext: BrainstormContext | null = useMemo(() => {
     if (!tensions?.length) return null;
+    if (!programId) return null;
 
     const idx = selectedPairIndex ?? 0;
     const pair = PAIRS[idx];
@@ -316,6 +317,9 @@ export default function ExecutionBalanceMapPanel({
     const direction = abs <= VIZ_DEADBAND ? "balanced" : t > 0 ? "top" : "bottom";
 
     return {
+      programId,
+      scopeType: "execution_balance",
+      scopeId: DICHOTOMY_KEYS[idx],
       dichotomyKey: DICHOTOMY_KEYS[idx] ?? "unknown",
       topLabel: pair.top,
       bottomLabel: pair.bottom,
@@ -324,7 +328,7 @@ export default function ExecutionBalanceMapPanel({
       direction,
       panelState,
     };
-  }, [tensions, selectedPairIndex, panelState]);
+  }, [tensions, selectedPairIndex, panelState, programId]);
 
   const equilibriumCopy = useMemo(() => {
     if (panelState === "equilibrium") {
@@ -692,11 +696,13 @@ export default function ExecutionBalanceMapPanel({
           </div>
         </div>
       </GlassModalShell>
-      <BrainstormModal
-        open={isBrainstormOpen}
-        onClose={() => setIsBrainstormOpen(false)}
-        context={brainstormContext}
-      />
+      {brainstormContext ? (
+        <BrainstormModal
+          open={isBrainstormOpen}
+          onClose={() => setIsBrainstormOpen(false)}
+          context={brainstormContext}
+        />
+      ) : null}
     </div>
   );
 }

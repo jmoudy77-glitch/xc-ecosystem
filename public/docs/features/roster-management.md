@@ -1,3 +1,0 @@
-# Roster Management
-
-Team-season roster structure, API, UI...

@@ -1,3 +1,0 @@
--- Migration v0.1
-
--- SQL statements here...

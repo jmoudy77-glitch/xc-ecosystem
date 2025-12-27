@@ -1,3 +1,0 @@
-# Inquiries
-
-Inbox workflow, statuses, conversion pipeline...

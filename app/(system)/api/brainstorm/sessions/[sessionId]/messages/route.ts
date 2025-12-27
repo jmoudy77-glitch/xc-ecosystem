@@ -11,9 +11,9 @@ function error(status: number, message: string, extra?: any) {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string } >}
 ) {
-  const { sessionId } = params;
+  const { sessionId } = await params;
   const { supabase } = supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
@@ -34,9 +34,9 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  const { sessionId } = params;
+  const { sessionId } = await params;
   const { supabase } = supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();

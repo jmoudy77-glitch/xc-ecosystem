@@ -27,10 +27,10 @@ function isCoachRole(role: string | null | undefined) {
 
 export async function POST(
   req: NextRequest,
-  ctx: { params: { programId: string; teamId: string; scenarioId: string } }
+  { params }: { params: Promise<{ programId: string; teamId: string; scenarioId: string }> }
 ) {
   try {
-    const { programId, teamId, scenarioId } = ctx.params;
+    const { programId, teamId, scenarioId } = await params;
 
     const { supabase } = supabaseServer(req);
 

@@ -595,14 +595,23 @@ export default function BrainstormModal({ open, onClose, context }: BrainstormMo
           </div>
 
           {/* Main layout: Whiteboard (left) + Conversation/Index (right) + Edge selectors */}
-          <div className="relative grid h-full grid-cols-[1fr_360px_44px] gap-3">
+          <div className="relative grid h-full grid-cols-[1fr_360px_44px] gap-3 pointer-events-auto select-none">
             {/* Left: Whiteboard */}
-            <div className="relative h-full overflow-hidden rounded-xl bg-panel/20 ring-1 ring-white/10">
+            <div
+              className="relative h-full min-h-0 overflow-hidden rounded-xl bg-panel/20 ring-1 ring-white/10 pointer-events-auto"
+              style={{ zIndex: 1 }}
+              onPointerDownCapture={(e) => {
+                e.stopPropagation();
+              }}
+              onMouseDownCapture={(e) => {
+                e.stopPropagation();
+              }}
+            >
               <BrainstormWhiteboard pageId={activePageId} />
             </div>
 
             {/* Right: Conversation + Index */}
-            <div className="flex h-full flex-col gap-3">
+            <div className="flex h-full flex-col gap-3 pointer-events-auto" style={{ zIndex: 2 }}>
               <div className="flex h-[58%] flex-col overflow-hidden rounded-xl bg-panel/35 ring-1 ring-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                 <div className="flex items-center justify-between px-3 py-2">
                   <div>
@@ -628,7 +637,7 @@ export default function BrainstormModal({ open, onClose, context }: BrainstormMo
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-3 pb-3">
+                <div className="flex-1 overflow-y-auto px-3 pb-3 select-text">
                   <div className="space-y-2">
                     {messages.map((m) => (
                       <div
@@ -682,7 +691,7 @@ export default function BrainstormModal({ open, onClose, context }: BrainstormMo
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       placeholder="Type as coach…"
-                      className="h-[54px] flex-1 resize-none rounded-md bg-panel/35 px-2 py-1 text-[11px] text-[var(--foreground)] ring-1 ring-white/10 placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      className="h-[54px] flex-1 resize-none rounded-md bg-panel/35 px-2 py-1 text-[11px] text-[var(--foreground)] ring-1 ring-white/10 placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 select-text"
                     />
                     <button
                       type="button"
@@ -728,7 +737,7 @@ export default function BrainstormModal({ open, onClose, context }: BrainstormMo
             </div>
 
             {/* Far-right: Graph/Table selectors (edge rail) */}
-            <div className="flex h-full flex-col items-center gap-2 rounded-xl bg-panel/20 py-3 ring-1 ring-white/10">
+            <div className="flex h-full flex-col items-center gap-2 rounded-xl bg-panel/20 py-3 ring-1 ring-white/10 pointer-events-auto" style={{ zIndex: 3 }}>
               <button
                 type="button"
                 onClick={() => {

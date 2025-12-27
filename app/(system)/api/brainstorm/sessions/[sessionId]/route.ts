@@ -4,10 +4,10 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 export async function GET(
   req: NextRequest,
-  ctx: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   const { supabase } = supabaseServer(req);
-  const { sessionId } = ctx.params;
+  const { sessionId } = await params;
 
   const { data, error } = await supabase
     .from("brainstorm_sessions")
@@ -21,10 +21,10 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  ctx: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   const { supabase } = supabaseServer(req);
-  const { sessionId } = ctx.params;
+  const { sessionId } = await params;
 
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, any> = {};
@@ -46,10 +46,10 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  ctx: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   const { supabase } = supabaseServer(req);
-  const { sessionId } = ctx.params;
+  const { sessionId } = await params;
 
   const { error } = await supabase
     .from("brainstorm_sessions")

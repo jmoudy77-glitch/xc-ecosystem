@@ -15,9 +15,9 @@ function error(status: number, message: string, extra?: any) {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { objectId: string } }
+  { params }: { params: Promise<{ objectId: string }> }
 ) {
-  const { objectId } = params;
+  const { objectId } = await params;
   const { supabase } = supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
@@ -42,9 +42,9 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { objectId: string } }
+  { params }: { params: Promise<{ objectId: string }> }
 ) {
-  const { objectId } = params;
+  const { objectId } = await params;
   const { supabase } = supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
@@ -87,9 +87,9 @@ export async function PATCH(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { objectId: string } }
+  { params }: { params: Promise<{ objectId: string }> }
 ) {
-  const { objectId } = params;
+  const { objectId } = await params;
   const { supabase } = supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();

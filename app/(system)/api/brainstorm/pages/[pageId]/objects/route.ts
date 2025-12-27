@@ -1,4 +1,4 @@
-// app/api/brainstorm/sessions/[sessionId]/pages/route.ts
+// app/(system)/api/brainstorm/pages/[pageId]/objects/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
@@ -9,29 +9,39 @@ function error(status: number, message: string, extra?: any) {
   );
 }
 
+type CreateObjectBody = {
+  object_type: string;
+  payload_json?: Record<string, any>;
+  x?: number;
+  y?: number;
+  width?: number | null;
+  height?: number | null;
+  z_index?: number;
+};
+
 /**
  * GET
- * Returns all pages for a brainstorm session (active + archived),
- * ordered chronologically.
+ * Returns all objects for a brainstorm page, ordered by z_index then created_at.
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
-  const { sessionId } = params;
+  const { pageId } = await params;
   const { supabase } = supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth?.user) return error(401, "Unauthorized");
 
   const { data, error: dbErr } = await supabase
-    .from("brainstorm_pages")
+    .from("brainstorm_objects")
     .select("*")
-    .eq("session_id", sessionId)
-    .order("page_index", { ascending: true });
+    .eq("page_id", pageId)
+    .order("z_index", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (dbErr) {
-    return error(500, "Failed to load brainstorm pages", { supabase: dbErr });
+    return error(500, "Failed to load brainstorm objects", { supabase: dbErr });
   }
 
   return NextResponse.json({ data });
@@ -39,77 +49,54 @@ export async function GET(
 
 /**
  * POST
- * Creates a new page.
- *
- * If an active page exists:
- * - it is marked archived
- * - its archived_at timestamp is set
- *
- * Then a fresh active page is created.
+ * Creates a new object for a brainstorm page.
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
-  const { sessionId } = params;
+  const { pageId } = await params;
   const { supabase } = supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth?.user) return error(401, "Unauthorized");
 
-  // Find current active page (if any)
-  const { data: activePage, error: activeErr } = await supabase
-    .from("brainstorm_pages")
-    .select("*")
-    .eq("session_id", sessionId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (activeErr) {
-    return error(500, "Failed to resolve active page", {
-      supabase: activeErr,
-    });
+  let body: CreateObjectBody;
+  try {
+    body = (await req.json()) as CreateObjectBody;
+  } catch {
+    return error(400, "Invalid JSON body");
   }
 
-  // Archive active page
-  if (activePage) {
-    const { error: archiveErr } = await supabase
-      .from("brainstorm_pages")
-      .update({
-        is_active: false,
-        archived_at: new Date().toISOString(),
-      })
-      .eq("id", activePage.id);
+  const object_type = body.object_type;
+  if (!object_type) return error(400, "object_type is required");
 
-    if (archiveErr) {
-      return error(500, "Failed to archive active page", {
-        supabase: archiveErr,
-      });
-    }
-  }
+  const payload_json = body.payload_json ?? {};
+  const x = typeof body.x === "number" ? body.x : 24;
+  const y = typeof body.y === "number" ? body.y : 24;
+  const width = typeof body.width === "number" || body.width === null ? body.width : null;
+  const height = typeof body.height === "number" || body.height === null ? body.height : null;
+  const z_index = typeof body.z_index === "number" ? body.z_index : 0;
 
-  const nextPageIndex =
-    activePage && typeof activePage.page_index === "number"
-      ? activePage.page_index + 1
-      : 0;
-
-  // Create new active page
-  const { data: newPage, error: createErr } = await supabase
-    .from("brainstorm_pages")
+  const { data: created, error: createErr } = await supabase
+    .from("brainstorm_objects")
     .insert({
-      session_id: sessionId,
-      page_index: nextPageIndex,
-      is_active: true,
+      page_id: pageId,
+      object_type,
+      payload_json,
+      x,
+      y,
+      width,
+      height,
+      z_index,
       created_by_user_id: auth.user.id,
     })
     .select("*")
     .single();
 
   if (createErr) {
-    return error(500, "Failed to create new brainstorm page", {
-      supabase: createErr,
-    });
+    return error(500, "Failed to create brainstorm object", { supabase: createErr });
   }
 
-  return NextResponse.json({ data: newPage }, { status: 201 });
+  return NextResponse.json({ data: created }, { status: 201 });
 }

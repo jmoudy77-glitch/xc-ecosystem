@@ -1,4 +1,5 @@
 // components/brainstorm/WhiteboardObjectRenderer.tsx
+import type { CSSProperties } from "react";
 import { BrainstormObjectBase } from "@/lib/brainstorm/types";
 import { TextNoteObject } from "./objects/TextNoteObject";
 import { ImageObject } from "./objects/ImageObject";
@@ -8,7 +9,7 @@ type Props = {
 };
 
 export function WhiteboardObjectRenderer({ object }: Props) {
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     position: "absolute",
     left: object.x,
     top: object.y,

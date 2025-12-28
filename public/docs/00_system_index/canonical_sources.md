@@ -54,6 +54,19 @@ Every material change to canonical governance/spec documents must be recorded vi
 
 - Promotions directory
   - `public/docs/01_governance/promotions/`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_17__causal_alignment_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_18__recruiting_boundary_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_19__roster_boundary_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_20__performance_boundary_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_21__philosophy_boundary_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_22__ui_causal_separation_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_23__a1_horizon_scope_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_24__a1_event_immutability_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_25__recruiting_offer_structure_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_26__recruiting_absence_mitigation_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_27__recruiting_commitment_probability_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_28__performance_diagnostic_output_lock.md`
+- `public/docs/01_governance/promotions/2025-12-28__promotion_29__promotion_index_update.md`
 
 ---
 

@@ -26,8 +26,7 @@
 
 - Scope respected: only `/public/docs/**` modified
 - Constitution created at stable canonical path
-- Constitution content copied verbatim from the discovered source (with a short canonical header)
-- Promotion record created and traceable
+- Constitution content copied verbatim from discovered source (with canonical header)
 
 Status: **PASSED**
 
@@ -37,11 +36,10 @@ Status: **PASSED**
 
 | Requirement | Artifact |
 |------------|----------|
-| R1 – Constitutions directory exists | public/docs/01_governance/constitutions/ |
-| R2 – Constitutions README exists | public/docs/01_governance/constitutions/README.md |
-| R3 – A1 constitution created | public/docs/01_governance/constitutions/a1_absence_engine.md |
-| R4 – Promotion record exists | This file |
-| R5 – Diff discipline | git status output |
+| Constitutions directory exists | public/docs/01_governance/constitutions/ |
+| Constitutions README exists | public/docs/01_governance/constitutions/README.md |
+| A1 constitution created | public/docs/01_governance/constitutions/a1_absence_engine.md |
+| Promotion record exists | This file |
 
 ---
 

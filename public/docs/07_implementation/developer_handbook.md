@@ -1,79 +1,82 @@
 # Developer Handbook
+**Authority Level:** Implementation Law (binding as operating standard)  
+**Purpose:** Capture recurring development practices and guardrails for building XC-Ecosystem safely and efficiently.
 
-## Purpose
-Capture operational development practices, conventions, and recurring patterns.
+---
 
-## Scope
-Local dev workflow, code standards, common pitfalls, and preferred patterns.
+## 1. How We Build (Operating Principles)
+- Prefer architectural approaches that won’t need refactoring later.
+- Centralize data logic in reusable server actions instead of inline queries.
+- Preserve module boundaries: do not mix ownership.
+- Treat docs as the constitution: update them when reality changes.
 
-## Authoritative statements
-- Prefer reusable server actions for data logic.
-- When using Supabase in Next.js Server Components, use the working cookie pattern:
-  - `const cookieStore = cookies() as any; cookieStore.get(name)?.value`
-- Any change to schema/RLS must include doc updates and a migration.
+---
 
-## Sources
-- `00-index.md`
-- `ai/ai-data-sources.md`
-- `architecture/ai-architecture.md`
-- `architecture/api-architecture.md`
-- `architecture/billing-architecture.md`
-- `architecture/domain-architecture.md`
-- `architecture/ia_map.md`
-- `architecture/performance-architecture.md`
-- `architecture/system-architecture.md`
-- `development/coding-standards.md`
-- `development/dev-seed-core-training.md`
-- `development/developer-handbook.md`
-- `development/developer-handbook/01.introduction.md`
-- `development/developer-handbook/02.tech-stack-overview.md`
-- `development/developer-handbook/03.project-structure.md`
-- `development/developer-handbook/04.environment-setup.md`
-- `development/developer-handbook/05.environment-variables.md`
-- `development/developer-handbook/06.database-workflows.md`
-- `development/developer-handbook/07.api-guidelines.md`
-- `development/developer-handbook/08.billing-and-subscriptions.md`
-- `development/developer-handbook/09.ai-development.md`
-- `development/developer-handbook/10.ui-ux-guidelines.md`
-- `development/developer-handbook/11.testing-and-quality.md`
-- `development/developer-handbook/12.deployment-guide.md`
-- `development/developer-handbook/13.troubleshooting.md`
-- `development/developer-handbook/14.glossary.md`
-- `development/developer-handbook/index.md`
-- `development/handbook/api-design.md`
-- `development/handbook/file-structure.md`
-- `development/handbook/naming-conventions.md`
-- `development/handbook/supabase-integration.md`
-- `development/handbook/testing-strategy.md`
-- `features/billing.md`
-- `function_area_notes/ai_analytics_modules.md`
-- `function_area_notes/meet_management_data_ingestion.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/platform_architecture_devops.md`
-- `function_area_notes/practice_scheduler_planner.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/recruiting.md`
-- `function_area_notes/ui_ux_interaction_philosophy.md`
-- `index.md`
-- `master-architecture.md`
-- `product/positioning.md`
-- `product/roadmap.md`
-- `schema/domains/athletes.md`
-- `schema/domains/billing-subscriptions.md`
-- `schema/domains/identity-users.md`
-- `schema/domains/programs-teams.md`
-- `schema/domains/recruiting.md`
-- `schema/domains/results.md`
-- `schema/domains/seasons-rosters.md`
-- `schema/domains/training.md`
-- `schema/migrations/future-migrations.md`
-- `schema/schema-history/2025-12-01-with-teams-and-seasons.md`
-- `schema/schema-history/2025-12-01.md`
-- `schema/schema-latest.md`
-- `security/data-ownership.md`
-- `security/privacy-model.md`
-- `security/rls-framework.md`
-- `theme/token-contract.md`
-- `ui/workflows/meet-manager.md`
-- `ui/workflows/practice-scheduler.md`
-- `ui/workflows/roster-builder.md`
+## 2. Local Dev Workflow (Canonical)
+- Use consistent environment variables and `.env` discipline.
+- Run migrations through a controlled process; do not “hot fix” production.
+- Prefer repeatable scripts over fragile aliases; keep commands robust.
+
+---
+
+## 3. Data Access Rules (Non-negotiable)
+- RLS is mandatory; server actions still validate scope.
+- No direct client writes to authoritative tables outside controlled paths.
+- Avoid “service key in user path” patterns.
+
+---
+
+## 4. Supabase + Next.js App Router Notes
+### 4.1 Cookie pattern (server components)
+Use the working cookie access pattern to avoid TS `.get` errors:
+
+```ts
+const cookieStore = cookies() as any;
+cookieStore.get(name)?.value
+```
+
+### 4.2 Route handlers
+Route handlers may use `req.cookies.get(name)?.value` patterns; keep handlers thin and delegate to internal services.
+
+---
+
+## 5. Schema and RLS Change Protocol
+Any schema or RLS change requires:
+1) migration (SQL)  
+2) updated docs (schema + relevant lawbooks)  
+3) smoke test for tenant isolation  
+4) review of any downstream impacts (AI outputs, UI state labels)
+
+---
+
+## 6. Quality Gates
+- Prefer type-safe boundaries; avoid “any” unless required at integration seams.
+- Write tests for high-impact actions (billing, roster allocations, pipeline transitions).
+- Add regression tests when bugs reoccur.
+
+---
+
+## 7. Common Pitfalls (Avoid)
+- Mixing module ownership in one write path without contracts.
+- Ad-hoc joins in UI that leak cross-scope data.
+- Silent automation (especially AI) that mutates truth.
+- UI that hides state consequences.
+
+---
+
+## 8. Documentation Discipline
+When you add or change:
+- a state machine → update `02_architecture/state_transitions.md` and relevant module doc
+- a data ownership rule → update `02_architecture/data_authority.md`
+- an AI output → update `05_ai_systems/*` and output contract
+- a deep workflow → update `06_ui_system/interaction_contracts.md`
+
+---
+
+## 9. Reference Map
+- Service boundaries: `07_implementation/service_responsibilities.md`
+- Server actions: `07_implementation/server_actions.md`
+- API routes: `07_implementation/api_patterns.md`
+- RLS: `07_implementation/rls_patterns.md`
+- Billing: `07_implementation/billing_and_plans.md`
+- Domain meaning: `03_domain_models/*`

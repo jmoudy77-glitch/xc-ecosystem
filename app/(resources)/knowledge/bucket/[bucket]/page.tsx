@@ -1,10 +1,14 @@
 import Link from "next/link";
-import { BUCKETS, type DocsBucket } from "@/lib/docs/buckets";
 import { getDocsIndex } from "@/lib/docs";
 
+function prettifyBucketTitle(bucket: string): string {
+  const withoutPrefix = bucket.replace(/^\d+[ -_]+/, "");
+  const spaced = withoutPrefix.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return spaced.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default async function BucketPage({ params }: { params: { bucket: string } }) {
-  const bucket = decodeURIComponent(params.bucket) as DocsBucket;
-  const meta = BUCKETS.find((b) => b.id === bucket);
+  const bucket = decodeURIComponent(params.bucket);
 
   const items = (await getDocsIndex()).filter((d) => d.bucket === bucket);
 
@@ -12,8 +16,10 @@ export default async function BucketPage({ params }: { params: { bucket: string 
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 18px" }}>
       <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>{meta?.title ?? bucket}</h1>
-          <p style={{ margin: "8px 0 0", opacity: 0.75 }}>{meta?.description ?? ""}</p>
+          <h1 style={{ margin: 0, fontSize: 26 }}>{prettifyBucketTitle(bucket)}</h1>
+          <p style={{ margin: "8px 0 0", opacity: 0.75 }}>
+            Folder: <span style={{ opacity: 0.95 }}>{bucket}</span> ({items.length})
+          </p>
         </div>
         <Link href="/knowledge" style={{ textDecoration: "none" }}>
           ← Back

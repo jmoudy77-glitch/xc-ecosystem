@@ -1,77 +1,73 @@
-# Roster & Scholarships
+# Roster & Scholarships (Operational Module)
+**Authority Level:** Operational Module (binding)  
+**Scope:** Roster composition, scholarship budgeting, allocations, auditability  
+**Dependencies:** `01_governance/*`, `02_architecture/*`, `03_domain_models/roster_domain.md`  
+**Boundary:** Consumes Recruiting outputs; upstream of Performance execution
 
-## Purpose
-Describe the user-facing capabilities, workflows, and integration points for this module.
+---
 
-## Scope
-Defines what the module does and what it depends on. Does not redefine governance or architecture.
+## 1. What this module is for
+Roster & Scholarships converts recruiting reality into a season roster you can actually build:
+- roster composition by team/event group/class year
+- scholarship budgets and allocations (equivalency or dollars)
+- attrition mitigation planning
+- auditable decision history
 
-## Authoritative statements
-- This module must comply with `01_governance/*` and `02_architecture/module_boundaries.md`.
-- Roster-building consumes recruiting outputs and must remain consistent with budget auditability.
+This module replaces spreadsheets and fragmented budget tracking with an enforceable, explainable system.
 
-## Primary workflows
-- Key flows should be implemented as minimal-touch, coach-intuitive interactions.
-- Use drag-and-drop where feasible for high-frequency tasks.
+---
 
-## Data and integration points
-- Source-of-truth entities and states are defined in `03_domain_models/*`.
-- Persisted outputs must be auditable when derived.
+## 2. Coach outcomes
+A coach should be able to:
+- See roster composition health (balance, gaps, depth)
+- Allocate scholarships confidently without overspending
+- Track commitments and offers with audit history
+- Run “what-if” scenarios without mutating truth
+- Understand downstream impact on performance planning (groups, development tracks)
 
-## Sources
-- `2025-12-18_XC-Ecosystem_Design_Protocol.md`
-- `ai/coach_facing_ai_philosophy.md`
-- `ai/pipeline-projection.md`
-- `architecture/ai-architecture.md`
-- `architecture/data-flow.md`
-- `architecture/domain-architecture.md`
-- `architecture/ia_map.md`
-- `architecture/navigation-architecture.md`
-- `architecture/performance-architecture.md`
-- `architecture/system-architecture.md`
-- `development/dev-seed-core-training.md`
-- `development/handbook/naming-conventions.md`
-- `development/performance_compute_boundary_contract_v1.md`
-- `features/onboarding-flows.md`
-- `features/recruiting-pipeline.md`
-- `features/roster-management.md`
-- `features/roster-system.md`
-- `features/team-season-management.md`
-- `function_area_notes/ai_analytics_modules.md`
-- `function_area_notes/meet_management_data_ingestion.md`
-- `function_area_notes/meta_session_logs.md`
-- `function_area_notes/partnerships_expansion.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/platform_architecture_devops.md`
-- `function_area_notes/practice_scheduler_planner.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/recruiting.md`
-- `function_area_notes/roster_scholarships.md`
-- `function_area_notes/ui_ux_interaction_philosophy.md`
-- `master-architecture.md`
-- `planning/milestones.md`
-- `planning/requirements.md`
-- `product/competitive-landscape.md`
-- `product/personas.md`
-- `product/positioning.md`
-- `product/pricing-model.md`
-- `product/roadmap.md`
-- `schema/domains/athletes.md`
-- `schema/domains/programs-teams.md`
-- `schema/domains/recruiting.md`
-- `schema/domains/results.md`
-- `schema/domains/seasons-rosters.md`
-- `schema/domains/training.md`
-- `schema/schema-latest.md`
-- `security/data-ownership.md`
-- `security/permissions-matrix.md`
-- `security/privacy-model.md`
-- `security/rls-framework.md`
-- `team-ops/evaluations.md`
-- `ui/components.md`
-- `ui/workflows/meet-manager.md`
-- `ui/workflows/practice-scheduler.md`
-- `ui/workflows/recruiting-board.md`
-- `ui/workflows/roster-builder.md`
-- `ui/workflows/team-management.md`
-- `xc_ecosystem_ui_architecture_doctrine.md`
+---
+
+## 3. Primary workflows (minimal-touch)
+### 3.1 Roster Builder (composition surface)
+- Roster view by team/event group/class year
+- Drag-and-drop recruits into roster slots (scenario or committed)
+- Highlight gaps and over-concentration
+
+### 3.2 Scholarship Budget Dashboard
+- Budget by season/team
+- Allocation list with remaining balance
+- Guardrails: prevent overspend unless explicit override recorded
+
+### 3.3 Allocation Editor (fast + auditable)
+- Quick edit allocations with effective dates
+- Mandatory attribution; optional rationale for high-impact edits
+- Auto-create audit entries
+
+### 3.4 Scenario Mode (what-if planning)
+- Clone roster/budget into scenario
+- Compare scenarios side-by-side
+- Convert scenario to truth only with explicit confirmation
+
+---
+
+## 4. Data & integration points
+- Consumes Recruiting pipeline outputs and forecasts.
+- Emits roster composition decisions and constraints to Performance.
+- May emit stability signals back to Program Health (read-only feedback).
+- Derived scenario outputs must be clearly marked non-authoritative until confirmed.
+
+---
+
+## 5. Outputs
+- Authoritative season roster membership
+- Scholarship budgets and allocations (auditable)
+- Scenario artifacts (non-authoritative until confirmed)
+- Roster gap summaries and planning notes
+
+---
+
+## 6. Non-negotiables
+- Must remain consistent with budget auditability. fileciteturn2file5L12-L12
+- Recruiting does not allocate scholarships; Performance does not allocate scholarships.
+- Overspend requires explicit override + audit trail.
+- High-frequency roster actions should be drag-first where it reduces friction.

@@ -1,23 +1,21 @@
 import fs from "fs/promises";
 import path from "path";
 import { cache } from "react";
-import type { DocsBucket } from "./buckets";
-import { bucketForDoc } from "./categorize";
+
+// Folder-driven bucket id, e.g. "02_architecture"
+export type DocsBucket = string;
 
 export type DocIndexItem = {
-  path: string;      // posix relative path within /docs, e.g. "architecture/system-architecture.md"
-  slug: string[];    // path split without .md
-  title: string;     // first H1 or filename
-  bucket: DocsBucket;
+  path: string;   // posix relative path within /public/docs
+  slug: string[]; // path split without .md
+  title: string;  // first H1 or filename
+  bucket: DocsBucket; // top-level folder name
 };
 
 function docsRoot(): string {
-  // Docs live under /app/public/docs
+  // Docs live under /public/docs
   // Allow override via env for future flexibility
-  return (
-    process.env.DOCS_ROOT ||
-    path.join(process.cwd(), "public", "docs")
-  );
+  return process.env.DOCS_ROOT || path.join(process.cwd(), "public", "docs");
 }
 
 function toPosix(p: string) {
@@ -58,6 +56,17 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
   return out;
 }
 
+function topLevelFolder(relPosix: string): string {
+  const seg = relPosix.split("/").filter(Boolean)[0];
+  return seg || "root";
+}
+
+function bucketOrderKey(bucket: string): number {
+  // Prefer numeric prefix ordering like "02_architecture"
+  const m = /^(\d+)[-_]/.exec(bucket);
+  return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
+}
+
 export const getDocsIndex = cache(async (): Promise<DocIndexItem[]> => {
   const root = docsRoot();
   const absFiles = await listMarkdownFiles(root);
@@ -66,19 +75,24 @@ export const getDocsIndex = cache(async (): Promise<DocIndexItem[]> => {
   for (const abs of absFiles) {
     const rel = toPosix(path.relative(root, abs));
     const md = await fs.readFile(abs, "utf8");
-    const fallback = path.posix.basename(rel, ".md").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+    const fallback = path.posix
+      .basename(rel, ".md")
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     const title = inferTitle(md, fallback);
-    // Bucket assignment: allow explicit directory→bucket overrides for stability.
-    // (This prevents missing panels when new top-level folders are added.)
-    const relLower = rel.toLowerCase();
-    const bucket = relLower.startsWith("ai/") ? ("ai" as DocsBucket) : bucketForDoc(rel);
+
+    const bucket = topLevelFolder(rel); // <-- folder-driven bucket id
     const slug = stripMdExt(rel).split("/").filter(Boolean);
 
     items.push({ path: rel, slug, title, bucket });
   }
 
-  // Stable sort: bucket, then title
+  // Stable sort: folder order (00..99), then folder name, then title
   items.sort((a, b) => {
+    const ak = bucketOrderKey(a.bucket);
+    const bk = bucketOrderKey(b.bucket);
+    if (ak !== bk) return ak - bk;
     if (a.bucket !== b.bucket) return a.bucket.localeCompare(b.bucket);
     return a.title.localeCompare(b.title);
   });

@@ -1,53 +1,77 @@
-# Performance
+# Performance (Operational Module)
+**Authority Level:** Operational Module (binding)  
+**Scope:** In-season execution, actionable clarity, training design, readiness and development oversight  
+**Dependencies:** `01_governance/*`, `02_architecture/*`, `03_domain_models/performance_domain.md`  
+**Boundary:** In-season headquarters; may show philosophy overlays but must not contaminate performance truth fileciteturn2file1L13-L13
 
-## Purpose
-Describe the user-facing capabilities, workflows, and integration points for this module.
+---
 
-## Scope
-Defines what the module does and what it depends on. Does not redefine governance or architecture.
+## 1. What this module is for
+Performance is where coaches live during the season.
+It exists to replace daily chaos with governed execution:
+- training plans and practice workflows
+- readiness and availability states
+- workload facts and interpretable interpretations
+- actionable clarity: what to do today, who needs attention, what risk is being carried
 
-## Authoritative statements
-- This module must comply with `01_governance/*` and `02_architecture/module_boundaries.md`.
-- Performance must not be contaminated by philosophy alignment logic unless explicitly specified and governed.
+Performance is downstream of roster reality and upstream of meet operations.
 
-## Primary workflows
-- Key flows should be implemented as minimal-touch, coach-intuitive interactions.
-- Use drag-and-drop where feasible for high-frequency tasks.
+---
 
-## Data and integration points
-- Source-of-truth entities and states are defined in `03_domain_models/*`.
-- Persisted outputs must be auditable when derived.
+## 2. Coach outcomes
+A coach should be able to:
+- Plan and run practices with minimal friction
+- Understand readiness at a glance without losing nuance
+- Make workload tradeoffs with clear consequence visibility
+- Maintain longitudinal development records that survive staff turnover
+- Integrate meet outcomes into training adjustments cleanly
 
-## Sources
-- `ai/ai_authority_charter.md`
-- `ai/coach_facing_ai_philosophy.md`
-- `architecture/data-flow.md`
-- `architecture/event-model.md`
-- `architecture/performance-architecture.md`
-- `development/2025-12-24-snapshot.md`
-- `development/Performance_Module_Actionable_Clarity_Executive_Summary.md`
-- `development/Performance_Module_Development_Design_Contract.md`
-- `development/handbook/git-standards.md`
-- `development/performance_compute_boundary_contract_v1.md`
-- `features/athlete-profile.md`
-- `function_area_notes/ai_analytics_modules.md`
-- `function_area_notes/meet_management_data_ingestion.md`
-- `function_area_notes/meta_session_logs.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/platform_architecture_devops.md`
-- `function_area_notes/practice_scheduler_planner.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/recruiting.md`
-- `function_area_notes/roster_scholarships.md`
-- `function_area_notes/ui_ux_interaction_philosophy.md`
-- `product/pricing-model.md`
-- `results/meet-structure.md`
-- `results/overview.md`
-- `results/verification-and-statuses.md`
-- `schema/domains/athletes.md`
-- `schema/domains/recruiting.md`
-- `schema/domains/results.md`
-- `ui/workflows/meet-manager.md`
-- `ui/workflows/recruiting-board.md`
-- `ui/workflows/team-management.md`
-- `xc_ecosystem_ui_architecture_doctrine.md`
+---
+
+## 3. Primary workflows (minimal-touch)
+### 3.1 Performance Home (Actionable Clarity)
+A single surface that answers:
+- What needs attention today?
+- Who is at risk (and why)?
+- What decisions are pending?
+- What changed since last time?
+
+### 3.2 Readiness & Availability Management
+- Availability states (facts) with effective windows
+- Readiness overlays (derived) with explainability
+- “Unknown” states surfaced explicitly
+
+### 3.3 Training Plan & Practice Execution
+- Build week-level plan, then drill into sessions
+- Group assignments + individual adjustments
+- Drag-and-drop events/workouts into practices where feasible
+- Record completion outcomes when desired
+
+### 3.4 Athlete Development Records
+- Notes, goals, benchmarks
+- Coachable metric visibility (coach-authored)
+- Trend snapshots (facts + derived)
+
+---
+
+## 4. Data & integration points
+- Consumes roster composition and scholarship constraints as context for grouping and expectations.
+- Consumes Program Health overlays (constraint profile, stability risk posture) without rewriting truth.
+- Emits readiness/availability signals to Meet Management.
+- Receives results from Meet Management as facts (results ingestion).
+
+---
+
+## 5. Outputs
+- Training plan artifacts and practice sessions
+- Availability facts, readiness interpretations
+- Actionable clarity summaries (explainable)
+- Athlete development records and notes
+
+---
+
+## 6. Non-negotiables
+- Must comply with Governance and module boundaries. fileciteturn2file1L12-L12
+- Performance truth must not be contaminated by philosophy logic unless explicitly governed. fileciteturn2file1L13-L13
+- High-frequency tasks must be minimal-touch; drag-and-drop is preferred where it reduces friction.
+- Missing data must degrade to “Unknown,” not false precision.

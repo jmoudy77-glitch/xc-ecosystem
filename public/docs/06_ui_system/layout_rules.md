@@ -1,34 +1,74 @@
 # Layout Rules
+**Authority Level:** UI System Law (binding)  
+**Purpose:** Define non-negotiable layout and shell requirements for coach-facing UX.
 
-## Purpose
-Define non-negotiable layout and shell requirements.
+---
 
-## Authoritative statements
-- Coach-facing app must include hero header and navigation shell for all program-related pages unless explicitly designing a compact variant.
-- Deep workflows should use centered modal layouts; avoid right-side panels as the primary container for complex builders.
+## 1. Navigation Shell Requirement
+All program-related pages must include:
+- the hero header (program identity + context)
+- the navigation shell (stable global navigation for program work)
 
-## Sources
-- `2025-12-18_XC-Ecosystem_Design_Protocol.md`
-- `ai/ai_presence_and_onboarding_doctrine.md`
-- `architecture/ai-architecture.md`
-- `architecture/ia_map.md`
-- `architecture/performance-architecture.md`
-- `development/Performance_Module_Actionable_Clarity_Executive_Summary.md`
-- `development/Performance_Module_Development_Design_Contract.md`
-- `development/developer-handbook/10.ui-ux-guidelines.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/platform_architecture_devops.md`
-- `function_area_notes/practice_scheduler_planner.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/recruiting.md`
-- `function_area_notes/roster_scholarships.md`
-- `function_area_notes/ui_ux_interaction_philosophy.md`
-- `theme/token-contract.md`
-- `theme/ui-intuition-checklist.md`
-- `training-module-decisions.md`
-- `ui/layout-rules.md`
-- `ui/workflows/practice-scheduler.md`
-- `ui/workflows/recruiting-board.md`
-- `ui/workflows/roster-builder.md`
-- `ui/workflows/team-management.md`
-- `ui/workflows/ui_workflow_overview.md`
+**Exception:** A compact variant may be introduced later, but it must be explicit and documented.
+
+---
+
+## 2. Page Anatomy (Canonical)
+Coach-facing pages should follow a predictable structure:
+1. **Context header** (program/team/season; page title; breadcrumbs as needed)
+2. **Primary actions** (top-right or immediately visible; limited to 1–3)
+3. **Primary content** (boards, dashboards, lists)
+4. **Secondary panels** (filters, insights, detail panes) via progressive disclosure
+
+---
+
+## 3. Deep Workflow Container Standard
+Deep builders (practice builder, roster builder, complex evaluators) must use:
+- a **large centered modal** as the primary container
+- optional inner slide-out panel(s) for advanced detail (e.g., per-athlete assignments)
+
+Avoid right-side panels as the primary container for complex builders.
+
+---
+
+## 4. Density and Readability
+- Default views must be readable at a glance.
+- Reserve dense tables for drill-down views.
+- Use cards/rows with consistent hierarchy: label → value → status → action.
+
+---
+
+## 5. State Visibility
+Any page that represents a state machine (recruiting pipeline, readiness, season mode) must show:
+- the current state
+- allowed transitions (and who can perform them)
+- the consequence of transition (preview) where impact is high
+
+---
+
+## 6. Builder Layout Convention
+For multi-pane builders:
+- left: primary structure (groups, plan structure)
+- center: working canvas (the thing being built)
+- right: library/tooling (workouts, events, templates)
+- slide-out: advanced detail (individual overrides)
+
+This keeps the coach oriented and reduces accidental context loss.
+
+---
+
+## 7. Mobile / Responsive Constraint
+Mobile may be supported, but the system is optimized for coach desktop usage.
+Responsive behavior should preserve the mental model:
+- panes become stacked
+- the “working canvas” remains primary
+- key actions remain visible
+
+---
+
+## 8. Definition of Done (Layout)
+A layout is compliant if:
+- nav shell + hero are present (where required)
+- deep workflows use modal doctrine
+- primary actions are obvious and limited
+- information hierarchy is readable without scanning fatigue

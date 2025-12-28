@@ -1,6 +1,18 @@
 # Source Inventory (Non-canonical)
+**Authority Level:** Archive Reference (informational)  
+**Purpose:** List all source markdown files discovered in the imported legacy archive. These files are preserved for traceability but are not authoritative unless their content has been consolidated into canonical docs.
 
-This file lists all source markdown files found in the uploaded archive. These are preserved for traceability but are not authoritative unless their content has been consolidated into canonical docs.
+---
+
+## How to interpret this inventory
+- The list below is a **file-level manifest** of legacy/source docs.
+- A file appearing here does **not** mean it should exist in the canonical `/docs` tree.
+- If a file contains durable rules, those rules must be rewritten into the numbered canonical sections.
+
+---
+
+## Manifest (as discovered)
+(Original manifest retained below for exact traceability.)
 
 - `00-index.md`
 - `2025-12-18_XC-Ecosystem_Design_Protocol.md`

@@ -1,36 +1,82 @@
 # Commit Probability (AI System)
+**Authority Level:** AI System (binding within charter)  
+**Purpose:** Forecast the likelihood that a given recruit will commit within a time window, and explain the drivers.
 
-## Purpose
-Describe the user-facing capabilities, workflows, and integration points for this module.
+---
 
-## Scope
-Defines what the module does and what it depends on. Does not redefine governance or architecture.
+## 1. What it does
+Commit Probability is a **forecast** attached to Recruiting / Roster-building planning.
+It helps coaches:
+- triage pipeline effort
+- understand conversion risk
+- allocate attention and resources
+- reduce surprise losses late in the cycle
 
-## Authoritative statements
-- This module must comply with `01_governance/*` and `02_architecture/module_boundaries.md`.
+It is probabilistic and must be presented as such.
 
+---
 
-## Primary workflows
-- Key flows should be implemented as minimal-touch, coach-intuitive interactions.
-- Use drag-and-drop where feasible for high-frequency tasks.
+## 2. What it must not do
+- Must not guarantee outcomes.
+- Must not move pipeline states automatically.
+- Must not imply certainty when data is sparse.
+- Must not use hidden cross-tenant data.
 
-## Data and integration points
-- Source-of-truth entities and states are defined in `03_domain_models/*`.
-- Persisted outputs must be auditable when derived.
+---
 
-## Sources
-- `ai/ai_authority_charter.md`
-- `ai/ai_presence_and_onboarding_doctrine.md`
-- `ai/coach_facing_ai_philosophy.md`
-- `ai/commit-probability.md`
-- `architecture/performance-architecture.md`
-- `development/Performance_Module_Development_Design_Contract.md`
-- `development/handbook/git-standards.md`
-- `features/recruiting-pipeline.md`
-- `function_area_notes/ai_analytics_modules.md`
-- `function_area_notes/recruiting.md`
-- `function_area_notes/roster_scholarships.md`
-- `product/positioning.md`
-- `product/pricing-model.md`
-- `product/roadmap.md`
-- `ui/workflows/recruiting-board.md`
+## 3. Inputs (Canonical)
+- recruit pipeline state + history (transitions)
+- contact cadence facts (touch frequency, recency)
+- engagement signals (visit scheduled, responses logged, etc.)
+- program constraints context (capacity, scholarships remaining) as optional context
+- timeline context (graduation year, decision deadlines)
+- competitor signals (if coach enters them; never inferred from private sources)
+
+Optional:
+- athlete preference signals (explicitly entered)
+- historical cohort conversion priors (within the same program/tenant only)
+
+---
+
+## 4. Output (Canonical)
+- probability (0–1) and/or categorical band
+- confidence (High/Medium/Low/Unknown)
+- forecast window (e.g., “next 30 days”)
+- top drivers (+/−)
+- risk flags (e.g., “contact gap > 14 days”)
+- recommended next action(s) (bounded; coach-controlled)
+
+Persist outputs via `ai_output_record_contract.md`.
+
+---
+
+## 5. Coach Workflow Integration
+Surfaces:
+- recruit card (small: probability band + confidence)
+- board filters (“high conversion / low confidence”)
+- “today queue” prioritization (who needs action)
+- roster planning (“expected commits” scenario)
+
+Interaction rules:
+- recommendations must be phrased as options
+- show why the system thinks cadence matters (provenance)
+- allow coach to record “new information” that updates forecast (as facts)
+
+---
+
+## 6. Confidence Discipline
+Commit Probability must heavily weight:
+- missing contact history
+- ambiguous pipeline state
+- lack of explicit engagement signals
+
+If key signals are missing, default to Low/Unknown with explanation.
+
+---
+
+## 7. References
+- `ai_authority_charter.md`
+- `confidence_semantics.md`
+- `ai_output_record_contract.md`
+- `03_domain_models/recruiting_domain.md`
+- `02_architecture/state_transitions.md`

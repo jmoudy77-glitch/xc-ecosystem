@@ -1,56 +1,74 @@
-# Practice Scheduler
+# Practice Scheduler (Operational Module)
+**Authority Level:** Operational Module (binding)  
+**Scope:** Practice planning UI/workflows as part of Performance execution  
+**Dependencies:** `01_governance/*`, `02_architecture/*`, `03_domain_models/performance_domain.md`, `06_ui_system/*`  
+**Boundary:** Part of Performance domain execution; does not redefine performance truth
 
-## Purpose
-Describe the user-facing capabilities, workflows, and integration points for this module.
+---
 
-## Scope
-Defines what the module does and what it depends on. Does not redefine governance or architecture.
+## 1. What this module is for
+Practice Scheduler is the coach’s daily execution workspace:
+- build practices quickly
+- assign groups and individuals
+- reuse workouts/events libraries
+- manage day-by-day constraints (time, facilities, weather)
 
-## Authoritative statements
-- This module must comply with `01_governance/*` and `02_architecture/module_boundaries.md`.
-- The Practice Scheduler must include a weather forecast function when feasible.
+It is designed to minimize clicks and mental overhead while maintaining clarity and reversibility.
 
-## Primary workflows
-- Key flows should be implemented as minimal-touch, coach-intuitive interactions.
-- Use drag-and-drop where feasible for high-frequency tasks.
+---
 
-## Data and integration points
-- Source-of-truth entities and states are defined in `03_domain_models/*`.
-- Persisted outputs must be auditable when derived.
+## 2. Coach outcomes
+A coach should be able to:
+- Build a complete practice in minutes
+- Assign groups and individuals without repetitive input
+- Reuse patterns (templates, libraries)
+- See constraints early (weather, facility windows, meet schedule)
+- Make last-minute adjustments safely and transparently
 
-## Sources
-- `2025-12-18_XC-Ecosystem_Design_Protocol.md`
-- `ai/ai_authority_charter.md`
-- `ai/coach_facing_ai_philosophy.md`
-- `architecture/data-flow.md`
-- `architecture/ia_map.md`
-- `architecture/navigation-architecture.md`
-- `development/dev-seed-core-training.md`
-- `function_area_notes/ai_analytics_modules.md`
-- `function_area_notes/meet_management_data_ingestion.md`
-- `function_area_notes/meta_session_logs.md`
-- `function_area_notes/partnerships_expansion.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/platform_architecture_devops.md`
-- `function_area_notes/practice_scheduler_planner.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/roster_scholarships.md`
-- `function_area_notes/ui_ux_interaction_philosophy.md`
-- `product/competitive-landscape.md`
-- `product/personas.md`
-- `product/positioning.md`
-- `product/pricing-model.md`
-- `product/roadmap.md`
-- `schema/domains/training.md`
-- `security/data-ownership.md`
-- `team-ops/overview.md`
-- `team-ops/practice-scheduler.md`
-- `team-ops/stats-manager.md`
-- `team-ops/strength-conditioning.md`
-- `team-ops/workouts-and-training-events.md`
-- `training-module-decisions.md`
-- `ui/page-blueprints.md`
-- `ui/workflows/meet-manager.md`
-- `ui/workflows/practice-scheduler.md`
-- `ui/workflows/team-management.md`
-- `xc_ecosystem_ui_architecture_doctrine.md`
+---
+
+## 3. Primary workflows (minimal-touch, drag-and-drop preferred)
+### 3.1 Practice Builder (modal-first deep workflow)
+- Large centered modal for deep workflow (builder)
+- Groups panel + library + optional individual assignment panel
+- Drag workouts/events into groups
+- “Individual Assignments” panel for exceptions and personalization
+
+### 3.2 Template & Library Reuse
+- Save practice as template
+- Curate workouts/events library
+- Drag templates onto calendar to instantiate
+
+### 3.3 Attendance & Adjustments
+- Optional quick attendance marking
+- Rapid edits to group assignments
+- Clear “what changed” and reversibility cues
+
+### 3.4 Weather Forecast Integration (required where feasible)
+Practice Scheduler must include a weather forecast function when feasible. fileciteturn2file2L13-L13
+- Display forecast in context of practice time
+- Allow “weather-sensitive” flag on workouts (optional)
+- Surface risk suggestions (e.g., heat index) as decision support, not commands
+
+---
+
+## 4. Data & integration points
+- Writes practice plan artifacts (Performance-owned).
+- Reads roster groupings and availability as inputs.
+- May emit attendance outcomes as facts into Performance and Program Health inputs.
+- Weather data is a non-authoritative external input; store snapshots if decisions depend on it.
+
+---
+
+## 5. Outputs
+- Practice sessions (planned components + assignments)
+- Template artifacts and workout library items
+- Optional attendance outcomes and notes
+- Weather context snapshots (if stored)
+
+---
+
+## 6. Non-negotiables
+- Must comply with module boundaries. fileciteturn2file2L12-L12
+- Must preserve minimal-touch and intuitive interaction; drag-and-drop preferred. fileciteturn2file2L17-L18
+- Weather must be included when feasible. fileciteturn2file2L13-L13

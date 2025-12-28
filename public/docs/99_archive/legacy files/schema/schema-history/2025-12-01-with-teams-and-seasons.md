@@ -1,0 +1,3 @@
+# Schema with Teams & Seasons
+
+Details...

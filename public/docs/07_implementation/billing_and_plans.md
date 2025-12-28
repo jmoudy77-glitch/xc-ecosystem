@@ -1,70 +1,113 @@
 # Billing and Plans (Stripe)
+**Authority Level:** Implementation Law (binding)  
+**Purpose:** Document billing architecture, plan taxonomy, and integration responsibilities for Stripe-based subscriptions and entitlements.
 
-## Purpose
-Document billing architecture, plan taxonomy, and integration responsibilities.
+---
 
-## Scope
-Program/org plans vs athlete plans, checkout flows, webhooks, entitlement mapping.
+## 1. Billing Thesis
+Billing is not just payments; it is **entitlement truth**.
+The platform must:
+- keep subscription state authoritative and auditable
+- enforce entitlements server-side
+- separate program/org plans from athlete plans
+- degrade gracefully when billing state is ambiguous
 
-## Sources
-- `00-index.md`
-- `ai/ai_presence_and_onboarding_doctrine.md`
-- `ai/coach_facing_ai_philosophy.md`
-- `architecture/ai-architecture.md`
-- `architecture/billing-architecture.md`
-- `architecture/data-flow.md`
-- `architecture/domain-architecture.md`
-- `architecture/ia_map.md`
-- `architecture/navigation-architecture.md`
-- `architecture/performance-architecture.md`
-- `architecture/system-architecture.md`
-- `branding/ecosport-universe.md`
-- `development/Performance_Module_Actionable_Clarity_Executive_Summary.md`
-- `development/dev-seed-core-training.md`
-- `development/developer-handbook/02.tech-stack-overview.md`
-- `development/developer-handbook/08.billing-and-subscriptions.md`
-- `development/handbook/supabase-integration.md`
-- `development/performance_compute_boundary_contract_v1.md`
-- `features/billing.md`
-- `function_area_notes/ai_analytics_modules.md`
-- `function_area_notes/meet_management_data_ingestion.md`
-- `function_area_notes/meta_session_logs.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/platform_architecture_devops.md`
-- `function_area_notes/practice_scheduler_planner.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/recruiting.md`
-- `function_area_notes/roster_scholarships.md`
-- `function_area_notes/ui_ux_interaction_philosophy.md`
-- `master-architecture.md`
-- `planning/milestones.md`
-- `planning/project-scope.md`
-- `planning/releases.md`
-- `planning/requirements.md`
-- `planning/roadmap-2025.md`
-- `product/competitive-landscape.md`
-- `product/personas.md`
-- `product/positioning.md`
-- `product/pricing-model.md`
-- `product/pricing-strategy.md`
-- `results/meet-structure.md`
-- `results/overview.md`
-- `schema/domains/billing-subscriptions.md`
-- `schema/domains/results.md`
-- `schema/domains/seasons-rosters.md`
-- `schema/domains/training.md`
-- `schema/migrations/future-migrations.md`
-- `schema/schema-latest.md`
-- `security/data-ownership.md`
-- `security/permissions-matrix.md`
-- `security/privacy-model.md`
-- `security/rls-framework.md`
-- `team-ops/overview.md`
-- `theme/token-contract.md`
-- `theme/ui-intuition-checklist.md`
-- `training-module-decisions.md`
-- `ui/workflows/meet-manager.md`
-- `ui/workflows/practice-scheduler.md`
-- `ui/workflows/roster-builder.md`
-- `ui/workflows/team-management.md`
-- `xc_ecosystem_ui_architecture_doctrine.md`
+---
+
+## 2. Plan Taxonomy (Canonical)
+### 2.1 Program/Org Plans
+These plans govern coach/program features:
+- recruiting module access and capacity limits
+- roster/scholarship tooling
+- performance tooling depth
+- meet management tooling
+- storage quotas and staff seats (as configured)
+
+### 2.2 Athlete Plans (Optional / Future)
+These plans govern athlete-facing features:
+- athlete profile visibility features
+- athlete portal access (where enabled)
+- AI report access (where enabled)
+
+Rule: athlete plans never grant program/coach features.
+
+---
+
+## 3. Entitlements Model
+Entitlements are derived from Stripe subscription state but stored as platform truth for fast enforcement.
+
+Entitlement checks must occur:
+- inside server actions (primary)
+- reinforced by RLS where feasible (secondary)
+
+Entitlements should include:
+- feature flags
+- limits (counts/quotas)
+- seat constraints
+- plan tier identifiers
+- effective timestamps
+
+---
+
+## 4. Checkout Flow (Canonical)
+1) user initiates checkout (server action)
+2) create Stripe Checkout Session with correct scope metadata (program_id, user_id)
+3) redirect user to Stripe
+4) Stripe completes payment
+5) webhook updates subscription + entitlements
+6) UI reflects new entitlements
+
+Rule: UI does not assume payment succeeded until webhook confirms.
+
+---
+
+## 5. Webhook Responsibilities (Canonical)
+Webhook processing must:
+- verify signature
+- be idempotent
+- map Stripe events to internal subscription state
+- update entitlements
+- write audit log entries for entitlement changes
+
+Treat webhook as the authoritative state transition mechanism.
+
+---
+
+## 6. Metadata and Linking Requirements
+Checkout and subscription records must carry enough metadata to link to:
+- program/org scope
+- user who initiated the purchase
+- plan code / price id mapping
+- environment (test vs live)
+
+---
+
+## 7. Failure Modes and Required Behavior
+### 7.1 Payment succeeded but webhook delayed
+- UI shows “Processing subscription” state
+- system retries webhook processing
+- do not grant entitlements early
+
+### 7.2 Webhook failure
+- alert/log with correlation id
+- allow safe replay
+- preserve raw event record where feasible
+
+### 7.3 Subscription cancelled/expired
+- entitlements must be downgraded promptly
+- retain access to historical data per retention policy
+- never delete domain truth as a billing side effect
+
+---
+
+## 8. Security Requirements
+- never expose Stripe secret keys to client
+- do not accept “plan tier” claims from client
+- all plan enforcement is server-side
+
+---
+
+## 9. References
+- `07_implementation/api_patterns.md`
+- `07_implementation/service_responsibilities.md`
+- `02_architecture/data_flow.md`

@@ -1,58 +1,72 @@
-# Meet Management
+# Meet Management (Operational Module)
+**Authority Level:** Operational Module (binding)  
+**Scope:** Meet calendar operations, entries, seeding, logistics, results ingestion  
+**Dependencies:** `01_governance/*`, `02_architecture/*`, `03_domain_models/season.md`, Performance readiness signals  
+**Boundary:** Operational execution; consumes readiness/availability; produces results facts
 
-## Purpose
-Describe the user-facing capabilities, workflows, and integration points for this module.
+---
 
-## Scope
-Defines what the module does and what it depends on. Does not redefine governance or architecture.
+## 1. What this module is for
+Meet Management is the operational layer that turns season competition into:
+- a managed meet calendar
+- clean entry workflows
+- seeding and lineup decisions (with transparency)
+- logistical checklists
+- results ingestion back into system truth
 
-## Authoritative statements
-- This module must comply with `01_governance/*` and `02_architecture/module_boundaries.md`.
+It replaces scattered meet spreadsheets, email threads, and last-minute chaos with a governed process.
 
+---
 
-## Primary workflows
-- Key flows should be implemented as minimal-touch, coach-intuitive interactions.
-- Use drag-and-drop where feasible for high-frequency tasks.
+## 2. Coach outcomes
+A coach should be able to:
+- Maintain a season meet calendar
+- Build entries quickly with availability/readiness context
+- Seed intelligently with transparent rules
+- Execute logistics with checklists and assignments
+- Import and verify results so performance truth stays clean
 
-## Data and integration points
-- Source-of-truth entities and states are defined in `03_domain_models/*`.
-- Persisted outputs must be auditable when derived.
+---
 
-## Sources
-- `00-index.md`
-- `architecture/data-flow.md`
-- `architecture/event-model.md`
-- `architecture/ia_map.md`
-- `architecture/navigation-architecture.md`
-- `architecture/performance-architecture.md`
-- `architecture/system-architecture.md`
-- `development/developer-handbook/06.database-workflows.md`
-- `development/performance_compute_boundary_contract_v1.md`
-- `features/onboarding-flows.md`
-- `features/transfer-portal.md`
-- `function_area_notes/meet_management_data_ingestion.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/recruiting.md`
-- `planning/milestones.md`
-- `product/competitive-landscape.md`
-- `product/personas.md`
-- `product/positioning.md`
-- `product/pricing-model.md`
-- `product/roadmap.md`
-- `results/meet-structure.md`
-- `results/overview.md`
-- `results/verification-and-statuses.md`
-- `schema/domains/recruiting.md`
-- `schema/domains/results.md`
-- `schema/domains/seasons-rosters.md`
-- `security/data-ownership.md`
-- `security/privacy-model.md`
-- `team-ops/meet-manager.md`
-- `team-ops/overview.md`
-- `ui/page-blueprints.md`
-- `ui/workflows/meet-manager.md`
-- `ui/workflows/practice-scheduler.md`
-- `ui/workflows/roster-builder.md`
-- `ui/workflows/team-management.md`
-- `xc_ecosystem_ui_architecture_doctrine.md`
+## 3. Primary workflows (minimal-touch)
+### 3.1 Meet Calendar & Meet Detail
+- Calendar view + list view
+- Meet detail includes: events, travel notes, deadlines, checklist
+
+### 3.2 Entries & Lineups
+- Select athletes with availability/readiness surfaced
+- Drag-and-drop athletes into events where useful
+- Validate eligibility/constraints (program-configured)
+
+### 3.3 Seeding Tools
+- Support seeding strategies (universal seeding where configured)
+- Show seeding rationale and inputs (times/marks, verified status)
+- Allow manual overrides with attribution
+
+### 3.4 Results Ingestion & Verification
+- Import results (manual upload/integration where available)
+- Mark verification status
+- Attach meet artifacts (PDFs, heat sheets, etc.)
+- Push results into Performance truth facts
+
+---
+
+## 4. Data & integration points
+- Consumes availability/readiness from Performance (signals + facts).
+- Writes meet operations artifacts and results.
+- Results become canonical facts used by Performance analytics and Recruiting history.
+
+---
+
+## 5. Outputs
+- Meet calendar and operational artifacts
+- Entries and seeding artifacts (auditable)
+- Results facts + verification statuses
+- Logistics checklists and assignments
+
+---
+
+## 6. Non-negotiables
+- Must comply with governance and module boundaries. fileciteturn2file0L12-L12
+- Derived outputs (seeding suggestions) must be auditable when persisted. fileciteturn2file0L21-L22
+- High-frequency tasks should be minimal-touch and drag-and-drop where feasible. fileciteturn2file0L17-L18

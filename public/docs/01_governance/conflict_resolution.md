@@ -1,33 +1,53 @@
 # Conflict Resolution
+**Authority Level:** Governance (binding)  
+**Purpose:** Provide a consistent method for resolving contradictions in doctrine, architecture, or implementation.
 
-## Purpose
-Provide a deterministic method for resolving conflicts between modules, specs, and implementation.
+---
 
-## Scope
-Conflicts between any two of: governance, architecture, domain, module docs, AI docs, UI docs, implementation patterns.
+## 1. Types of Conflicts
+Conflicts typically appear as:
+- doctrine conflict (two docs disagree)
+- ownership conflict (two modules claim authority over the same data/state)
+- semantics conflict (same term used differently)
+- UI contract conflict (implementation violates interaction law)
+- AI jurisdiction conflict (AI behaving outside charter)
 
-## Authoritative statements
-- Use precedence: Governance → Architecture → Domain Models → Operational Modules → AI/UI → Implementation.
-- If a conflict is discovered:
-  1) freeze the change,
-  2) identify the violated invariant,
-  3) update documentation first,
-  4) then update code.
-- Avoid “silent drift”: if behavior changes, documentation must change or the behavior is invalid.
+---
 
-## Sources
-- `ai/ai_authority_charter.md`
-- `ai/ai_presence_and_onboarding_doctrine.md`
-- `ai/coach_facing_ai_philosophy.md`
-- `architecture/billing-architecture.md`
-- `architecture/ia_map.md`
-- `architecture/performance-architecture.md`
-- `development/Performance_Module_Actionable_Clarity_Executive_Summary.md`
-- `function_area_notes/performance.md`
-- `function_area_notes/platform_architecture_devops.md`
-- `function_area_notes/program_health_absence_engine.md`
-- `function_area_notes/recruiting.md`
-- `security/rls-framework.md`
-- `xc_ecosystem_conflict_resolution_doctrine.md`
-- `xc_ecosystem_constitution.md`
-- `xc_ecosystem_ui_architecture_doctrine.md`
+## 2. Resolution Workflow (Mandatory)
+1) **Identify the highest-precedence controlling document** (see Authority Hierarchy).  
+2) **Restate the conflict plainly** (one sentence per side).  
+3) **Select the controlling rule** (higher precedence wins).  
+4) **Update the non-controlling sources** to conform (or explicitly amend the controlling layer).  
+5) **Record a brief resolution note** in the affected docs (what changed and why).  
+6) **If cross-cutting**, record the resolution path here as a dated entry.
+
+---
+
+## 3. Prohibited Resolutions
+You may not resolve conflicts by:
+- burying an exception in code without doctrinal updates
+- duplicating logic across modules “for convenience”
+- creating hidden coupling that defeats modularity
+- allowing AI to “decide” which interpretation is correct
+
+---
+
+## 4. Required Outputs
+A resolved conflict must produce:
+- a single controlling statement at the correct layer
+- an updated set of references in dependent docs
+- clear terminology so the conflict cannot recur
+
+---
+
+## 5. Resolution Log (append-only)
+Add entries here when a conflict is resolved.
+
+### Template
+- **Date:** YYYY‑MM‑DD  
+- **Conflict:**  
+- **Controlling doctrine:**  
+- **Resolution:**  
+- **Impacted docs:**  
+- **Notes:**  

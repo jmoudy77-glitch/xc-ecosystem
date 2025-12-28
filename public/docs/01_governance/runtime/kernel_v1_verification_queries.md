@@ -20,6 +20,9 @@ select
 from public.canonical_events
 order by created_at desc
 limit 50;
+```
+
+---
 
 ---
 

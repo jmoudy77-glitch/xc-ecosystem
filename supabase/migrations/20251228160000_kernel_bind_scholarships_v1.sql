@@ -1,6 +1,5 @@
 -- Kernel v1 — Scholarship Binding (Team Roster Allocation)
 -- Constitutional pattern: canonical_events -> entitlement_ledger -> feature write
--- NOTE: No ':' bind params. Function parameters are referenced directly.
 
 create or replace function public.kernel_upsert_team_roster_scholarship(
   p_program_id uuid,
@@ -29,13 +28,11 @@ declare
 
   v_value_json jsonb;
 begin
-  -- Validate unit against the same set enforced by team_roster constraint
   if p_scholarship_unit not in ('percent','equivalency','amount') then
     raise exception 'Invalid scholarship_unit: %', p_scholarship_unit
       using errcode = '22023';
   end if;
 
-  -- Lock the projection row and capture before state
   select
     tr.team_id,
     tr.team_season_id,
@@ -60,7 +57,6 @@ begin
       using errcode = 'P0002';
   end if;
 
-  -- 1) canonical_events
   insert into public.canonical_events(
     program_id,
     event_domain,
@@ -95,7 +91,6 @@ begin
   )
   returning id into v_event_id;
 
-  -- 2) entitlement_ledger (append-only, 1:1 with canonical_event_id)
   v_value_json :=
     jsonb_build_object(
       'scope', jsonb_build_object(
@@ -139,7 +134,6 @@ begin
     'active'
   );
 
-  -- 3) feature write (projection)
   update public.team_roster
   set
     scholarship_amount = p_scholarship_amount,
@@ -147,7 +141,6 @@ begin
     scholarship_notes = p_scholarship_notes
   where id = p_team_roster_id;
 
-  -- 4) legacy history write (non-sovereign compatibility)
   insert into public.athlete_scholarship_history(
     team_season_id,
     roster_entry_id,

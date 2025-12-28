@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { kernelIngestStripeEvent } from "@/app/actions/kernelIngestStripeEvent";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
@@ -19,6 +20,35 @@ function normalizeStatus(status: string | null | undefined): string {
     return s;
   }
   return "unknown";
+}
+
+function extractStripeAmount(value: unknown): number {
+  if (typeof value === "number") return value / 100;
+  return 0;
+}
+
+function extractStripeCurrency(value: unknown): string | null {
+  return typeof value === "string" ? value.toUpperCase() : null;
+}
+
+async function ingestEconomicEvent(args: {
+  programId: string;
+  eventType: string;
+  amount: number;
+  currency: string | null;
+  externalRef: string;
+  calculationJson: Record<string, unknown>;
+}) {
+  const { programId, eventType, amount, currency, externalRef, calculationJson } = args;
+
+  return kernelIngestStripeEvent({
+    programId,
+    eventType,
+    amount,
+    currency,
+    externalRef,
+    calculationJson,
+  });
 }
 
 async function upsertFromSubscription(args: {
@@ -181,6 +211,29 @@ export async function POST(req: NextRequest) {
           subscription.metadata.plan_code = planCode;
         }
 
+        if (scope === "org") {
+          await ingestEconomicEvent({
+            programId: ownerId,
+            eventType: event.type,
+            amount: extractStripeAmount(session.amount_total),
+            currency: extractStripeCurrency(session.currency),
+            externalRef: event.id,
+            calculationJson: {
+              stripe_event_id: event.id,
+              stripe_subscription_id: subscription.id,
+              stripe_customer_id: session.customer ?? null,
+              scope,
+              owner_id: ownerId,
+            },
+          });
+        } else {
+          console.warn("[stripe webhook] Athlete scope missing program binding for kernel ingest", {
+            eventId: event.id,
+            scope,
+            ownerId,
+          });
+        }
+
         await upsertFromSubscription({ scope, ownerId, subscription });
         break;
       }
@@ -198,6 +251,30 @@ export async function POST(req: NextRequest) {
           break;
         }
 
+        if (scope === "org") {
+          const price = subscription.items?.data?.[0]?.price;
+          await ingestEconomicEvent({
+            programId: ownerId,
+            eventType: event.type,
+            amount: extractStripeAmount(price?.unit_amount),
+            currency: extractStripeCurrency(price?.currency),
+            externalRef: event.id,
+            calculationJson: {
+              stripe_event_id: event.id,
+              stripe_subscription_id: subscription.id,
+              scope,
+              owner_id: ownerId,
+              status: subscription.status,
+            },
+          });
+        } else {
+          console.warn("[stripe webhook] Athlete scope missing program binding for kernel ingest", {
+            eventId: event.id,
+            scope,
+            ownerId,
+          });
+        }
+
         await upsertFromSubscription({ scope, ownerId, subscription });
         break;
       }
@@ -213,6 +290,29 @@ export async function POST(req: NextRequest) {
             subscriptionId: subscription.id,
           });
           break;
+        }
+
+        if (scope === "org") {
+          await ingestEconomicEvent({
+            programId: ownerId,
+            eventType: event.type,
+            amount: 0,
+            currency: null,
+            externalRef: event.id,
+            calculationJson: {
+              stripe_event_id: event.id,
+              stripe_subscription_id: subscription.id,
+              scope,
+              owner_id: ownerId,
+              status: subscription.status,
+            },
+          });
+        } else {
+          console.warn("[stripe webhook] Athlete scope missing program binding for kernel ingest", {
+            eventId: event.id,
+            scope,
+            ownerId,
+          });
         }
 
         await markCanceled({

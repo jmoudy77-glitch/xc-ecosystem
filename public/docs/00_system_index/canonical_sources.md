@@ -1,54 +1,61 @@
-# Canonical Sources and Precedence
+# Canonical Sources Index
 
-## Canonical set
-This codex is intended to be the **single source of truth** for XC‑Ecosystem product doctrine and implementation law.
+This document is the **single map of truth** for what is considered canonical within this repository’s documentation system.
 
-The canonical set is:
+## What this index is
+- A stable, human-readable pointer map to canonical documents
+- A governance tool to prevent drift and re-litigation
+- The first stop for “which doc is authoritative?”
 
-- `01_governance/*` — constitution, decision protocol, conflict resolution, authority rules
-- `02_architecture/*` — boundaries, ownership, causality, data authority
-- `03_domain_models/*` — core entities, meanings, invariants, lifecycle semantics
-- `04_operational_modules/*` — coach workflows, module responsibilities, downstream effects
-- `05_ai_systems/*` — AI authority charter, model interfaces, confidence semantics, prohibitions
-- `06_ui_system/*` — interaction contracts, navigation IA, layout rules, branding/system UI constraints
-- `07_implementation/*` — enforceable patterns: RLS, server actions, API contracts, billing, developer handbook
+## What this index is not
+- A substitute for the constitutions/specs themselves
+- A place to restate or rewrite canonical content
+- A changelog (see promotions)
 
-## Precedence rules
-When multiple documents address the same question:
+---
 
-1. **Governance overrides all.**  
-   If a lower layer conflicts with governance, the lower layer must be revised.
+## Canonical Constitutions (locked)
 
-2. **Architecture overrides domain and module behavior.**  
-   Ownership and boundaries are not negotiable at the module level.
+These are non-negotiable governance-layer documents. Implementations must not overwrite or “correct” them.
 
-3. **Domain models define meaning; modules implement meaning.**  
-   If a module diverges from domain meaning, the module is wrong (or the domain model needs to be updated intentionally).
+- **A1 Absence Engine (Canonical Constitution)**
+  - `public/docs/01_governance/constitutions/a1_absence_engine.md`
 
-4. **AI systems must obey governance, architecture, and domain meaning.**  
-   AI may never invent new authority; it may only operate within defined jurisdiction.
+> If additional constitutions exist, they must be promoted into `public/docs/01_governance/constitutions/` and listed here.
 
-5. **UI system is binding on all coach-facing surfaces.**  
-   UI may not violate interaction contracts even if “easier to implement.”
+---
 
-6. **Implementation law is binding for engineers.**  
-   Code patterns exist to enforce doctrine; if a pattern cannot support doctrine, the pattern must evolve.
+## Authoritative Operational Specs (TBD via promotion)
 
-## Non‑canonical / historical sources
-- `99_archive/*` — historical notes, snapshots, superseded drafts, legacy docs. Useful as precedent, **not** controlling.
-- Any file outside `/docs` is assumed **non‑authoritative** unless explicitly elevated into this codex.
+These are authoritative specs that govern implementation, but are not necessarily “constitutions.”
+Only list items here when their authoritative path is unambiguous.
 
-## Conflict handling
-If you find an inconsistency:
-1. Identify the highest‑precedence controlling document.
-2. Update or annotate the conflicting lower document.
-3. If conflict is cross‑cutting, record the resolution path in `01_governance/conflict_resolution.md`.
+- Program Health UI spec: **TBD (promote and index)**
+- Recruiting module architecture: **TBD (promote and index)**
+- Performance module spec: **TBD (promote and index)**
 
-## “Living doctrine” rule
-The codex is not static. It is *governed*.  
-All revisions must preserve:
-- coach sovereignty and clarity
-- modular boundaries and clean ownership
-- causality transparency (“why / what happens if / reversible?”)
-- AI jurisdiction constraints
+---
 
+## Archive & Session Records (historical)
+
+Snapshots are factual records and are not constitutions/specs.
+
+- Snapshots directory
+  - `public/docs/99_archive/snapshots/`
+
+---
+
+## Promotion Ledger (auditable handoffs)
+
+Every material change to canonical governance/spec documents must be recorded via a promotion.
+
+- Promotions directory
+  - `public/docs/01_governance/promotions/`
+
+---
+
+## How to add a new canonical source
+
+1) Promote the document into the appropriate canonical location (usually a constitution under `01_governance/constitutions/`).
+2) Create a promotion record in `01_governance/promotions/`.
+3) Add its path here.

@@ -83,3 +83,60 @@ from public.team_roster
 order by updated_at desc
 limit 50;
 ```
+
+---
+
+## Scholarship Budget Binding v1 — team_season allocation
+
+### 1) Latest canonical_events for scholarship budgets
+
+```sql
+select
+  id,
+  program_id,
+  event_type,
+  scope_type,
+  scope_id,
+  actor_user_id,
+  source_system,
+  created_at
+from public.canonical_events
+where event_type = 'scholarship_budget_upsert'
+order by created_at desc
+limit 50;
+```
+
+### 2) canonical_events → entitlement_ledger (team_season)
+
+```sql
+select
+  ce.id as canonical_event_id,
+  ce.program_id,
+  ce.scope_id as team_season_id,
+  el.entitlement_type,
+  el.beneficiary_type,
+  el.beneficiary_id,
+  el.status,
+  el.created_at
+from public.canonical_events ce
+join public.entitlement_ledger el
+  on el.canonical_event_id = ce.id
+where ce.event_type = 'scholarship_budget_upsert'
+order by el.created_at desc
+limit 50;
+```
+
+### 3) team_seasons projection state
+
+```sql
+select
+  id,
+  program_id,
+  scholarship_budget_equivalents,
+  scholarship_budget_amount,
+  scholarship_currency,
+  updated_at
+from public.team_seasons
+order by updated_at desc
+limit 50;
+```

@@ -30,7 +30,8 @@ These are non-negotiable governance-layer documents. Implementations must not ov
 These are authoritative specs that govern implementation, but are not necessarily “constitutions.”
 Only list items here when their authoritative path is unambiguous.
 
-- Program Health UI spec: **TBD (promote and index)**
+- Program Health UI starter/spec:
+  - `public/docs/06_ui_system/program_health/program_health_ui_starter.md`
 - Recruiting module architecture: **TBD (promote and index)**
 - Performance module spec: **TBD (promote and index)**
 

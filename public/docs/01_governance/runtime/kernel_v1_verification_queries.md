@@ -223,3 +223,37 @@ where ce.event_type = 'athlete_merged'
 order by aie.created_at desc
 limit 50;
 ```
+
+## Stripe → Economic Ledger (Kernel-bound)
+
+### 1) Latest economic canonical events
+select
+  id,
+  program_id,
+  event_domain,
+  event_type,
+  scope_type,
+  scope_id,
+  source_system,
+  created_at
+from public.canonical_events
+where event_domain = 'economic'
+order by created_at desc
+limit 25;
+
+### 2) Join canonical_events -> economic_ledger
+select
+  ce.id as canonical_event_id,
+  ce.program_id,
+  ce.event_type as ledger_type,
+  el.amount,
+  el.currency,
+  el.external_ref,
+  el.status,
+  ce.created_at
+from public.canonical_events ce
+join public.economic_ledger el
+  on el.canonical_event_id = ce.id
+where ce.event_domain = 'economic'
+order by ce.created_at desc
+limit 25;

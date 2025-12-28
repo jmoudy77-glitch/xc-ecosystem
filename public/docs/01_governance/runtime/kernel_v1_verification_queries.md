@@ -257,3 +257,44 @@ join public.economic_ledger el
 where ce.event_domain = 'economic'
 order by ce.created_at desc
 limit 25;
+
+## AI Output Binding v1 — ai_causal_ledger (Kernel-bound)
+
+### 1) Latest AI canonical events
+select
+  id,
+  program_id,
+  event_domain,
+  event_type,
+  scope_type,
+  scope_id,
+  actor_user_id,
+  source_system,
+  created_at
+from public.canonical_events
+where event_domain = 'ai'
+  and event_type = 'ai_output_emitted'
+order by created_at desc
+limit 25;
+
+### 2) Join canonical_events -> ai_causal_ledger
+select
+  ce.id as canonical_event_id,
+  ce.program_id,
+  ce.scope_type,
+  ce.scope_id,
+  acl.model_version,
+  acl.tier,
+  acl.inputs_fingerprint,
+  acl.confidence,
+  acl.drivers_json,
+  acl.data_lineage,
+  acl.output_json,
+  ce.created_at
+from public.canonical_events ce
+join public.ai_causal_ledger acl
+  on acl.canonical_event_id = ce.id
+where ce.event_domain = 'ai'
+  and ce.event_type = 'ai_output_emitted'
+order by ce.created_at desc
+limit 25;

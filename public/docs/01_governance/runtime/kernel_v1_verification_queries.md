@@ -183,3 +183,43 @@ where ce.event_type = 'ai_output_emitted'
 order by al.created_at desc
 limit 50;
 ```
+
+---
+
+## Athlete Identity Merge v1 — canonical_events → athlete_identity_events
+
+### 1) Latest canonical_events for athlete merges
+
+```sql
+select
+  id,
+  program_id,
+  event_type,
+  scope_type,
+  scope_id,
+  actor_user_id,
+  source_system,
+  created_at
+from public.canonical_events
+where event_type = 'athlete_merged'
+order by created_at desc
+limit 50;
+```
+
+### 2) canonical_events → athlete_identity_events
+
+```sql
+select
+  ce.id as canonical_event_id,
+  ce.program_id,
+  ce.scope_id as canonical_athlete_id,
+  aie.source_athlete_id,
+  aie.actor_user_id,
+  aie.created_at
+from public.canonical_events ce
+join public.athlete_identity_events aie
+  on (aie.details->>'canonical_event_id')::uuid = ce.id
+where ce.event_type = 'athlete_merged'
+order by aie.created_at desc
+limit 50;
+```

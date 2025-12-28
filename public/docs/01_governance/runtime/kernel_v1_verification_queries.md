@@ -298,3 +298,68 @@ where ce.event_domain = 'ai'
   and ce.event_type = 'ai_output_emitted'
 order by ce.created_at desc
 limit 25;
+
+## Athlete Identity Merge v1 — canonical_events + athlete_identity_events (Kernel-bound)
+
+### 1) Latest identity canonical events
+select
+  id,
+  program_id,
+  event_domain,
+  event_type,
+  scope_type,
+  scope_id,
+  actor_user_id,
+  source_system,
+  created_at
+from public.canonical_events
+where event_domain = 'identity'
+  and event_type = 'athlete_merged'
+order by created_at desc
+limit 25;
+
+### 2) Join canonical_events -> athlete_identity_events (by canonical_event_id)
+select
+  ce.id as canonical_event_id,
+  ce.program_id,
+  aie.event_type,
+  aie.canonical_athlete_id,
+  aie.source_athlete_id,
+  aie.actor_user_id,
+  aie.details,
+  ce.created_at
+from public.canonical_events ce
+join public.athlete_identity_events aie
+  on aie.canonical_event_id = ce.id
+where ce.event_domain = 'identity'
+  and ce.event_type = 'athlete_merged'
+order by ce.created_at desc
+limit 25;
+
+### 3) Post-merge pointer audit (counts of rows still pointing at source)
+-- Replace :source_athlete_id with the source athlete id you merged.
+select 'program_athletes' as table_name, count(*) as remaining from public.program_athletes where athlete_id = :source_athlete_id
+union all
+select 'team_roster', count(*) from public.team_roster where athlete_id = :source_athlete_id
+union all
+select 'athlete_media', count(*) from public.athlete_media where athlete_id = :source_athlete_id
+union all
+select 'athlete_performances', count(*) from public.athlete_performances where athlete_id = :source_athlete_id
+union all
+select 'athlete_scores', count(*) from public.athlete_scores where athlete_id = :source_athlete_id
+union all
+select 'athlete_training_sessions', count(*) from public.athlete_training_sessions where athlete_id = :source_athlete_id
+union all
+select 'athlete_scholarship_history', count(*) from public.athlete_scholarship_history where athlete_id = :source_athlete_id
+union all
+select 'program_athlete_notes', count(*) from public.program_athlete_notes where athlete_id = :source_athlete_id
+union all
+select 'program_athlete_scores', count(*) from public.program_athlete_scores where athlete_id = :source_athlete_id
+union all
+select 'athlete_inquiries', count(*) from public.athlete_inquiries where athlete_id = :source_athlete_id
+union all
+select 'athlete_invites', count(*) from public.athlete_invites where athlete_id = :source_athlete_id
+union all
+select 'recruiting_profiles', count(*) from public.recruiting_profiles where athlete_id = :source_athlete_id
+union all
+select 'transfer_portal_entries', count(*) from public.transfer_portal_entries where athlete_id = :source_athlete_id;

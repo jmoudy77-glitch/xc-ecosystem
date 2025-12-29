@@ -14,17 +14,6 @@ interface A1EmitArgs {
   engineVersion?: string;
 }
 
-/**
- * Actor-bound UI path via Route Handler.
- *
- * Rationale:
- * - Next.js cookies() API surface differs across contexts in this repo/runtime.
- * - Using raw Cookie header avoids depending on cookieStore.get/getAll.
- *
- * This route:
- * - derives actor_user_id from the authenticated Supabase session (if present)
- * - emits A1 evaluation strictly through kernel_program_health_a1_emit
- */
 function parseCookieHeader(headerValue: string | null): Record<string, string> {
   const out: Record<string, string> = {};
   if (!headerValue) return out;
@@ -56,12 +45,8 @@ function getSupabaseFromRequest(req: Request) {
       get(name: string) {
         return cookieMap[name];
       },
-      set() {
-        // no-op for this route; auth cookie mutation not required for reading session
-      },
-      remove() {
-        // no-op
-      },
+      set() {},
+      remove() {},
     },
   });
 }
@@ -81,6 +66,24 @@ export async function POST(req: Request) {
 
     const actorUserId = auth?.user?.id ?? null;
     if (!actorUserId) throw new Error('Not authenticated');
+
+    // Citizenship gate: actor must exist in public.users (canonical citizens table)
+    const { data: citizen, error: citizenErr } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', actorUserId)
+      .maybeSingle();
+
+    if (citizenErr) throw new Error(`Citizen lookup failed: ${citizenErr.message}`);
+    if (!citizen?.id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Actor not minted in public.users. actor_user_id=${actorUserId}. Apply backfill migration to mint canonical citizens.`,
+        },
+        { status: 409 }
+      );
+    }
 
     const { data, error } = await supabase.rpc('kernel_program_health_a1_emit', {
       p_program_id: body.programId,

@@ -380,7 +380,7 @@ export function ProgramHealthPage({
           />
         </div>
 
-        <aside className="ph-inspector">
+        <aside className="ph-latent ph-summoned">
           <CausalityDrilldownPanel absence={selectedAbsence} lineage={selectedLineage} />
         </aside>
       </div>

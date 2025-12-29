@@ -7,6 +7,7 @@ import { AbsencePanel } from "./AbsencePanel";
 import { TruthView } from "./TruthView";
 import { OverviewStrip } from "./OverviewStrip";
 import { HorizonTimeline } from "./HorizonTimeline";
+import { CausalityDrilldownPanel } from "./CausalityDrilldownPanel";
 import { readAbsenceTruth } from "@/app/actions/program-health/readAbsenceTruth";
 import { readCanonicalEventGraph } from "@/app/actions/program-health/readCanonicalEventGraph";
 import { readLinkedCanonicalEventIds } from "@/app/actions/program-health/readLinkedCanonicalEventIds";
@@ -45,40 +46,15 @@ export function ProgramHealthPage({
   const [selectedAbsenceId, setSelectedAbsenceId] = React.useState<string | null>(null);
 
   // Timeline state (navigation only)
-  const [selectedHorizon, setSelectedHorizon] = React.useState<string>("H0");
+  const [selectedHorizon, setSelectedHorizon] = React.useState<"H0" | "H1" | "H2" | "H3">(
+    model.snapshot?.horizon ?? "H0"
+  );
   const latestByHorizon = React.useMemo(() => getLatest(model as any), [model]);
 
-  const snapshots = React.useMemo(() => {
-    const modelAny = model as any;
-    const raw = modelAny.snapshots ?? (modelAny.snapshot ? [modelAny.snapshot] : []);
-    return Array.isArray(raw) ? (raw as ProgramHealthSnapshot[]) : [];
-  }, [model]);
-
-  const snapshotsByHorizon = React.useMemo(() => {
-    const by = new Map<string, ProgramHealthSnapshot[]>();
-    for (const s of snapshots) {
-      const h = String(s.horizon ?? "H1");
-      if (!by.has(h)) by.set(h, []);
-      by.get(h)!.push(s);
-    }
-    for (const [h, arr] of by.entries()) {
-      arr.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
-      by.set(h, arr);
-    }
-    return by;
-  }, [snapshots]);
-
-  const selectedSnapshot = React.useMemo(() => {
-    const arr = snapshotsByHorizon.get(selectedHorizon) ?? [];
-    return arr[0] ?? null;
-  }, [snapshotsByHorizon, selectedHorizon]);
-
-  const getSnapshotForHorizon = React.useCallback(
-    (horizon: string) => {
-      const arr = snapshotsByHorizon.get(horizon) ?? [];
-      return arr[0] ?? null;
-    },
-    [snapshotsByHorizon]
+  const snapshot = model.snapshot ?? null;
+  const selectedSnapshot = React.useMemo(
+    () => (snapshot && snapshot.horizon === selectedHorizon ? snapshot : null),
+    [snapshot, selectedHorizon]
   );
 
   // Truth modal
@@ -98,6 +74,7 @@ export function ProgramHealthPage({
   }, [model.absences, selectedAbsenceId]);
 
   const [lineageNodeIds, setLineageNodeIds] = React.useState<string[]>([]);
+  const [selectedLineage, setSelectedLineage] = React.useState<any[] | null>(null);
 
   // Lineage Highlight overlay
   const [lineageHighlightOn, setLineageHighlightOn] = React.useState(false);
@@ -142,6 +119,7 @@ export function ProgramHealthPage({
     async function run() {
       if (!selectedAbsence?.canonical_event_id) {
         setLineageNodeIds([]);
+        setSelectedLineage([]);
         return;
       }
 
@@ -165,8 +143,15 @@ export function ProgramHealthPage({
         }
 
         if (!cancelled) setLineageNodeIds(Array.from(ids));
+        if (!cancelled) {
+          const linked = (graph.linkedEvents ?? []).filter(
+            (event) => event.id !== graph.rootEvent?.id
+          );
+          setSelectedLineage([graph.rootEvent, ...linked]);
+        }
       } catch {
         if (!cancelled) setLineageNodeIds([]);
+        if (!cancelled) setSelectedLineage([]);
       }
     }
 
@@ -203,15 +188,19 @@ export function ProgramHealthPage({
   }
 
   async function openTruthViewForSnapshot(tab: "truth" | "causality", horizon?: string) {
-    const snapshot = horizon ? getSnapshotForHorizon(horizon) : selectedSnapshot;
-    if (!snapshot) return;
+    const target = horizon
+      ? snapshot && snapshot.horizon === horizon
+        ? snapshot
+        : null
+      : selectedSnapshot;
+    if (!target) return;
 
     setTruthError(null);
     setTruthLoading(true);
     setTruthModel(null);
 
     setTruthInitialTab(tab);
-    setTruthInitialRootEventId(snapshot.canonical_event_id);
+    setTruthInitialRootEventId(target.canonical_event_id);
 
     try {
       if (selectedAbsenceId) {
@@ -225,18 +214,18 @@ export function ProgramHealthPage({
             program_id: programId as any,
             scope_id: null as any,
             sport: "xc" as any,
-            horizon: snapshot.horizon as any,
+            horizon: target.horizon as any,
             absence_key: "snapshot",
             absence_type: "snapshot",
             severity: null as any,
             details: {},
-            canonical_event_id: snapshot.canonical_event_id,
-            ledger_id: snapshot.ledger_id,
-            created_at: snapshot.created_at,
-            updated_at: snapshot.created_at,
+            canonical_event_id: target.canonical_event_id,
+            ledger_id: target.ledger_id,
+            created_at: target.created_at,
+            updated_at: target.created_at,
           } as any,
           canonicalEvent: {
-            id: snapshot.canonical_event_id,
+            id: target.canonical_event_id,
             program_id: programId,
             event_domain: "program_health",
             event_type: "snapshot",
@@ -246,7 +235,7 @@ export function ProgramHealthPage({
             source_system: "runtime",
             causality: {},
             payload: {},
-            created_at: snapshot.created_at,
+            created_at: target.created_at,
           } as any,
           links: [],
           linkedEvents: [],
@@ -349,11 +338,11 @@ export function ProgramHealthPage({
 
         <div className="ph-side">
           <HorizonTimeline
-            snapshots={snapshots}
-            selectedHorizon={selectedHorizon as "H0" | "H1" | "H2" | "H3"}
-            onSelectHorizon={(h) => setSelectedHorizon(h)}
-            onOpenSnapshotTruth={(h) => openTruthViewForSnapshot("truth", h)}
-            onOpenSnapshotCausality={(h) => openTruthViewForSnapshot("causality", h)}
+            snapshot={snapshot}
+            selectedHorizon={selectedHorizon}
+            onSelectHorizon={setSelectedHorizon}
+            onOpenTruth={(h) => openTruthViewForSnapshot("truth", h)}
+            onOpenCausality={(h) => openTruthViewForSnapshot("causality", h)}
           />
 
           {selectedSnapshot ? (
@@ -390,6 +379,10 @@ export function ProgramHealthPage({
             onOpenCausality={() => openTruthForSelectedAbsence("causality")}
           />
         </div>
+
+        <aside className="ph-inspector">
+          <CausalityDrilldownPanel absence={selectedAbsence} lineage={selectedLineage} />
+        </aside>
       </div>
 
       {truthViewOpen && truthModel ? (

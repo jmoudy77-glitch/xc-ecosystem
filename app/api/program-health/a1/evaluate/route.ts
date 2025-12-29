@@ -21,14 +21,29 @@ interface A1EmitArgs {
  * Write path:
  *   API route → kernel_program_health_a1_emit → canonical_events → program_health_ledger → derived tables
  *
- * NOTE:
- * This route uses SERVICE_ROLE to enable deterministic local smoke-testing and job execution
- * without relying on browser/session cookies or auth-helper exports.
+ * Security:
+ * - INTERNAL ONLY. Requires X-XC-KERNEL-SECRET header to match env PROGRAM_HEALTH_EVAL_SECRET.
+ * - Uses SUPABASE_SERVICE_ROLE_KEY server-side to ensure deterministic job execution.
  *
  * Required env:
  * - NEXT_PUBLIC_SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE_KEY
+ * - PROGRAM_HEALTH_EVAL_SECRET
  */
+function requireInternalSecret(req: Request) {
+  const expected = process.env.PROGRAM_HEALTH_EVAL_SECRET;
+  if (!expected) {
+    throw new Error('Missing env: PROGRAM_HEALTH_EVAL_SECRET');
+  }
+
+  const provided = req.headers.get('x-xc-kernel-secret') || req.headers.get('X-XC-KERNEL-SECRET');
+  if (!provided || provided !== expected) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  return null;
+}
+
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,6 +57,9 @@ function getServiceSupabase() {
 }
 
 export async function POST(req: Request) {
+  const unauthorized = requireInternalSecret(req);
+  if (unauthorized) return unauthorized;
+
   try {
     const body = (await req.json()) as A1EmitArgs;
 

@@ -103,3 +103,653 @@
 .ph-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .ph-modal-title { font-weight: 700; }
 .ph-modal-section { margin-top: 12px; }
+
+/* ph-map-v1 styles */
+.ph-map-v1 { display: flex; flex-direction: column; gap: 12px; }
+.ph-map-v1-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.ph-map-v1-legend { display: flex; gap: 10px; flex-wrap: wrap; }
+.ph-legend-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); font-size: 12px; }
+
+.ph-map-v1-canvas {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  position: relative;
+  overflow: hidden;
+}
+
+/* subtle mesh */
+.ph-map-v1-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.ph-node-cell {
+  position: relative;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ph-node-cell.is-selected-cell {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset;
+}
+
+.ph-node-cell-header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ph-node-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-node-code { font-size: 11px; opacity: 0.8; }
+
+/* a darker “below space” layer for holes to reveal */
+.ph-node-void-layer {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120px 90px at 50% 60%, rgba(0,0,0,0.65), rgba(0,0,0,0.15));
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* holes layer */
+.ph-node-holes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; z-index: 1; }
+.ph-node-empty { opacity: 0.5; font-size: 12px; }
+.ph-node-more { font-size: 11px; opacity: 0.7; padding: 2px 6px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); }
+
+.ph-hole-v1 {
+  position: relative;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ph-hole-void {
+  display: block;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, rgba(0,0,0,0.95), rgba(0,0,0,0.75) 55%, rgba(0,0,0,0.55));
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.08) inset,
+    0 10px 24px rgba(0,0,0,0.45);
+}
+
+/* sizes */
+.ph-hole-v1.size-sm .ph-hole-void { width: 18px; height: 18px; }
+.ph-hole-v1.size-md .ph-hole-void { width: 26px; height: 26px; }
+.ph-hole-v1.size-lg .ph-hole-void { width: 36px; height: 36px; }
+.ph-hole-v1.size-xl .ph-hole-void { width: 48px; height: 48px; }
+
+/* severity ring (visual encoding only) */
+.ph-hole-v1.sev-critical .ph-hole-void { box-shadow: 0 0 0 2px rgba(255,255,255,0.16) inset, 0 0 0 2px rgba(255,80,80,0.35); }
+.ph-hole-v1.sev-high .ph-hole-void { box-shadow: 0 0 0 2px rgba(255,255,255,0.14) inset, 0 0 0 2px rgba(255,160,60,0.30); }
+.ph-hole-v1.sev-medium .ph-hole-void { box-shadow: 0 0 0 2px rgba(255,255,255,0.12) inset, 0 0 0 2px rgba(255,210,80,0.24); }
+.ph-hole-v1.sev-low .ph-hole-void { box-shadow: 0 0 0 2px rgba(255,255,255,0.10) inset, 0 0 0 2px rgba(120,200,255,0.20); }
+.ph-hole-v1.sev-unknown .ph-hole-void { box-shadow: 0 0 0 2px rgba(255,255,255,0.10) inset; }
+
+.ph-hole-v1.is-selected .ph-hole-void {
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.20) inset,
+    0 0 0 3px rgba(255,255,255,0.22);
+}
+
+.ph-hole-v1.is-highlighted .ph-hole-void {
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.14) inset,
+    0 0 0 2px rgba(140,200,255,0.30);
+}
+
+/* unmapped list */
+.ph-unmapped { margin-top: 10px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); }
+.ph-unmapped-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ph-unmapped-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.20);
+  cursor: pointer;
+}
+.ph-unmapped-row.is-selected { border-color: rgba(255,255,255,0.22); }
+.ph-unmapped-row.is-highlighted { border-color: rgba(140,200,255,0.25); }
+.ph-unmapped-main { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ph-unmapped-type { font-weight: 600; font-size: 12px; }
+.ph-unmapped-key { opacity: 0.85; font-size: 12px; }
+
+/* severity dots (shared) */
+.ph-sev-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; opacity: 0.95; }
+.ph-sev-dot.critical { background: rgba(255,80,80,0.85); }
+.ph-sev-dot.high { background: rgba(255,160,60,0.80); }
+.ph-sev-dot.medium { background: rgba(255,210,80,0.75); }
+.ph-sev-dot.low { background: rgba(120,200,255,0.70); }
+.ph-sev-dot.unknown { background: rgba(200,200,200,0.55); }
+
+/* ph-inspector styles */
+.ph-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.ph-inspector-title { font-size: 14px; font-weight: 700; letter-spacing: 0.2px; }
+.ph-inspector-section {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ph-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.9; }
+
+.ph-empty { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.10); opacity: 0.9; }
+
+.ph-filter-row { display: flex; flex-direction: column; gap: 8px; }
+.ph-filter-label { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.08em; }
+.ph-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.ph-chip {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ph-chip.is-active {
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.08);
+}
+
+.ph-input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.25);
+  padding: 10px 12px;
+  outline: none;
+  color: inherit;
+}
+
+.ph-absence-list-v2 { display: flex; flex-direction: column; gap: 8px; }
+.ph-absence-row-v2 {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.18);
+  cursor: pointer;
+}
+.ph-absence-row-v2.is-active { border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.05); }
+.ph-absence-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.ph-absence-col-right { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.ph-absence-line1 { display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ph-absence-line2 { opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.ph-absence-mini { font-size: 11px; opacity: 0.75; }
+
+.ph-preview-list { display: flex; flex-direction: column; gap: 10px; }
+.ph-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+.ph-preview-label { font-weight: 600; font-size: 12px; }
+.ph-preview-meta { font-size: 11px; opacity: 0.75; display: inline-flex; gap: 8px; align-items: center; }
+.ph-preview-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+/* button variants (lightweight) */
+.ph-btn.ph-btn-ghost {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+}
+
+/* ph-selection-pill styles */
+.ph-selection-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 12px;
+}
+
+.ph-selection-pill.is-empty { opacity: 0.85; }
+
+.ph-selection-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ph-selection-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.9; }
+
+.ph-selection-body {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ph-selection-type { font-weight: 700; font-size: 12px; opacity: 0.95; }
+.ph-selection-key { font-size: 12px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+
+.ph-selection-meta { font-size: 11px; opacity: 0.75; display: inline-flex; gap: 6px; align-items: center; }
+
+.ph-selection-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ph-structural-plane styles */
+.ph-structural-truth .ph-map-v1-canvas { display: none; } /* retire old canvas if still present anywhere */
+
+.ph-plane {
+  position: relative;
+  border-radius: 22px;
+  padding: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+
+/* plane lighting + mesh */
+.ph-plane::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 420px at 25% 0%, rgba(255,255,255,0.10), transparent 55%),
+    radial-gradient(800px 420px at 85% 35%, rgba(255,255,255,0.07), transparent 60%),
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: auto, auto, 28px 28px, 28px 28px;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.ph-plane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(1200px 600px at 50% 30%, rgba(0,0,0,0.0), rgba(0,0,0,0.55));
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.ph-plane-canvas {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  z-index: 1;
+}
+
+.ph-plane-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(700px 260px at 50% 10%, rgba(0,0,0,0.0), rgba(0,0,0,0.28)),
+    radial-gradient(900px 420px at 50% 100%, rgba(0,0,0,0.0), rgba(0,0,0,0.38));
+  opacity: 0.9;
+}
+
+/* selection “gravity”: dim everything except focused plates */
+.ph-plane.has-selection .ph-node-plate.is-dimmed {
+  opacity: 0.55;
+  filter: saturate(0.8) contrast(0.95);
+}
+.ph-node-plate.is-focused {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset, 0 12px 30px rgba(0,0,0,0.35);
+}
+
+/* plates should read like rigid structural segments */
+.ph-node-plate {
+  background:
+    radial-gradient(180px 120px at 20% 0%, rgba(255,255,255,0.08), transparent 55%),
+    radial-gradient(220px 140px at 90% 45%, rgba(255,255,255,0.06), transparent 60%),
+    rgba(0,0,0,0.24);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* holes: true perforations with rim + inner void + “below space” */
+.ph-hole-v2 {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* deterministic offsets for up to 4 holes */
+.ph-hole-pos-0 { transform: translate(0px, 0px); }
+.ph-hole-pos-1 { transform: translate(6px, 4px); }
+.ph-hole-pos-2 { transform: translate(-4px, 6px); }
+.ph-hole-pos-3 { transform: translate(8px, -2px); }
+
+.ph-hole-rim,
+.ph-hole-void,
+.ph-hole-below {
+  position: absolute;
+  border-radius: 999px;
+}
+
+/* size mapping */
+.ph-hole-v2.size-sm { width: 18px; height: 18px; }
+.ph-hole-v2.size-md { width: 26px; height: 26px; }
+.ph-hole-v2.size-lg { width: 36px; height: 36px; }
+.ph-hole-v2.size-xl { width: 48px; height: 48px; }
+
+.ph-hole-rim {
+  inset: -2px;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.22), rgba(255,255,255,0.08) 55%, rgba(0,0,0,0.05));
+  filter: blur(0.1px);
+  opacity: 0.85;
+}
+
+/* void mouth */
+.ph-hole-void {
+  inset: 0px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(0,0,0,0.98), rgba(0,0,0,0.78) 60%, rgba(0,0,0,0.60));
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.08) inset,
+    0 10px 22px rgba(0,0,0,0.45);
+}
+
+/* below-space reveal (depth varies by horizon) */
+.ph-hole-below {
+  inset: 2px;
+  background:
+    radial-gradient(circle at 50% 60%, rgba(0,0,0,0.90), rgba(0,0,0,0.20));
+  opacity: 0.0;
+}
+
+/* horizon depth encoding (H0 shallow -> H3 through-plane) */
+.ph-hole-v2.hdepth-h0 .ph-hole-below { opacity: 0.10; transform: translateY(2px); filter: blur(0.2px); }
+.ph-hole-v2.hdepth-h1 .ph-hole-below { opacity: 0.18; transform: translateY(5px); filter: blur(0.35px); }
+.ph-hole-v2.hdepth-h2 .ph-hole-below { opacity: 0.26; transform: translateY(9px); filter: blur(0.55px); }
+.ph-hole-v2.hdepth-h3 .ph-hole-below { opacity: 0.34; transform: translateY(13px); filter: blur(0.75px); }
+
+/* severity ring (visual encoding only) */
+.ph-hole-v2.sev-critical .ph-hole-rim { box-shadow: 0 0 0 2px rgba(255,80,80,0.35); }
+.ph-hole-v2.sev-high .ph-hole-rim { box-shadow: 0 0 0 2px rgba(255,160,60,0.30); }
+.ph-hole-v2.sev-medium .ph-hole-rim { box-shadow: 0 0 0 2px rgba(255,210,80,0.24); }
+.ph-hole-v2.sev-low .ph-hole-rim { box-shadow: 0 0 0 2px rgba(120,200,255,0.20); }
+.ph-hole-v2.sev-unknown .ph-hole-rim { box-shadow: 0 0 0 2px rgba(200,200,200,0.14); }
+
+/* selection focus */
+.ph-hole-v2.is-selected .ph-hole-rim { box-shadow: 0 0 0 3px rgba(255,255,255,0.22); }
+.ph-hole-v2.is-highlighted .ph-hole-rim { box-shadow: 0 0 0 2px rgba(140,200,255,0.28); }
+
+
+/* ph-horizon-depth styles */
+.ph-depth-timeline { display: flex; flex-direction: column; gap: 10px; }
+
+.ph-depth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.ph-depth-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.18);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.ph-depth-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.ph-depth-h0::before { background: radial-gradient(520px 220px at 30% 10%, rgba(255,255,255,0.08), transparent 60%); }
+.ph-depth-h1::before { background: radial-gradient(520px 220px at 30% 10%, rgba(255,255,255,0.10), transparent 60%); }
+.ph-depth-h2::before { background: radial-gradient(520px 220px at 30% 10%, rgba(255,255,255,0.12), transparent 60%); }
+.ph-depth-h3::before { background: radial-gradient(520px 220px at 30% 10%, rgba(255,255,255,0.14), transparent 60%); }
+
+.ph-depth-card.is-active {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset;
+}
+
+.ph-depth-card-top { display: flex; flex-direction: column; gap: 6px; z-index: 1; }
+.ph-depth-label { font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+.ph-depth-sub { opacity: 0.8; font-size: 12px; }
+.ph-depth-card-body { display: flex; flex-direction: column; gap: 6px; z-index: 1; }
+.ph-depth-meta { font-size: 11px; opacity: 0.75; }
+.ph-depth-empty { font-size: 12px; opacity: 0.8; line-height: 1.35; }
+
+.ph-depth-card-actions { display: inline-flex; gap: 8px; z-index: 1; }
+
+/* void tokens for unmapped absences (depth + severity, selectable) */
+.ph-void-token-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ph-void-token {
+  position: relative;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.18);
+  padding: 14px;
+  cursor: pointer;
+  overflow: hidden;
+  min-height: 62px;
+  text-align: left;
+}
+
+.ph-void-token.is-selected { border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.05); }
+
+.ph-void-token .ph-hole-rim,
+.ph-void-token .ph-hole-void,
+.ph-void-token .ph-hole-below {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ph-void-token.size-sm .ph-hole-rim,
+.ph-void-token.size-sm .ph-hole-void,
+.ph-void-token.size-sm .ph-hole-below { width: 18px; height: 18px; }
+
+.ph-void-token.size-md .ph-hole-rim,
+.ph-void-token.size-md .ph-hole-void,
+.ph-void-token.size-md .ph-hole-below { width: 26px; height: 26px; }
+
+.ph-void-token.size-lg .ph-hole-rim,
+.ph-void-token.size-lg .ph-hole-void,
+.ph-void-token.size-lg .ph-hole-below { width: 36px; height: 36px; }
+
+.ph-void-token.size-xl .ph-hole-rim,
+.ph-void-token.size-xl .ph-hole-void,
+.ph-void-token.size-xl .ph-hole-below { width: 48px; height: 48px; }
+
+.ph-void-token-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding-left: 64px;
+  z-index: 1;
+  position: relative;
+}
+
+.ph-void-token-type { font-weight: 700; font-size: 12px; opacity: 0.95; }
+.ph-void-token-key { font-size: 12px; opacity: 0.9; }
+
+/* ph-lineage-overlay styles */
+.ph-lineage-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ph-lineage-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ph-lineage-line {
+  stroke: rgba(170, 220, 255, 0.45);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.45));
+  opacity: 0.85;
+}
+
+
+/* ph-structural-scar styles */
+
+/* Optional: deepen the dimming when something is selected (gravity) */
+.ph-plane.has-selection .ph-node-plate.is-dimmed {
+  opacity: 0.42;
+  filter: saturate(0.72) contrast(0.92) blur(0.1px);
+}
+
+.ph-node-plate.is-focused {
+  position: relative;
+}
+
+.ph-node-plate.is-focused::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 20px;
+  pointer-events: none;
+  background: radial-gradient(420px 220px at 50% 30%, rgba(255,255,255,0.10), transparent 65%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.14) inset;
+  opacity: 0.85;
+}
+
+/* Hole “scar”: cracks + deformation halo */
+.ph-hole-v2::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0.0;
+  background:
+    radial-gradient(circle at 45% 40%, rgba(255,255,255,0.10), transparent 55%),
+    radial-gradient(circle at 60% 65%, rgba(0,0,0,0.55), transparent 60%),
+    conic-gradient(from 220deg,
+      rgba(255,255,255,0.00) 0deg,
+      rgba(255,255,255,0.10) 24deg,
+      rgba(255,255,255,0.00) 58deg,
+      rgba(255,255,255,0.10) 86deg,
+      rgba(255,255,255,0.00) 140deg,
+      rgba(255,255,255,0.08) 182deg,
+      rgba(255,255,255,0.00) 240deg,
+      rgba(255,255,255,0.08) 308deg,
+      rgba(255,255,255,0.00) 360deg);
+  filter: blur(0.4px);
+}
+
+.ph-hole-v2.sev-critical::before,
+.ph-hole-v2.sev-high::before {
+  opacity: 0.65;
+}
+
+.ph-hole-v2.sev-medium::before { opacity: 0.42; }
+.ph-hole-v2.sev-low::before { opacity: 0.28; }
+
+/* Rim deformation (subtle “torn edge”) */
+.ph-hole-v2 .ph-hole-rim {
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.22), rgba(255,255,255,0.08) 55%, rgba(0,0,0,0.05)),
+    conic-gradient(from 10deg,
+      rgba(255,255,255,0.00) 0deg,
+      rgba(255,255,255,0.10) 18deg,
+      rgba(255,255,255,0.00) 44deg,
+      rgba(255,255,255,0.08) 66deg,
+      rgba(255,255,255,0.00) 92deg,
+      rgba(255,255,255,0.06) 140deg,
+      rgba(255,255,255,0.00) 200deg,
+      rgba(255,255,255,0.07) 252deg,
+      rgba(255,255,255,0.00) 360deg);
+  opacity: 0.9;
+}
+
+/* Critical/high “breathing” stress pulse (visual only) */
+@keyframes phStressPulse {
+  0%   { transform: translateY(0px) scale(1.00); opacity: 0.62; }
+  50%  { transform: translateY(-1px) scale(1.03); opacity: 0.86; }
+  100% { transform: translateY(0px) scale(1.00); opacity: 0.62; }
+}
+
+.ph-hole-v2.sev-critical .ph-hole-rim,
+.ph-hole-v2.sev-high .ph-hole-rim {
+  animation: phStressPulse 2.8s ease-in-out infinite;
+}
+
+/* Selected hole gets a “focus scar ring” */
+.ph-hole-v2.is-selected::before {
+  opacity: 0.85;
+  filter: blur(0.25px);
+}
+
+.ph-hole-v2.is-selected .ph-hole-rim {
+  animation: none;
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,0.22),
+    0 0 40px rgba(255,255,255,0.10);
+}
+
+/* Unmapped void tokens: add the same scar language */
+.ph-void-token::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(520px 240px at 20% 0%, rgba(255,255,255,0.06), transparent 60%);
+  opacity: 0.75;
+}
+
+.ph-void-token.sev-critical,
+.ph-void-token.sev-high {
+  box-shadow: 0 10px 26px rgba(0,0,0,0.28);
+}

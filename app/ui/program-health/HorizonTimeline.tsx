@@ -3,6 +3,8 @@
 import * as React from "react";
 import type { ProgramHealthSnapshot } from "./types";
 
+type Horizon = "H0" | "H1" | "H2" | "H3";
+
 function fmtTs(ts: string | null | undefined) {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -10,52 +12,135 @@ function fmtTs(ts: string | null | undefined) {
   return d.toLocaleString();
 }
 
+function shortId(id: string | null | undefined) {
+  if (!id) return "—";
+  return `${id.slice(0, 8)}…`;
+}
+
+function depthClass(h: Horizon) {
+  if (h === "H0") return "ph-depth-h0";
+  if (h === "H1") return "ph-depth-h1";
+  if (h === "H2") return "ph-depth-h2";
+  return "ph-depth-h3";
+}
+
 export function HorizonTimeline({
-  horizon,
-  history,
-  selectedSnapshotId,
-  onSelectSnapshot,
+  snapshots,
+  selectedHorizon,
+  onSelectHorizon,
+  onOpenSnapshotTruth,
+  onOpenSnapshotCausality,
 }: {
-  horizon: string;
-  history: ProgramHealthSnapshot[];
-  selectedSnapshotId: string | null;
-  onSelectSnapshot: (id: string) => void;
+  snapshots: ProgramHealthSnapshot[];
+  selectedHorizon: Horizon;
+  onSelectHorizon: (h: Horizon) => void;
+  onOpenSnapshotTruth?: (h: Horizon) => void;
+  onOpenSnapshotCausality?: (h: Horizon) => void;
 }) {
+  const safeSnapshots = (snapshots ?? []) as ProgramHealthSnapshot[];
+  const byH = React.useMemo(() => {
+    const m = new Map<Horizon, ProgramHealthSnapshot[]>();
+    for (const h of ["H0", "H1", "H2", "H3"] as Horizon[]) m.set(h, []);
+    for (const s of safeSnapshots) {
+      const h = (s.horizon ?? "H1") as Horizon;
+      if (!m.has(h)) m.set(h, []);
+      m.get(h)!.push(s);
+    }
+    for (const [h, arr] of m.entries()) {
+      arr.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+      m.set(h, arr);
+    }
+    return m;
+  }, [safeSnapshots]);
+
   return (
-    <div className="ph-timeline">
-      <div className="ph-timeline-header">
-        <div className="ph-panel-subtitle">Horizon Timeline</div>
-        <div className="ph-muted">Snapshots are canonical emissions (navigation only).</div>
+    <div className="ph-depth-timeline">
+      <div className="ph-panel-title">Horizon Timeline</div>
+      <div className="ph-muted">
+        Snapshots are canonical emissions (navigation only). Horizon is rendered as depth bands.
       </div>
 
-      {!history || history.length === 0 ? (
-        <div className="ph-muted">No snapshots available for {horizon}.</div>
-      ) : (
-        <div className="ph-timeline-list">
-          {history.map((s) => {
-            const isSel = selectedSnapshotId === s.id;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                className={`ph-timeline-item ${isSel ? "is-selected" : ""}`}
-                onClick={() => onSelectSnapshot(s.id)}
-                title={`canonical_event ${String(s.canonical_event_id).slice(0, 8)}…`}
-              >
-                <div className="ph-timeline-top">
-                  <div className="ph-timeline-ts">{fmtTs(s.created_at)}</div>
-                  <div className="ph-timeline-meta">{String(s.id).slice(0, 8)}…</div>
+      <div className="ph-depth-grid">
+        {(["H0", "H1", "H2", "H3"] as Horizon[]).map((h) => {
+          const arr = byH.get(h) ?? [];
+          const latest = arr[0] ?? null;
+          const active = selectedHorizon === h;
+
+          return (
+            <div
+              key={h}
+              className={[
+                "ph-depth-card",
+                depthClass(h),
+                active ? "is-active" : "",
+                latest ? "has-emission" : "is-empty",
+              ].join(" ")}
+              onClick={() => onSelectHorizon(h)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onSelectHorizon(h);
+              }}
+              title={`Select ${h}`}
+            >
+              <div className="ph-depth-card-top">
+                <div className="ph-depth-label">{h}</div>
+                <div className="ph-depth-sub">
+                  {latest ? fmtTs(latest.created_at) : "No emission"}
                 </div>
-                <div className="ph-timeline-bottom">
-                  <span className="ph-mono">ledger {String(s.ledger_id).slice(0, 8)}…</span>
-                  <span className="ph-dot">•</span>
-                  <span className="ph-mono">event {String(s.canonical_event_id).slice(0, 8)}…</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+              </div>
+
+              <div className="ph-depth-card-body">
+                {latest ? (
+                  <>
+                    <div className="ph-depth-meta">
+                      ledger <span className="ph-mono">{shortId(latest.ledger_id)}</span>
+                    </div>
+                    <div className="ph-depth-meta">
+                      cevt <span className="ph-mono">{shortId(latest.canonical_event_id)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="ph-depth-empty">
+                    This depth band currently contains no canonical snapshot.
+                  </div>
+                )}
+              </div>
+
+              <div className="ph-depth-card-actions">
+                <button
+                  type="button"
+                  className="ph-btn ph-btn-ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenSnapshotTruth?.(h);
+                  }}
+                  disabled={!latest}
+                  title="Open snapshot truth"
+                >
+                  Truth
+                </button>
+                <button
+                  type="button"
+                  className="ph-btn ph-btn-ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenSnapshotCausality?.(h);
+                  }}
+                  disabled={!latest}
+                  title="Open snapshot causality"
+                >
+                  Causality
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="ph-muted">
+        Selected band: <span className="ph-mono">{selectedHorizon}</span>
+      </div>
     </div>
   );
 }

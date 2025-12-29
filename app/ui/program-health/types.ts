@@ -86,3 +86,20 @@ export type AbsenceTruthModel = {
   links: CanonicalEventLink[];
   linkedEvents: CanonicalEvent[];
 };
+
+/**
+ * Canonical Event Graph (depth-1) — for causality drilldown UI
+ */
+export type CanonicalEventGraphModel = {
+  rootEvent: CanonicalEvent;
+  links: CanonicalEventLink[];
+  linkedEvents: CanonicalEvent[];
+};
+
+/**
+ * Linked canonical event IDs (depth-1) — for Lineage Highlight overlay
+ */
+export type LinkedCanonicalEventIdsModel = {
+  rootEventId: string;
+  linkedEventIds: string[];
+};

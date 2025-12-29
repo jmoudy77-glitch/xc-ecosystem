@@ -27,32 +27,46 @@ export interface A1UserEmitResult {
  * Actor-bound UI path.
  * Uses Supabase SSR client bound to current user session.
  * Emits A1 evaluation strictly via kernel_program_health_a1_emit.
+ *
+ * IMPORTANT:
+ * We do NOT assume cookies().get exists on the returned object at runtime.
+ * We use the stable Next.js RequestCookies API surface:
+ * - cookies().getAll()
+ * - cookies().set() is not available in Server Actions the same way; we no-op set/remove.
  */
 function getSupabaseSSR() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) {
-    throw new Error('Missing Supabase env vars');
+    throw new Error('Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
-  const cookieStore = cookies() as any;
+  const cookieStore = cookies();
 
   return createServerClient(supabaseUrl, anonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set() {},
-      remove() {},
+      setAll() {
+        // Server Actions should not mutate auth cookies here.
+        // If your auth flow requires cookie mutation, move this to a Route Handler.
+      },
     },
   });
 }
 
 export async function emitProgramHealthA1User(args: A1UserEmitArgs): Promise<A1UserEmitResult> {
+  if (!args?.programId) throw new Error('programId is required');
+  if (!args?.inputsHash) throw new Error('inputsHash is required');
+  if (!args?.resultPayload) throw new Error('resultPayload is required');
+
   const supabase = getSupabaseSSR();
 
-  const { data: auth } = await supabase.auth.getUser();
-  const actorUserId = auth?.user?.id;
+  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw new Error(`Auth error: ${authErr.message}`);
+
+  const actorUserId = auth?.user?.id ?? null;
   if (!actorUserId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.rpc('kernel_program_health_a1_emit', {
@@ -66,14 +80,17 @@ export async function emitProgramHealthA1User(args: A1UserEmitArgs): Promise<A1U
     p_actor_user_id: actorUserId,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`kernel_program_health_a1_emit failed: ${error.message}`);
 
   const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.canonical_event_id || !row?.ledger_id) {
+    throw new Error('kernel_program_health_a1_emit returned unexpected shape');
+  }
 
   return {
     canonicalEventId: row.canonical_event_id,
     ledgerId: row.ledger_id,
-    absencesUpserted: Number(row.absences_upserted),
+    absencesUpserted: Number(row.absences_upserted ?? 0),
     snapshotWritten: Boolean(row.snapshot_written),
   };
 }

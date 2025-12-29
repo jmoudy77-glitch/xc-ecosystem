@@ -43,10 +43,14 @@ export type CapabilityNode = {
   updated_at: string;
 };
 
+export type ProgramHealthCapabilityNode = CapabilityNode;
+
 export type ProgramHealthViewModel = {
   snapshot: ProgramHealthSnapshot | null;
   absences: ProgramHealthAbsence[];
   capabilityNodes: CapabilityNode[];
+  latestSnapshotsByHorizon: Record<string, ProgramHealthSnapshot | null>;
+  snapshotHistoryByHorizon: Record<string, ProgramHealthSnapshot[]>;
 };
 
 /**

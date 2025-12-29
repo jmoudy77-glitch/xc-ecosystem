@@ -3,7 +3,18 @@
 import * as React from "react";
 import type { ProgramHealthAbsence } from "./types";
 
-export function AbsencePanel({ selected }: { selected: ProgramHealthAbsence | null }) {
+export function AbsencePanel({
+  selectedAbsenceId,
+  absences,
+}: {
+  selectedAbsenceId: string | null;
+  absences: ProgramHealthAbsence[];
+}) {
+  const selected =
+    selectedAbsenceId == null
+      ? null
+      : absences.find((a) => a.id === selectedAbsenceId) ?? null;
+
   if (!selected) {
     return (
       <div className="ph-panel ph-panel-empty">

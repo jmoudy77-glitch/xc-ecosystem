@@ -9,14 +9,14 @@
 .ph-side { position: sticky; top: 12px; }
 
 .ph-grid { border: 1px solid rgba(0,0,0,0.12); border-radius: 16px; overflow: hidden; }
-.ph-grid-head { display: grid; grid-template-columns: 260px repeat(4, 1fr); background: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(0,0,0,0.08); }
+.ph-grid-head { display: grid; grid-template-columns: 220px repeat(4, minmax(120px, 1fr)); background: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(0,0,0,0.08); }
 .ph-grid-corner { padding: 10px; }
 .ph-grid-colhead { padding: 10px; font-weight: 600; text-align: center; }
 
 .ph-grid-body { display: flex; flex-direction: column; }
-.ph-grid-row { display: grid; grid-template-columns: 260px repeat(4, 1fr); border-bottom: 1px solid rgba(0,0,0,0.06); }
+.ph-grid-row { display: grid; grid-template-columns: 220px repeat(4, minmax(120px, 1fr)); border-bottom: 1px solid rgba(0,0,0,0.06); }
 .ph-grid-row:last-child { border-bottom: none; }
-.ph-grid-rowhead { padding: 10px; font-weight: 500; background: rgba(255,255,255,0.55); }
+.ph-grid-rowhead { padding: 10px; font-weight: 500; background: rgba(255,255,255,0.55); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-grid-row.is-unplaced .ph-grid-rowhead { font-style: italic; }
 
 .ph-cell { position: relative; min-height: 74px; }
@@ -43,6 +43,7 @@
     inset 0 3px 8px rgba(0,0,0,0.35),
     inset 0 -2px 6px rgba(255,255,255,0.25);
 }
+.ph-hole.is-selected { outline: 2px solid rgba(0,0,0,0.6); outline-offset: 2px; }
 
 .ph-overflow {
   padding: 4px 8px;
@@ -58,6 +59,7 @@
   font-size: 12px;
   opacity: 0.9;
 }
+.ph-count { font-variant-numeric: tabular-nums; font-weight: 600; }
 
 .ph-dot { opacity: 0.7; }
 
@@ -95,3 +97,9 @@
   text-align: left;
 }
 .ph-muted { opacity: 0.75; }
+.ph-modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 50; }
+.ph-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); border: none; }
+.ph-modal-body { position: relative; width: min(960px, 92vw); max-height: 85vh; overflow: auto; border-radius: 16px; padding: 16px; background: rgba(255,255,255,0.96); border: 1px solid rgba(0,0,0,0.15); }
+.ph-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ph-modal-title { font-weight: 700; }
+.ph-modal-section { margin-top: 12px; }

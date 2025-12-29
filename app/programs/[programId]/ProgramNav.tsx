@@ -436,6 +436,10 @@ const NAV_ITEMS: NavItem[] = [
     href: (programId) => `/programs/${programId}/performance`,
   },
   {
+    label: "Program Health",
+    href: (programId) => `/programs/${programId}/program-health`,
+  },
+  {
     label: "Resources",
     href: () => `#`,
   },

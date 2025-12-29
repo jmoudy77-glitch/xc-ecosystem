@@ -14,11 +14,13 @@ function severityKey(s: string | null | undefined) {
 export function CapabilityDriftMap({
   capabilityNodes,
   absences,
+  selectedAbsenceId,
   onSelect,
 }: {
   capabilityNodes: CapabilityNode[];
   absences: ProgramHealthAbsence[];
-  onSelect: (a: ProgramHealthAbsence) => void;
+  selectedAbsenceId: string | null;
+  onSelect: (absenceId: string) => void;
 }) {
   const placed: Record<string, Record<Horizon, ProgramHealthAbsence[]>> = {};
   const unplaced: Record<Horizon, ProgramHealthAbsence[]> = { H0: [], H1: [], H2: [], H3: [] };
@@ -43,13 +45,6 @@ export function CapabilityDriftMap({
     return placed[rowId]?.[h] ?? [];
   }
 
-  function cellSeverityState(list: ProgramHealthAbsence[]) {
-    if (list.length === 0) return "none";
-    const set = new Set(list.map((a) => severityKey(a.severity)));
-    if (set.size === 1) return Array.from(set)[0];
-    return "mixed";
-  }
-
   return (
     <div className="ph-grid">
       <div className="ph-grid-head">
@@ -67,7 +62,6 @@ export function CapabilityDriftMap({
             <div className="ph-grid-rowhead">{r.label}</div>
             {HORIZONS.map((h) => {
               const list = cellAbsences(r.id, h);
-              const severityState = cellSeverityState(list);
               const visible = list.slice(0, MAX_HOLES_PER_CELL);
               const overflow = list.length - visible.length;
 
@@ -78,8 +72,8 @@ export function CapabilityDriftMap({
                       {visible.map((a) => (
                         <button
                           key={a.id}
-                          className={`ph-hole sev-${severityKey(a.severity)}`}
-                          onClick={() => onSelect(a)}
+                          className={`ph-hole sev-${severityKey(a.severity)} ${selectedAbsenceId === a.id ? "is-selected" : ""}`}
+                          onClick={() => onSelect(a.id)}
                           title={`${a.absence_type} | ${a.absence_key} | severity=${a.severity ?? "unknown"} | ${a.horizon}`}
                         />
                       ))}
@@ -87,7 +81,7 @@ export function CapabilityDriftMap({
                         <button
                           className="ph-overflow"
                           onClick={() => {
-                            onSelect(list[0]);
+                            onSelect(list[0].id);
                           }}
                           title={`+${overflow} more`}
                         >
@@ -96,12 +90,8 @@ export function CapabilityDriftMap({
                       )}
                     </div>
 
-                    <div className="ph-truth-strip">
-                      <span>{h}</span>
-                      <span className="ph-dot">.</span>
-                      <span>{list.length} absences</span>
-                      <span className="ph-dot">.</span>
-                      <span>severity: {severityState}</span>
+                    <div className="ph-truth-strip" title={`${list.length} absences at ${h}`}>
+                      <span className="ph-count">{list.length}</span>
                     </div>
                   </div>
                 </div>

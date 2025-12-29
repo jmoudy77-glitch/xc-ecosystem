@@ -9,7 +9,7 @@ type Params = {
 };
 
 async function getAuthAndVerifyAthlete(req: NextRequest, athleteId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // Get auth user
   const {

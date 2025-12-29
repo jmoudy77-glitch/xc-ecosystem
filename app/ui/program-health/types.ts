@@ -48,3 +48,37 @@ export type ProgramHealthViewModel = {
   absences: ProgramHealthAbsence[];
   capabilityNodes: CapabilityNode[];
 };
+
+/**
+ * Canonical Truth Types (Program Health UI v1)
+ * Pure read-models for rendering causality and payloads.
+ */
+
+export type CanonicalEvent = {
+  id: string;
+  program_id: string | null;
+  event_domain: string;
+  event_type: string;
+  scope_type: string;
+  scope_id: string | null;
+  actor_user_id: string | null;
+  source_system: string;
+  causality: any;
+  payload: any;
+  created_at: string;
+};
+
+export type CanonicalEventLink = {
+  id: string;
+  from_canonical_event_id: string;
+  to_canonical_event_id: string;
+  link_type: string;
+  created_at: string;
+};
+
+export type AbsenceTruthModel = {
+  absence: ProgramHealthAbsence;
+  canonicalEvent: CanonicalEvent;
+  links: CanonicalEventLink[];
+  linkedEvents: CanonicalEvent[];
+};

@@ -17,7 +17,7 @@ type UpdateInquiryBody = {
 
 // Shared auth helper: verify the current user is a member of this program.
 async function assertProgramMembership(req: NextRequest, programId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user: authUser },

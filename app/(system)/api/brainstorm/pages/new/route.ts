@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     const { session_id, current_page_id, title } = parsed.data;
 
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // 1) Ensure session exists (and RLS enforces access)
     const { data: session, error: sessionError } = await supabase

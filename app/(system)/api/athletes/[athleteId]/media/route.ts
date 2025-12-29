@@ -28,7 +28,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const contentType = file.type || "";
   const mediaType: "photo" | "video" =
@@ -143,7 +143,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Missing mediaId" }, { status: 400 });
   }
 
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const { data: mediaRow, error: mediaError } = await supabase
     .from("athlete_media")

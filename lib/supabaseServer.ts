@@ -4,11 +4,15 @@
 // Binds to the incoming NextRequest so Supabase can read/write auth cookies.
 
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
-export function supabaseServer(cookieStoreOrReq?: any, res?: NextResponse) {
+export async function supabaseServer(cookieStoreOrReq?: any, res?: NextResponse) {
   // For route handlers, a NextResponse can be passed in; otherwise we create one.
   const response = res ?? NextResponse.next();
+  const resolvedCookieStoreOrReq = await cookieStoreOrReq;
+  const cookieStore =
+    resolvedCookieStoreOrReq ?? (typeof cookies === "function" ? await cookies() : undefined);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,8 +21,8 @@ export function supabaseServer(cookieStoreOrReq?: any, res?: NextResponse) {
       cookies: {
         get(name: string) {
           // App Router server components: cookieStore from `cookies()`
-          if (cookieStoreOrReq && typeof cookieStoreOrReq.get === "function") {
-            const value = cookieStoreOrReq.get(name);
+          if (cookieStore && typeof cookieStore.get === "function") {
+            const value = cookieStore.get(name);
             // cookies().get(name) returns { name, value } or undefined
             if (value && typeof value === "object" && "value" in value) {
               return (value as any).value;
@@ -28,11 +32,11 @@ export function supabaseServer(cookieStoreOrReq?: any, res?: NextResponse) {
 
           // Route handlers / pages: NextRequest with req.cookies.get
           if (
-            cookieStoreOrReq &&
-            cookieStoreOrReq.cookies &&
-            typeof cookieStoreOrReq.cookies.get === "function"
+            cookieStore &&
+            cookieStore.cookies &&
+            typeof cookieStore.cookies.get === "function"
           ) {
-            return cookieStoreOrReq.cookies.get(name)?.value;
+            return cookieStore.cookies.get(name)?.value;
           }
 
           return undefined;

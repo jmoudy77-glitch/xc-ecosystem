@@ -18,7 +18,7 @@ export async function GET(
   { params }: { params: Promise<{ objectId: string }> }
 ) {
   const { objectId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth?.user) return error(401, "Unauthorized");
@@ -45,7 +45,7 @@ export async function PATCH(
   { params }: { params: Promise<{ objectId: string }> }
 ) {
   const { objectId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth?.user) return error(401, "Unauthorized");
@@ -90,7 +90,7 @@ export async function DELETE(
   { params }: { params: Promise<{ objectId: string }> }
 ) {
   const { objectId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth?.user) return error(401, "Unauthorized");

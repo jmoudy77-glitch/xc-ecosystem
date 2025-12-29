@@ -23,7 +23,7 @@ export async function PATCH(
 ) {
   const { programId, teamId, rosterEntryId } = await context.params;
 
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // Require an authenticated user – we'll use this for history logging
   const {

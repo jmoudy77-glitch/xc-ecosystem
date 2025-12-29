@@ -19,7 +19,7 @@ export async function GET(
   { params }: { params: Promise<{ programId: string; workoutId: string }> }
 ) {
   const { programId, workoutId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // 1) Fetch workout (RLS will enforce access)
   const { data: workout, error: workoutError } = await supabase
@@ -119,7 +119,7 @@ export async function PATCH(
   { params }: { params: Promise<{ programId: string; workoutId: string }> }
 ) {
   const { programId, workoutId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   let body: any = null;
   try {

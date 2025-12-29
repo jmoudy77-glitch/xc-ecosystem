@@ -18,7 +18,7 @@ type CreateProgramBody = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // 1) Authenticate (cookie session first)
     const {

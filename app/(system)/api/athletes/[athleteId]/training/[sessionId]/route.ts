@@ -18,10 +18,10 @@ async function getAuthAndVerifyAthlete(
   req: NextRequest,
   athleteId: string
 ): Promise<{
-  supabase: ReturnType<typeof supabaseServer>["supabase"];
+  supabase: Awaited<ReturnType<typeof supabaseServer>>["supabase"];
   errorResponse: NextResponse | null;
 }> {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user },

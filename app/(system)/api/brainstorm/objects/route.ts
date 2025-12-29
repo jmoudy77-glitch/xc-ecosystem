@@ -4,7 +4,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 async function getProgramMemberOrError(req: NextRequest, programId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user },

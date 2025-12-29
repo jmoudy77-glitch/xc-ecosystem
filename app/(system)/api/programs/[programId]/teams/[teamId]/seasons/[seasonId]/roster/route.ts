@@ -32,7 +32,7 @@ async function assertProgramMembership(
   | { ok: true; viewerUserId: string; role: string | null }
   | { ok: false; status: number; error: string }
 > {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user: authUser },

@@ -60,7 +60,7 @@ export async function GET(
   { params }: { params: Promise<{ programId: string; exerciseId: string }> },
 ) {
   const { programId, exerciseId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const membership = await requireProgramMember(supabase, programId);
   if (!membership.ok) {
@@ -93,7 +93,7 @@ export async function PATCH(
   { params }: { params: Promise<{ programId: string; exerciseId: string }> },
 ) {
   const { programId, exerciseId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const membership = await requireProgramMember(supabase, programId);
   if (!membership.ok) {
@@ -166,7 +166,7 @@ export async function DELETE(
   { params }: { params: Promise<{ programId: string; exerciseId: string }> },
 ) {
   const { programId, exerciseId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const membership = await requireProgramMember(supabase, programId);
   if (!membership.ok) {

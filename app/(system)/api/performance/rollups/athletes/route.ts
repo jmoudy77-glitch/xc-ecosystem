@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing programId" }, { status: 400 });
   }
 
-  const { supabase, res } = supabaseServer(req);
+  const { supabase, res } = await supabaseServer(req);
 
   // Require auth. Program scoping should be enforced by RLS on program_athletes / performance tables.
   const {

@@ -96,7 +96,7 @@ export default async function AthletePage({ params, searchParams }: PageProps) {
   }
 
   const cookieStore = await cookies();
-  const { supabase } = supabaseServer(cookieStore);
+  const { supabase } = await supabaseServer(cookieStore);
 
   const {
     data: { user: authUser },

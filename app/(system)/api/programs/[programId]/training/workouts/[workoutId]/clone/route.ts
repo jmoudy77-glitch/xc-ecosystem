@@ -8,7 +8,7 @@ export async function POST(
 ) {
   const { programId, workoutId } = await params;
 
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // 1) Load source workout (must be readable via RLS: global OR same program)
   const { data: srcWorkout, error: srcErr } = await supabase

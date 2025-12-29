@@ -28,7 +28,7 @@ type AthleteInquiry = {
 
 // Auth helper: ensure the current auth user belongs to this program.
 async function assertProgramMembership(req: NextRequest, programId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user: authUser },

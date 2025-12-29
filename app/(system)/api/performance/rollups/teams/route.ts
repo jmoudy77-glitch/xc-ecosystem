@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     const rawLimit = url.searchParams.get("limit");
     const limit = Math.min(Math.max(parseInt(rawLimit || "50", 10) || 50, 1), 100);
 
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // Auth gate (RLS should also enforce, but we fail fast with a clean message)
     const {

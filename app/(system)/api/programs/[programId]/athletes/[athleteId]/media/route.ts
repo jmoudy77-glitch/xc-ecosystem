@@ -13,7 +13,7 @@ export async function GET(
   try {
     const { programId, athleteId } = await ctx.params;
 
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // Auth
     const {

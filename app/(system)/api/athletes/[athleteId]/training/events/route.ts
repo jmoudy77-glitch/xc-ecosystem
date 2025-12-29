@@ -11,7 +11,7 @@ const createEventSchema = z.object({
 });
 
 async function getProgramMemberOrError(req: NextRequest, programId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user },

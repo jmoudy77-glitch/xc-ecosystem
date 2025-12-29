@@ -23,7 +23,7 @@ type AthleteOnboardingBody = {
 export async function POST(req: NextRequest) {
   try {
     // Auth (prefer cookie session; fall back to bearer token for fetches that don't carry cookies)
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
     const bearerToken = authHeader?.toLowerCase().startsWith("bearer ")

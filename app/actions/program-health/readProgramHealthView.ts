@@ -5,7 +5,8 @@ import type { ProgramHealthViewModel } from "@/app/ui/program-health/types";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export async function readProgramHealthView(programId: string): Promise<ProgramHealthViewModel> {
-  const { supabase } = supabaseServer(cookies());
+  const cookieStore = await cookies();
+  const { supabase } = await supabaseServer(cookieStore);
 
   const [{ data: snapshot }, { data: absences }, { data: capabilityNodes }] = await Promise.all([
     supabase

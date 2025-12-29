@@ -59,7 +59,7 @@ export async function GET(
 ) {
   try {
     const { programId, athleteId } = await ctx.params;
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     const {
       data: { user },
@@ -112,7 +112,7 @@ export async function POST(
 ) {
   try {
     const { programId, athleteId } = await ctx.params;
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     const {
       data: { user },

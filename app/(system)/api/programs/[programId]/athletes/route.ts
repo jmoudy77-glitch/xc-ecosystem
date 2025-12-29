@@ -32,7 +32,7 @@ type ProgramAthlete = {
 
 // Shared auth helper
 async function assertProgramMembership(req: NextRequest, programId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user: authUser },

@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // Get logged-in user
     const {

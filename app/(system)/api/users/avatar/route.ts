@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export async function POST(req: NextRequest) {
   try {
     // 1) Get authed user via cookie-bound server client
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     const {
       data: { user },

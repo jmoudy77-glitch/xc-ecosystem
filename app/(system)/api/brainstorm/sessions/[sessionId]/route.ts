@@ -6,7 +6,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
   const { sessionId } = await params;
 
   const { data, error } = await supabase
@@ -23,7 +23,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
   const { sessionId } = await params;
 
   const body = await req.json().catch(() => ({}));
@@ -48,7 +48,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
   const { sessionId } = await params;
 
   const { error } = await supabase

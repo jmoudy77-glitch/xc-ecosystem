@@ -67,7 +67,7 @@ function normalizeStatus(status: string | null): BillingStatus {
 
 export async function GET(req: NextRequest) {
   try {
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // 1) Get the authenticated user from Supabase Auth
     const {

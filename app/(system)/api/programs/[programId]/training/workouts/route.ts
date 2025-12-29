@@ -20,7 +20,7 @@ async function requireProgramMember(
   req: NextRequest,
   programId: string,
 ): Promise<{ supabase: any; appUserId: string; programMemberId: string }> {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // 1) Get authed user
   const {

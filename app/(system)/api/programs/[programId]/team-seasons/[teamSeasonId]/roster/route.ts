@@ -5,7 +5,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 type Ctx = { params: Promise<Record<string, string>> };
 
 async function getProgramMemberOrError(req: NextRequest, programId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user },

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export async function GET(req: NextRequest) {
-  const { supabase, res } = supabaseServer(req);
+  const { supabase, res } = await supabaseServer(req);
 
   // Clear Supabase auth cookies server-side
   const { error } = await supabase.auth.signOut();

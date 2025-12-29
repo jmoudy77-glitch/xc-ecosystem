@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     const to = searchParams.get("to"); // YYYY-MM-DD
     const limit = Number(searchParams.get("limit") ?? 50);
 
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // 🔐 Authorization: ensure user has access to program
     const { data: member, error: memberError } = await supabase

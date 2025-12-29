@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ programId: 
   const { programId, teamId, scenarioId } = await ctx.params;
 
   // Auth (viewer must at least belong to program)
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -175,7 +175,7 @@ export async function PATCH(
 ) {
   const { programId, teamId, scenarioId } = await ctx.params;
 
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
   const {
     data: { user },
   } = await supabase.auth.getUser();

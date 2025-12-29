@@ -9,7 +9,7 @@ type Params = {
 };
 
 async function getCoachAndContext(req: NextRequest, athleteId: string) {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // 1) Auth user
   const {

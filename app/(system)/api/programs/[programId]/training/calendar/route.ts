@@ -74,7 +74,7 @@ export async function GET(
   { params }: { params: Promise<{ programId: string }> },
 ) {
   const { programId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const membership = await requireProgramMember(supabase, programId);
   if (!membership.ok) {

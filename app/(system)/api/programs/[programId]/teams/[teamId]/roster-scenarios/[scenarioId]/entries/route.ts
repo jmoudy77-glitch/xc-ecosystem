@@ -31,7 +31,7 @@ async function getViewerAndMembership(
   req: NextRequest,
   programId: string
 ): Promise<ViewerResult> {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const {
     data: { user: authUser },

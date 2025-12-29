@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
     }
 
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // List pages for this brainstorm session.
     // RLS should enforce that the caller can only see pages for sessions they have access to.

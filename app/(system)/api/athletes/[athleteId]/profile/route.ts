@@ -13,7 +13,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Missing athleteId" }, { status: 400 });
   }
 
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // Identify the caller
   const {

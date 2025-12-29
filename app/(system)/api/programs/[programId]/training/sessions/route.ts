@@ -50,7 +50,7 @@ export async function GET(
   { params }: { params: Promise<{ programId: string }> },
 ) {
   const { programId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const parsed = listQuerySchema.safeParse(Object.fromEntries(new URL(req.url).searchParams));
   if (!parsed.success) {
@@ -87,7 +87,7 @@ export async function POST(
   { params }: { params: Promise<{ programId: string }> },
 ) {
   const { programId } = await params;
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   const body = await req.json();
   const parsed = createSessionSchema.safeParse(body);

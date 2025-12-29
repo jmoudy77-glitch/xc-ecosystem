@@ -34,7 +34,7 @@ async function assertProgramMembership(
   programId: string,
   opts?: { requireManager?: boolean },
 ): Promise<{ error: string | null; status: number }> {
-  const { supabase } = supabaseServer(req);
+  const { supabase } = await supabaseServer(req);
 
   // 1) Auth user from Supabase
   const {

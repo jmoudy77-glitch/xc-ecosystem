@@ -20,7 +20,7 @@ type AthleteProfileResponse = {
 
 export async function GET(req: NextRequest) {
   try {
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     const {
       data: { user: authUser },

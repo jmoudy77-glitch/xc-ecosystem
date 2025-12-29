@@ -24,7 +24,7 @@ export async function POST(
     }
 
     const { programId, exerciseId } = parsedParams.data;
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // Auth
     const {

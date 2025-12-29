@@ -20,7 +20,7 @@ export async function POST(
 
   try {
     // 1) Auth via Supabase (Auth user)
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
     const {
       data: { user: authUser },
       error: authError,

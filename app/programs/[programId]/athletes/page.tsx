@@ -21,7 +21,7 @@ export default async function AthletesPage({
   const cookieStore = (await cookies()) as any;
   const { programId } = await params;
 
-  const { supabase } = supabaseServer({ cookies: cookieStore });
+  const { supabase } = await supabaseServer({ cookies: cookieStore });
 
   // Auth user
   const {

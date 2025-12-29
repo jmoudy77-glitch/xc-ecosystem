@@ -32,7 +32,7 @@ export async function POST(
   try {
     const { programId, teamId, scenarioId } = await params;
 
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     const {
       data: { user },

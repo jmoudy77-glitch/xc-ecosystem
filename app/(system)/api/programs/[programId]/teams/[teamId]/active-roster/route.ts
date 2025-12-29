@@ -75,7 +75,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { programId, teamId } = await params;
 
   try {
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // 1) Load all seasons for this team/program
     const { data: seasonRows, error: seasonsError } = await supabase
@@ -223,7 +223,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { programId, teamId } = await params;
 
   try {
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // Ensure an auth session exists (prevents confusing 401s from downstream)
     const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -439,7 +439,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { programId, teamId } = await params;
 
   try {
-    const { supabase } = supabaseServer(req);
+    const { supabase } = await supabaseServer(req);
 
     // Ensure an auth session exists (prevents confusing 401s from downstream)
     const { data: authData, error: authErr } = await supabase.auth.getUser();

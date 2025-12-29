@@ -73,6 +73,7 @@ export function ProgramHealthPage({
     return model.absences.find((a) => a.id === selectedAbsenceId) ?? null;
   }, [model.absences, selectedAbsenceId]);
 
+  const [inspectorOpen, setInspectorOpen] = React.useState(false);
   const [lineageNodeIds, setLineageNodeIds] = React.useState<string[]>([]);
   const [selectedLineage, setSelectedLineage] = React.useState<any[] | null>(null);
 
@@ -263,10 +264,20 @@ export function ProgramHealthPage({
   }
 
   return (
-    <div className="ph-root">
+    <div
+      className="ph-root ph-instrument"
+      data-inspector={inspectorOpen ? "open" : "closed"}
+    >
       <div className="ph-header">
         <div className="ph-title">Program Health</div>
         <div className="ph-controls">
+          <button
+            type="button"
+            className="ph-summon-btn"
+            onClick={() => setInspectorOpen((open) => !open)}
+          >
+            {inspectorOpen ? "Hide Inspector" : "Open Inspector"}
+          </button>
           <button
             className="ph-btn"
             disabled={!selectedAbsenceId || truthLoading}
@@ -337,13 +348,15 @@ export function ProgramHealthPage({
         </div>
 
         <div className="ph-side">
-          <HorizonTimeline
-            snapshot={snapshot}
-            selectedHorizon={selectedHorizon}
-            onSelectHorizon={setSelectedHorizon}
-            onOpenTruth={(h) => openTruthViewForSnapshot("truth", h)}
-            onOpenCausality={(h) => openTruthViewForSnapshot("causality", h)}
-          />
+          <div className="ph-horizon-anchor">
+            <HorizonTimeline
+              snapshot={snapshot}
+              selectedHorizon={selectedHorizon}
+              onSelectHorizon={setSelectedHorizon}
+              onOpenTruth={(h) => openTruthViewForSnapshot("truth", h)}
+              onOpenCausality={(h) => openTruthViewForSnapshot("causality", h)}
+            />
+          </div>
 
           {selectedSnapshot ? (
             <div className="ph-panel ph-panel-snapshot">
@@ -369,6 +382,9 @@ export function ProgramHealthPage({
             </div>
           ) : null}
 
+        </div>
+
+        <aside className={inspectorOpen ? "ph-summoned" : "ph-latent"}>
           <AbsencePanel
             programId={programId}
             absences={model.absences}
@@ -378,9 +394,6 @@ export function ProgramHealthPage({
             onOpenTruth={() => openTruthForSelectedAbsence("truth")}
             onOpenCausality={() => openTruthForSelectedAbsence("causality")}
           />
-        </div>
-
-        <aside className="ph-latent ph-summoned">
           <CausalityDrilldownPanel absence={selectedAbsence} lineage={selectedLineage} />
         </aside>
       </div>

@@ -177,6 +177,30 @@
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* Promotion I-C — Summon control + true gravity */
+.ph-summon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(12,14,18,0.65);
+  color: rgba(255,255,255,0.88);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ph-summon-btn:hover {
+  background: rgba(12,14,18,0.78);
+}
+
+/* Default: remove clutter until summoned */
+.ph-unmapped { display: none; }
+
+/* When inspector is open, allow unmapped to appear (only if wrapped) */
+.ph-instrument[data-inspector="open"] .ph-unmapped { display: block; }
+
 /* ph-map-v1 styles */
 .ph-map-v1 { display: flex; flex-direction: column; gap: 12px; }
 .ph-map-v1-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }

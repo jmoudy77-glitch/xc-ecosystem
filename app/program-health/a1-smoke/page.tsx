@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useMemo, useState, useTransition } from 'react';
-import { emitProgramHealthA1User } from '@/app/actions/program-health/a1EvaluateUser';
 
 type Sport = 'xc' | 'tf';
 type Horizon = 'H0' | 'H1' | 'H2' | 'H3';
 
 function nowHash() {
   const d = new Date();
-  // stable-enough dev hash; real engine should pass deterministic inputs hash
   return `ui_smoke_${d.toISOString()}`;
 }
 
@@ -59,17 +57,26 @@ export default function ProgramHealthA1SmokePage() {
 
     startTransition(async () => {
       try {
-        const res = await emitProgramHealthA1User({
-          programId,
-          sport,
-          horizon,
-          inputsHash,
-          resultPayload,
-          scopeId: null,
-          engineVersion: 'a1_v1',
+        const resp = await fetch('/api/program-health/a1/evaluate-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            programId,
+            sport,
+            horizon,
+            inputsHash,
+            resultPayload,
+            scopeId: null,
+            engineVersion: 'a1_v1',
+          }),
         });
 
-        setResult(res);
+        const json = await resp.json();
+        if (!json?.ok) {
+          throw new Error(json?.error ?? `Request failed (${resp.status})`);
+        }
+
+        setResult(json.result);
       } catch (e: any) {
         setError(e?.message ?? 'Unknown error');
       }
@@ -80,7 +87,7 @@ export default function ProgramHealthA1SmokePage() {
     <div style={{ padding: 24, maxWidth: 960, margin: '0 auto', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Program Health — A1 Smoke Test</h1>
       <p style={{ marginTop: 0, marginBottom: 20, color: '#444' }}>
-        This page invokes the actor-bound Server Action (<code>emitProgramHealthA1User</code>) and should write:
+        This page calls the actor-bound route (<code>/api/program-health/a1/evaluate-user</code>) and should write:
         <br />
         <code>canonical_events → program_health_ledger → program_health_snapshots / program_health_absences</code>
       </p>
@@ -173,7 +180,7 @@ export default function ProgramHealthA1SmokePage() {
           }}
           type="button"
         >
-          {isPending ? 'Running...' : 'Emit A1 Evaluation (actor-bound)'}
+          {isPending ? 'Running…' : 'Emit A1 Evaluation (actor-bound)'}
         </button>
 
         <span style={{ fontSize: 12, color: '#555' }}>
@@ -193,34 +200,6 @@ export default function ProgramHealthA1SmokePage() {
           <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(result, null, 2)}</pre>
         </div>
       )}
-
-      <hr style={{ margin: '22px 0' }} />
-
-      <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>SQL invariant checks (copy/paste)</div>
-        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}>
-{`-- Replace <CANONICAL_EVENT_ID> with the page output
-select id, program_id, event_domain, event_type, scope_type, scope_id, actor_user_id, created_at
-from canonical_events
-where id = '<CANONICAL_EVENT_ID>';
-
-select id as ledger_id, canonical_event_id, program_id, sport, horizon, inputs_hash, created_at
-from program_health_ledger
-where canonical_event_id = '<CANONICAL_EVENT_ID>';
-
-select canonical_event_id, ledger_id, program_id, sport, horizon, inputs_hash, created_at
-from program_health_snapshots
-where canonical_event_id = '<CANONICAL_EVENT_ID>'
-order by created_at desc
-limit 5;
-
-select program_id, sport, horizon, absence_key, canonical_event_id, ledger_id, updated_at
-from program_health_absences
-where canonical_event_id = '<CANONICAL_EVENT_ID>'
-order by updated_at desc
-limit 10;`}
-        </pre>
-      </div>
     </div>
   );
 }

@@ -7,18 +7,23 @@ function prettifyBucketTitle(bucket: string): string {
   return spaced.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default async function BucketPage({ params }: { params: { bucket: string } }) {
-  const bucket = decodeURIComponent(params.bucket);
+type PageProps = {
+  params: Promise<{ bucket: string }>;
+};
 
-  const items = (await getDocsIndex()).filter((d) => d.bucket === bucket);
+export default async function BucketPage({ params }: PageProps) {
+  const { bucket } = await params;
+  const decodedBucket = decodeURIComponent(bucket);
+
+  const items = (await getDocsIndex()).filter((d) => d.bucket === decodedBucket);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 18px" }}>
       <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>{prettifyBucketTitle(bucket)}</h1>
+          <h1 style={{ margin: 0, fontSize: 26 }}>{prettifyBucketTitle(decodedBucket)}</h1>
           <p style={{ margin: "8px 0 0", opacity: 0.75 }}>
-            Folder: <span style={{ opacity: 0.95 }}>{bucket}</span> ({items.length})
+            Folder: <span style={{ opacity: 0.95 }}>{decodedBucket}</span> ({items.length})
           </p>
         </div>
         <Link href="/knowledge" style={{ textDecoration: "none" }}>

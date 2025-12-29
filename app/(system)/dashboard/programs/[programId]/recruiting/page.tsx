@@ -6,13 +6,11 @@ import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type PageProps = {
-  params: {
-    programId: string;
-  };
+  params: Promise<{ programId: string }>;
 };
 
 export default async function ProgramRecruitingPage({ params }: PageProps) {
-  const programId = params.programId;
+  const { programId } = await params;
 
   const supabase = await supabaseServerComponent();
 

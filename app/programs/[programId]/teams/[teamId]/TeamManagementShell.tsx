@@ -84,7 +84,6 @@ export default function TeamManagementShell({
 
   const seasonLabel =
     activeSeason?.season_label ??
-    // @ts-expect-error fallback if academic_year exists but not typed
     activeSeason?.academic_year ??
     "—";
 

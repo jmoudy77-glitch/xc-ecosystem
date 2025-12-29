@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 async function getProgramMemberOrError(req: NextRequest, programId: string) {
   const { supabase } = supabaseServer(req);
 
@@ -35,8 +37,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // GET: team season roster for assigning to practice groups
-export async function GET(req: NextRequest, context: any) {
-  const { programId, teamSeasonId } = context.params;
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const { programId, teamSeasonId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;

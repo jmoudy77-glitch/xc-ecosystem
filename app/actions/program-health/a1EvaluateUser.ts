@@ -34,14 +34,14 @@ export interface A1UserEmitResult {
  * - cookies().getAll()
  * - cookies().set() is not available in Server Actions the same way; we no-op set/remove.
  */
-function getSupabaseSSR() {
+async function getSupabaseSSR() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) {
     throw new Error('Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   return createServerClient(supabaseUrl, anonKey, {
     cookies: {
@@ -61,7 +61,7 @@ export async function emitProgramHealthA1User(args: A1UserEmitArgs): Promise<A1U
   if (!args?.inputsHash) throw new Error('inputsHash is required');
   if (!args?.resultPayload) throw new Error('resultPayload is required');
 
-  const supabase = getSupabaseSSR();
+  const supabase = await getSupabaseSSR();
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr) throw new Error(`Auth error: ${authErr.message}`);

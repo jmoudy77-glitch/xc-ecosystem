@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const updateEventSchema = z.object({
   label: z.string().min(1).optional(),
   eventCode: z.string().min(1).optional(),
@@ -43,8 +45,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // GET: fetch a single training event
-export async function GET(req: NextRequest, context: any) {
-  const { programId, eventId } = context.params;
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const { programId, eventId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -72,8 +74,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 // PATCH: update training event label / eventCode
-export async function PATCH(req: NextRequest, context: any) {
-  const { programId, eventId } = context.params;
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { programId, eventId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -150,8 +152,8 @@ export async function PATCH(req: NextRequest, context: any) {
 }
 
 // DELETE: delete a training event template
-export async function DELETE(req: NextRequest, context: any) {
-  const { programId, eventId } = context.params;
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const { programId, eventId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;

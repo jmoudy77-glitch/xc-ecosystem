@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 async function getProgramMemberOrError(req: NextRequest, programId: string) {
   const { supabase } = supabaseServer(req);
 
@@ -37,8 +39,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // POST: generate athlete_training_sessions from a practice's groups/assignments
-export async function POST(req: NextRequest, context: any) {
-  const { programId, practiceId } = context.params;
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { programId, practiceId } = await params;
 
   const { supabase, programMember, errorResponse } = await getProgramMemberOrError(
     req,

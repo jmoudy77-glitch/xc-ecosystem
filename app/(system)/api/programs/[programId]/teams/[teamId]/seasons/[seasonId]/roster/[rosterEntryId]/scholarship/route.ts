@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServerComponent } from "@/lib/supabaseServerComponent";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function PATCH(req: NextRequest, context: any) {
-  const params = await context.params;
-  const { programId, teamId, seasonId, rosterEntryId } = params;
+type Ctx = { params: Promise<Record<string, string>> };
+
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { programId, teamId, seasonId, rosterEntryId } = await params;
 
   try {
     // 1) Authenticated user via Supabase
@@ -163,9 +164,8 @@ export async function PATCH(req: NextRequest, context: any) {
   }
 }
 
-export async function DELETE(req: NextRequest, context: any) {
-  const params = await context.params;
-  const { programId, teamId, seasonId, rosterEntryId } = params;
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const { programId, teamId, seasonId, rosterEntryId } = await params;
 
   try {
     // 1) Authenticated user via Supabase

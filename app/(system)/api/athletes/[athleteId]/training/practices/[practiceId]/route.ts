@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const updatePracticeSchema = z.object({
   label: z.string().min(1).optional(),
   practiceDate: z.string().min(1).optional(), // ISO date string
@@ -43,8 +45,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // GET: single practice + groups (and assignment counts)
-export async function GET(req: NextRequest, context: any) {
-  const { programId, practiceId } = context.params;
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const { programId, practiceId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -118,8 +120,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 // PATCH: update label and/or date
-export async function PATCH(req: NextRequest, context: any) {
-  const { programId, practiceId } = context.params;
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { programId, practiceId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -165,8 +167,8 @@ export async function PATCH(req: NextRequest, context: any) {
 }
 
 // DELETE: delete practice + groups + assignments
-export async function DELETE(req: NextRequest, context: any) {
-  const { programId, practiceId } = context.params;
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const { programId, practiceId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ManageAthleteModal } from "../../active-roster/page";
+import { ManageAthleteModal } from "../../active-roster/ManageAthleteModal";
 
 type RecruitRow = {
   // normalized id we use in UI + actions (must be stable)

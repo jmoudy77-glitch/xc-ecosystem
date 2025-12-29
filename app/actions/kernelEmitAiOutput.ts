@@ -20,7 +20,7 @@ export type KernelEmitAiOutputArgs = {
 };
 
 export async function kernelEmitAiOutput(args: KernelEmitAiOutputArgs) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     programId,

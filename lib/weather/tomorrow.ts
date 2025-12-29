@@ -16,6 +16,8 @@ export type WeeklyWeatherDay = {
   tempMaxF: number | null;
   tempMinF: number | null;
   wetBulbF: number | null;
+  wbgtF?: number | null;
+  humidityPercent?: number | null;
 
   // Wind in kph (raw) and mph (for UI display)
   windKph: number | null;

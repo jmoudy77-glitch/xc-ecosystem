@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const updateSessionSchema = z.object({
   markComplete: z.boolean().optional(),
   completedAt: z.string().datetime().optional(), // ISO string
@@ -68,8 +70,8 @@ async function getAuthAndVerifyAthlete(
 }
 
 // PATCH: athlete updates their own training session (completion, RPE, notes, etc.)
-export async function PATCH(req: NextRequest, context: any) {
-  const { athleteId, sessionId } = context.params;
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { athleteId, sessionId } = await params;
 
   const { supabase, errorResponse } = await getAuthAndVerifyAthlete(req, athleteId);
   if (errorResponse) return errorResponse;

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const createGroupSchema = z.object({
   label: z.string().min(1),
   eventGroup: z.string().min(1),
@@ -44,8 +46,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // GET: list groups for a practice
-export async function GET(req: NextRequest, context: any) {
-  const { programId, practiceId } = context.params;
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const { programId, practiceId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -67,8 +69,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 // POST: create a new group on a practice
-export async function POST(req: NextRequest, context: any) {
-  const { programId, practiceId } = context.params;
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { programId, practiceId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;

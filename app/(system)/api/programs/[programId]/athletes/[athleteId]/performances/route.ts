@@ -1,19 +1,15 @@
 // app/(system)/api/programs/[programId]/athletes/[athleteId]/performances/route.ts
 // Coach-facing API: fetch athlete performances (PBs + recent)
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
-export async function GET(
-  req: NextRequest,
-  ctx: {
-    params:
-      | { programId: string; athleteId: string }
-      | Promise<{ programId: string; athleteId: string }>;
-  }
-) {
+type Ctx = { params: Promise<{ programId: string; athleteId: string }> };
+
+export async function GET(req: NextRequest, { params }: Ctx) {
   try {
-    const { programId, athleteId } = await Promise.resolve(ctx.params);
+    const { programId, athleteId } = await params;
     const { searchParams } = new URL(req.url);
 
     const eventCode = searchParams.get("eventCode");

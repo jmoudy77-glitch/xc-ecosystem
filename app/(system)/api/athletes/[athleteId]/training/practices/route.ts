@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const createPracticeSchema = z.object({
   teamSeasonId: z.string().uuid(),
   practiceDate: z.string().date().or(z.string().min(1)), // ISO string
@@ -44,8 +46,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // GET: list practice plans for a team season (optional date filters)
-export async function GET(req: NextRequest, context: any) {
-  const { programId } = context.params;
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const { programId } = await params;
   const { searchParams } = new URL(req.url);
 
   const teamSeasonId = searchParams.get("teamSeasonId");
@@ -89,8 +91,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 // POST: create a new practice plan
-export async function POST(req: NextRequest, context: any) {
-  const { programId } = context.params;
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { programId } = await params;
 
   const { supabase, programMember, errorResponse } = await getProgramMemberOrError(
     req,

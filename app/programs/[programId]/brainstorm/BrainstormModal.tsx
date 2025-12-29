@@ -17,6 +17,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 // (keep your existing imports)
 
+export type BrainstormContext = {
+  programId: string;
+  scopeType: string;
+  scopeId: string;
+  teamId?: string | null;
+  athleteId?: string | null;
+};
+
 type BrainstormPage = {
   id: string;
   session_id: string;

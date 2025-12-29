@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const addAssignmentsSchema = z.object({
   athletes: z
     .array(
@@ -54,8 +56,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // GET: list assignments for a group
-export async function GET(req: NextRequest, context: any) {
-  const { programId, groupId } = context.params;
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const { programId, groupId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -77,8 +79,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 // POST: add assignments to a group
-export async function POST(req: NextRequest, context: any) {
-  const { programId, practiceId, groupId } = context.params;
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { programId, practiceId, groupId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -139,8 +141,8 @@ export async function POST(req: NextRequest, context: any) {
 }
 
 // DELETE: bulk remove assignments (by IDs or roster IDs)
-export async function DELETE(req: NextRequest, context: any) {
-  const { programId, groupId } = context.params;
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const { programId, groupId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;

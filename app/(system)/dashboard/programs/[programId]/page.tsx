@@ -7,15 +7,13 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 
 type ProgramOverviewPageProps = {
-  params: {
-    programId: string;
-  };
+  params: Promise<{ programId: string }>;
 };
 
 export default async function ProgramOverviewPage({
   params,
 }: ProgramOverviewPageProps) {
-  const programId = params.programId;
+  const { programId } = await params;
 
   const supabase = await supabaseServerComponent();
 

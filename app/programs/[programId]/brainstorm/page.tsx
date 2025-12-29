@@ -2,6 +2,11 @@
 
 import BrainstormPageClient from "./BrainstormPageClient";
 
-export default function Page({ params }: { params: { programId: string } }) {
-  return <BrainstormPageClient programId={params.programId} />;
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ programId: string }>;
+}) {
+  const { programId } = await params;
+  return <BrainstormPageClient programId={programId} />;
 }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@/utils/supabase/server';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 function extractProgramId(event: Stripe.Event): string | null {
   const obj: any = event.data?.object ?? {};
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
   const { amount, currency } = amountFromEvent(event);
   const ledgerType = economicEventType(event);
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase.rpc('kernel_ingest_stripe_economic_event', {
     p_program_id: programId,

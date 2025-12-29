@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const createEventSchema = z.object({
   label: z.string().min(1),
   eventCode: z.string().min(1), // must match an event_definitions.event_code
@@ -43,8 +45,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // GET: list training events (templates) for a program
-export async function GET(req: NextRequest, context: any) {
-  const { programId } = context.params;
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const { programId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;
@@ -67,8 +69,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 // POST: create a new training event (template) for a program
-export async function POST(req: NextRequest, context: any) {
-  const { programId } = context.params;
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { programId } = await params;
 
   const { supabase, programMember, errorResponse } = await getProgramMemberOrError(
     req,

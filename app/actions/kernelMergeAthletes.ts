@@ -10,7 +10,7 @@ export type KernelMergeAthletesArgs = {
 };
 
 export async function kernelMergeAthletes(args: KernelMergeAthletesArgs) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { programId, canonicalAthleteId, sourceAthleteId, details = {} } = args;
 

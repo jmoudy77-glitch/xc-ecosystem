@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+type Ctx = { params: Promise<Record<string, string>> };
+
 const coachUpdateSessionSchema = z.object({
   // Shared
   title: z.string().min(1).max(255).optional(),
@@ -59,8 +61,8 @@ async function getProgramMemberOrError(req: NextRequest, programId: string) {
 }
 
 // PATCH: coach updates planned fields / notes for a training session
-export async function PATCH(req: NextRequest, context: any) {
-  const { programId, sessionId } = context.params;
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { programId, sessionId } = await params;
 
   const { supabase, errorResponse } = await getProgramMemberOrError(req, programId);
   if (errorResponse) return errorResponse;

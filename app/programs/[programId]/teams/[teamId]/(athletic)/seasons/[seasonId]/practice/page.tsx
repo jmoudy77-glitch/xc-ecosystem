@@ -503,7 +503,7 @@ async function getPracticePlansForSeason(args: {
   return (data ?? []) as PracticePlan[];
 }
 
-export function PracticePlannerWeeklySurface({
+function PracticePlannerWeeklySurface({
   mode,
   programId,
   teamId,

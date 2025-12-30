@@ -201,6 +201,115 @@
 /* When inspector is open, allow unmapped to appear (only if wrapped) */
 .ph-instrument[data-inspector="open"] .ph-unmapped { display: block; }
 
+/* ---------------------------------------------------------
+   Promotion M — Instrument Material Pass
+   (visual only; no semantics)
+--------------------------------------------------------- */
+
+/* Reduce overall “dashboard slab” feel */
+.ph-instrument {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px 18px 40px;
+}
+
+/* Make the drift plane the dominant visual object */
+.ph-drift-plane,
+.ph-drift,
+.ph-capability-drift,
+.ph-map {
+  border-radius: 18px !important;
+}
+
+/* If the map has its own wrapper, soften it */
+.ph-drift-plane,
+.ph-map,
+.ph-capability-drift {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+}
+
+/* Horizon: turn into a depth-band rail */
+.ph-horizon-anchor {
+  position: sticky;
+  top: 10px;
+  z-index: 8;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none; /* rail is contextual; buttons inside can re-enable */
+}
+
+/* Target HorizonTimeline outer card if it is a direct child */
+.ph-horizon-anchor > * {
+  pointer-events: auto;
+  width: 380px;
+  border-radius: 18px;
+  background: rgba(18,20,26,0.72);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 14px 50px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
+}
+
+/* Make internal horizon cards feel like bands, not tiles */
+.ph-horizon-anchor .card,
+.ph-horizon-anchor [class*="card"],
+.ph-horizon-anchor .panel,
+.ph-horizon-anchor [class*="panel"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Reduce “gray slab” problem */
+.ph-horizon-anchor h2,
+.ph-horizon-anchor h3,
+.ph-horizon-anchor .title {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 12px;
+  opacity: 0.86;
+}
+
+/* Chips/legend should be subtle marks */
+.ph-chip,
+.ph-pill,
+.ph-badge,
+.ph-legend-chip {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  border-radius: 999px !important;
+}
+
+/* Summoned inspector should feel like an instrument drawer, not a wall */
+.ph-summoned {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(10,12,16,0.86);
+  backdrop-filter: blur(14px);
+}
+
+/* Summon button: make it quiet */
+.ph-summon-btn {
+  border-radius: 999px;
+  padding: 9px 14px;
+}
+
+/* Kill overbearing section slabs if present */
+.ph-section,
+.ph-panel,
+.ph-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+}
+
+/* Default text tone: reduce “white on black glare” */
+.ph-instrument,
+.ph-instrument * {
+  color: rgba(255,255,255,0.86);
+}
+
 /* ph-map-v1 styles */
 .ph-map-v1 { display: flex; flex-direction: column; gap: 12px; }
 .ph-map-v1-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }

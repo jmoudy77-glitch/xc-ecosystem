@@ -310,6 +310,43 @@
   color: rgba(255,255,255,0.86);
 }
 
+/* ---------------------------------------------------------
+   Promotion J — Structural Plane Enlargement
+--------------------------------------------------------- */
+
+/* Make the instrument layout a wide field */
+.ph-instrument {
+  max-width: 1440px;
+}
+
+/* Drift plane becomes the world */
+.ph-drift-plane,
+.ph-drift,
+.ph-capability-drift,
+.ph-map {
+  min-height: 64vh;
+  margin-top: 20px;
+}
+
+/* Demote headers / legends */
+.ph-header,
+.ph-legend,
+.ph-chip,
+.ph-pill {
+  opacity: 0.78;
+}
+
+/* Pull horizon rail upward and narrow */
+.ph-horizon-anchor > * {
+  width: 300px;
+}
+
+/* Reduce vertical noise above plane */
+.ph-instrument h1,
+.ph-instrument h2 {
+  margin-bottom: 8px;
+}
+
 /* ph-map-v1 styles */
 .ph-map-v1 { display: flex; flex-direction: column; gap: 12px; }
 .ph-map-v1-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }

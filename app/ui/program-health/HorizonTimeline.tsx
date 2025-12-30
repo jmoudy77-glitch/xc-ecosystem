@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import type { ProgramHealthSnapshot } from "./types";
+import type { Horizon, ProgramHealthSnapshot } from "./types";
 
-type Horizon = "H0" | "H1" | "H2" | "H3";
+const HORIZONS: Horizon[] = ["H0", "H1", "H2", "H3"];
 
 function fmtTs(ts: string | null | undefined) {
   if (!ts) return "—";
@@ -17,87 +17,131 @@ function shortId(id: string | null | undefined) {
   return `${id.slice(0, 8)}…`;
 }
 
-function depthClass(h: Horizon) {
-  if (h === "H0") return "ph-depth-h0";
-  if (h === "H1") return "ph-depth-h1";
-  if (h === "H2") return "ph-depth-h2";
-  return "ph-depth-h3";
-}
-
-export function HorizonTimeline({
-  snapshots,
-  selectedHorizon,
-  onSelectHorizon,
-  onOpenSnapshotTruth,
-  onOpenSnapshotCausality,
-}: {
-  snapshots: ProgramHealthSnapshot[];
+type HorizonTimelineProps = {
+  snapshot: ProgramHealthSnapshot | null;
   selectedHorizon: Horizon;
   onSelectHorizon: (h: Horizon) => void;
-  onOpenSnapshotTruth?: (h: Horizon) => void;
-  onOpenSnapshotCausality?: (h: Horizon) => void;
-}) {
-  const safeSnapshots = (snapshots ?? []) as ProgramHealthSnapshot[];
-  const byH = React.useMemo(() => {
-    const m = new Map<Horizon, ProgramHealthSnapshot[]>();
-    for (const h of ["H0", "H1", "H2", "H3"] as Horizon[]) m.set(h, []);
-    for (const s of safeSnapshots) {
-      const h = (s.horizon ?? "H1") as Horizon;
-      if (!m.has(h)) m.set(h, []);
-      m.get(h)!.push(s);
-    }
-    for (const [h, arr] of m.entries()) {
-      arr.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
-      m.set(h, arr);
-    }
-    return m;
-  }, [safeSnapshots]);
+  onOpenTruth?: (h: Horizon) => void;
+  onOpenCausality?: (h: Horizon) => void;
+  variant?: "rail" | "cards";
+};
 
-  return (
-    <div className="ph-depth-timeline">
-      <div className="ph-panel-title">Horizon Timeline</div>
-      <div className="ph-muted">
-        Snapshots are canonical emissions (navigation only). Horizon is rendered as depth bands.
-      </div>
+export function HorizonTimeline({
+  snapshot,
+  selectedHorizon,
+  onSelectHorizon,
+  onOpenTruth,
+  onOpenCausality,
+  variant = "cards",
+}: HorizonTimelineProps) {
+  // v1: only one canonical emission available in the view model; render that horizon as emitting.
+  const emittingH = snapshot?.horizon ?? null;
 
-      <div className="ph-depth-grid">
-        {(["H0", "H1", "H2", "H3"] as Horizon[]).map((h) => {
-          const arr = byH.get(h) ?? [];
-          const latest = arr[0] ?? null;
+  if (variant === "rail") {
+    return (
+      <div className="flex items-center gap-2 overflow-x-auto">
+        {HORIZONS.map((h) => {
+          const has = emittingH === h;
           const active = selectedHorizon === h;
 
           return (
             <div
               key={h}
-              className={[
-                "ph-depth-card",
-                depthClass(h),
-                active ? "is-active" : "",
-                latest ? "has-emission" : "is-empty",
-              ].join(" ")}
-              onClick={() => onSelectHorizon(h)}
               role="button"
               tabIndex={0}
+              onClick={() => onSelectHorizon(h)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") onSelectHorizon(h);
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectHorizon(h);
+                }
               }}
-              title={`Select ${h}`}
+              className={[
+                "flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 min-w-[180px]",
+                active ? "ring-1 ring-white/20" : "",
+              ].join(" ")}
             >
-              <div className="ph-depth-card-top">
-                <div className="ph-depth-label">{h}</div>
-                <div className="ph-depth-sub">
-                  {latest ? fmtTs(latest.created_at) : "No emission"}
+              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] font-semibold">
+                {h}
+              </span>
+              <div className="flex-1 min-w-0 text-xs">
+                <div className="truncate">
+                  {has ? fmtTs(snapshot?.created_at) : "No emission"}
                 </div>
               </div>
+              {has ? (
+                <div className="flex items-center gap-1">
+                  {onOpenTruth ? (
+                    <button
+                      type="button"
+                      className="rounded-full border border-white/10 px-2 py-1 text-[11px]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenTruth(h);
+                      }}
+                    >
+                      Truth
+                    </button>
+                  ) : null}
+                  {onOpenCausality ? (
+                    <button
+                      type="button"
+                      className="rounded-full border border-white/10 px-2 py-1 text-[11px]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenCausality(h);
+                      }}
+                    >
+                      Causality
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
-              <div className="ph-depth-card-body">
-                {latest ? (
+  return (
+    <div className="ph-panel ph-timeline">
+      <div className="ph-panel-title">Horizon Timeline</div>
+      <div className="ph-panel-muted">
+        Snapshots are canonical emissions (navigation only). Depth is rendered as bands.
+      </div>
+
+      <div className="ph-depth-grid">
+        {HORIZONS.map((h) => {
+          const has = emittingH === h;
+          const active = selectedHorizon === h;
+
+          return (
+            <button
+              key={h}
+              type="button"
+              className={[
+                "ph-depth-card",
+                `depth-${h.toLowerCase()}`,
+                has ? "has-emission" : "is-empty",
+                active ? "is-active" : "",
+              ].join(" ")}
+              onClick={() => onSelectHorizon(h)}
+              title={`Select ${h}`}
+            >
+              <div className="ph-depth-top">
+                <div className="ph-depth-label">{h}</div>
+                <div className="ph-depth-sub">{has ? fmtTs(snapshot?.created_at) : "No emission"}</div>
+              </div>
+
+              <div className="ph-depth-body">
+                {has ? (
                   <>
                     <div className="ph-depth-meta">
-                      ledger <span className="ph-mono">{shortId(latest.ledger_id)}</span>
+                      ledger <span className="ph-mono">{shortId(snapshot?.ledger_id)}</span>
                     </div>
                     <div className="ph-depth-meta">
-                      cevt <span className="ph-mono">{shortId(latest.canonical_event_id)}</span>
+                      cevt <span className="ph-mono">{shortId(snapshot?.canonical_event_id)}</span>
                     </div>
                   </>
                 ) : (
@@ -107,38 +151,43 @@ export function HorizonTimeline({
                 )}
               </div>
 
-              <div className="ph-depth-card-actions">
-                <button
-                  type="button"
-                  className="ph-btn ph-btn-ghost"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenSnapshotTruth?.(h);
-                  }}
-                  disabled={!latest}
-                  title="Open snapshot truth"
-                >
-                  Truth
-                </button>
-                <button
-                  type="button"
-                  className="ph-btn ph-btn-ghost"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenSnapshotCausality?.(h);
-                  }}
-                  disabled={!latest}
-                  title="Open snapshot causality"
-                >
-                  Causality
-                </button>
+              <div className="ph-depth-actions">
+                <span className="ph-spacer" />
+                <span className="ph-actions">
+                  <span className="ph-action">
+                    <span className="ph-action-label">Truth</span>
+                    <input
+                      type="button"
+                      className="ph-btn ph-btn-mini"
+                      value="Open"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenTruth?.(h);
+                      }}
+                      disabled={!has}
+                    />
+                  </span>
+                  <span className="ph-action">
+                    <span className="ph-action-label">Causality</span>
+                    <input
+                      type="button"
+                      className="ph-btn ph-btn-mini"
+                      value="Open"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenCausality?.(h);
+                      }}
+                      disabled={!has}
+                    />
+                  </span>
+                </span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
-      <div className="ph-muted">
+      <div className="ph-panel-muted">
         Selected band: <span className="ph-mono">{selectedHorizon}</span>
       </div>
     </div>

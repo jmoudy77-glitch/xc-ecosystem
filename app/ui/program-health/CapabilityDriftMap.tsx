@@ -411,6 +411,71 @@ export function CapabilityDriftMap({
   const [hoverHorizon, setHoverHorizon] = React.useState<Horizon | null>(null);
   const [horizonPanelOpen, setHorizonPanelOpen] = React.useState(false);
   const [panelHorizon, setPanelHorizon] = React.useState<Horizon>("H0");
+  const dragActiveRef = React.useRef(false);
+  const dragStartClientRef = React.useRef<{ x: number; y: number } | null>(null);
+  const dragStartSpinRef = React.useRef<number>(0);
+  const dragStartAngleRef = React.useRef<number>(0);
+  const dragPointerIdRef = React.useRef<number | null>(null);
+  const suppressNextClickRef = React.useRef(false);
+  const DRAG_THRESHOLD_PX = 6;
+
+  function angleDegFromClient(px: number, py: number) {
+    const el = discStageRef.current!;
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const a = (Math.atan2(py - cy, px - cx) * 180) / Math.PI;
+    return normalizeDeg(a);
+  }
+
+  function shortestDelta(current: number, start: number) {
+    return ((current - start + 540) % 360) - 180;
+  }
+
+  function ignoreTarget(t: EventTarget | null) {
+    if (!(t instanceof Element)) return false;
+    return Boolean(t.closest(".ph-dock-top,.ph-dock-left,.ph-dock-right,.ph-dock-inspector,.ph-horizon-rail-bottom"));
+  }
+
+  const onDiscPointerDownCapture = (evt: React.PointerEvent<HTMLDivElement>) => {
+    if (ignoreTarget(evt.target)) return;
+    dragPointerIdRef.current = evt.pointerId;
+    dragActiveRef.current = false;
+    suppressNextClickRef.current = false;
+    dragStartClientRef.current = { x: evt.clientX, y: evt.clientY };
+    dragStartSpinRef.current = discSpinDeg;
+    dragStartAngleRef.current = angleDegFromClient(evt.clientX, evt.clientY);
+  };
+
+  const onDiscPointerMoveCapture = (evt: React.PointerEvent<HTMLDivElement>) => {
+    if (dragPointerIdRef.current !== evt.pointerId) return false;
+    const start = dragStartClientRef.current;
+    if (!start) return false;
+    const moved = Math.hypot(evt.clientX - start.x, evt.clientY - start.y);
+    if (!dragActiveRef.current) {
+      if (moved < DRAG_THRESHOLD_PX) return false;
+      dragActiveRef.current = true;
+      suppressNextClickRef.current = true;
+      evt.currentTarget.setPointerCapture(evt.pointerId);
+    }
+    const currentAngle = angleDegFromClient(evt.clientX, evt.clientY);
+    const d = shortestDelta(currentAngle, dragStartAngleRef.current);
+    setDiscSpinDeg(normalizeDeg(dragStartSpinRef.current + d));
+    evt.preventDefault();
+    evt.stopPropagation();
+    return true;
+  };
+
+  const onDiscPointerUpCapture = (evt: React.PointerEvent<HTMLDivElement>) => {
+    if (dragPointerIdRef.current !== evt.pointerId) return;
+    if (dragActiveRef.current) {
+      evt.preventDefault();
+      evt.stopPropagation();
+    }
+    dragPointerIdRef.current = null;
+    dragStartClientRef.current = null;
+    dragActiveRef.current = false;
+  };
 
   const activeHorizon = hoverHorizon ?? selectedHorizon;
   const isPinnedByClick = hoverHorizon == null;
@@ -536,18 +601,30 @@ export function CapabilityDriftMap({
             <div
               ref={discStageRef}
               className="ph-disc-stage"
+              onPointerDownCapture={onDiscPointerDownCapture}
               onPointerMoveCapture={(evt) => {
+                const dragging = onDiscPointerMoveCapture(evt);
+                if (dragging) return;
                 const h = computeHorizonFromDisc(evt);
                 if (lastHoverRef.current !== h) {
                   lastHoverRef.current = h;
                   handleHorizonHover(h);
                 }
               }}
+              onPointerUpCapture={onDiscPointerUpCapture}
+              onPointerCancelCapture={onDiscPointerUpCapture}
               onPointerLeave={() => {
+                if (dragActiveRef.current) return;
                 lastHoverRef.current = null;
                 handleHorizonHover(null);
               }}
               onClickCapture={(evt) => {
+                if (suppressNextClickRef.current) {
+                  suppressNextClickRef.current = false;
+                  evt.preventDefault();
+                  evt.stopPropagation();
+                  return;
+                }
                 const h = computeHorizonFromDisc(evt);
                 if (h) handleHorizonClick(h);
               }}

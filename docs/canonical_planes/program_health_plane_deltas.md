@@ -11,3 +11,8 @@ Rule: This ledger is append-only. Existing entries must never be edited, reorder
 - Strengthened phActiveSectorWash to primary (var(--brand))
 - Remount wash path on slice change via key for entry pulse
 - Added .ph-ray-enter animation for disciplined transient engagement
+
+### 2025-12-31 — R3.4 Drag-to-spin disc (Pattern A)
+- Added pointer-drag rotation of the Program Health disc using polar angle deltas around disc center.
+- Gesture uses 6px intent threshold to distinguish click vs drag.
+- Pointer capture and propagation suppression prevent hijacking horizon rail and dock click behaviors.

@@ -136,3 +136,9 @@ Non-negotiable:
 - This surface is a spatial instrument, not a dashboard.
 - Overlays must be disciplined and derived from instrument geometry.
 - No rectangular container may constrain the disc stage (overflow and layout must preserve instrument sovereignty).
+
+### F3) Drag-to-spin (Pattern A)
+- The disc interaction surface supports click-hold-drag rotation.
+- A 6px movement threshold distinguishes click vs drag.
+- While dragging, pointer capture and propagation suppression prevent click behaviors.
+- Drag initiation must not hijack horizon rail or dock clicks.

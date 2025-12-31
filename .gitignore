@@ -48,3 +48,6 @@ __MACOSX/
 **/__MACOSX/
 # artifact exports
 *.zip
+
+# Editor/patch backups
+*.bak_*

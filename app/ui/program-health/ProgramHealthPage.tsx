@@ -4,7 +4,6 @@ import * as React from "react";
 import type { AbsenceTruthModel, ProgramHealthViewModel } from "./types";
 import { CapabilityDriftMap } from "./CapabilityDriftMap";
 import { TruthView } from "./TruthView";
-import { HorizonTimeline } from "./HorizonTimeline";
 import { readAbsenceTruth } from "@/app/actions/program-health/readAbsenceTruth";
 import { readCanonicalEventGraph } from "@/app/actions/program-health/readCanonicalEventGraph";
 import { readLinkedCanonicalEventIds } from "@/app/actions/program-health/readLinkedCanonicalEventIds";
@@ -58,6 +57,8 @@ export function ProgramHealthPage({
     capabilityLabel: string;
     level: "critical" | "high" | "medium" | "low";
   } | null>(null);
+  const leftDockRef = React.useRef<HTMLDivElement | null>(null);
+  const [discTopPx, setDiscTopPx] = React.useState<number | null>(null);
 
   // Timeline state (navigation only)
   const [selectedHorizon, setSelectedHorizon] = React.useState<"H0" | "H1" | "H2" | "H3">(
@@ -189,6 +190,27 @@ export function ProgramHealthPage({
     };
   }, [programId, selectedAbsence]);
 
+  React.useEffect(() => {
+    const measure = () => {
+      const el = leftDockRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const bottom = rect.bottom;
+      const top = bottom + 192;
+      setDiscTopPx(top);
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    const t = window.setTimeout(measure, 200);
+
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.clearTimeout(t);
+    };
+  }, []);
+
   async function openTruthForSelectedAbsence(tab: "truth" | "causality") {
     if (!selectedAbsence) return;
 
@@ -291,34 +313,62 @@ export function ProgramHealthPage({
   }
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
-      <header className="flex items-start justify-between gap-3">
-        <div className="ph-title">Program Health</div>
-        <div className="ph-controls">
-          <button
-            className="ph-btn"
-            disabled={!selectedAbsenceId || truthLoading}
-            onClick={() => openTruthForSelectedAbsence("truth")}
-            title={
-              !selectedAbsenceId
-                ? "Select an absence first"
-                : truthLoading
-                  ? "Loading canonical truth…"
-                  : "Open truth view for selected absence"
-            }
-          >
-            {truthLoading ? "Loading…" : "Truth View"}
-          </button>
-        </div>
-      </header>
+    <main
+      className="ph-root ph-field"
+      style={
+        discTopPx
+          ? ({ ["--ph-disc-top" as any]: `${discTopPx}px` } as React.CSSProperties)
+          : undefined
+      }
+    >
+      <div className="ph-field-plane" aria-label="Program Health Instrument Field">
+        <CapabilityDriftMap
+          capabilityNodes={model.capabilityNodes}
+          absences={model.absences}
+          snapshot={snapshot}
+          selectedHorizon={selectedHorizon}
+          onSelectHorizon={setSelectedHorizon}
+          selectedAbsenceId={selectedAbsenceId}
+          onSelect={setSelectedAbsenceId}
+          highlightAbsenceIds={lineageHighlightOn ? highlightAbsenceIds : []}
+          lineageNodeIds={lineageNodeIds}
+          showUnmapped={false}
+          onAbsenceHover={(_absenceId, summary) => setHoveredAbsence(summary)}
+          onAbsenceSelect={setSelectedAbsenceId}
+        />
+      </div>
 
-      <section className="mt-4 flex min-h-[calc(100vh-var(--app-header-h,72px)-96px)] flex-col gap-4">
-        <div className="relative flex-1 min-h-0 rounded-2xl border border-white/10 bg-black/20 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] overflow-hidden">
-          <div className="absolute left-4 top-4 z-20 flex flex-col gap-2">
+      <div className="ph-overlay-anchor">
+        <div className="ph-dock ph-dock-top">
+          <div className="ph-topbar">
+            <div className="ph-title">Program Health</div>
+            <div className="ph-controls">
+              <button
+                className="ph-btn"
+                disabled={!selectedAbsenceId || truthLoading}
+                onClick={() => openTruthForSelectedAbsence("truth")}
+                title={
+                  !selectedAbsenceId
+                    ? "Select an absence first"
+                    : truthLoading
+                      ? "Loading canonical truth…"
+                      : "Open truth view for selected absence"
+                }
+              >
+                {truthLoading ? "Loading…" : "Truth View"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div ref={leftDockRef} className="ph-dock ph-dock-left">
+          <div className="ph-glass ph-left-stack">
+            <div className="ph-left-head">
+              <div className="ph-left-subtitle">Capability Drift Map</div>
+            </div>
+
             {truthError ? (
-              <div className="rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-xs text-white/80">
-                {truthError}
-              </div>
+              <div className="ph-glass ph-error-pill">{truthError}</div>
             ) : null}
 
             <SelectionPill
@@ -329,14 +379,14 @@ export function ProgramHealthPage({
             />
 
             {hoveredAbsence ? (
-              <div className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-white/80">
+              <div className="ph-glass ph-hover-pill">
                 <span className="truncate">
                   {hoveredAbsence.capabilityLabel} • {hoveredAbsence.level}
                 </span>
               </div>
             ) : null}
 
-            <label className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/80">
+            <label className="ph-glass ph-toggle-pill">
               <input
                 type="checkbox"
                 checked={lineageHighlightOn}
@@ -346,36 +396,68 @@ export function ProgramHealthPage({
               <span>Lineage highlight</span>
             </label>
           </div>
+        </div>
 
-          <div className="h-full w-full">
-            <CapabilityDriftMap
-              capabilityNodes={model.capabilityNodes}
-              absences={model.absences}
-              selectedAbsenceId={selectedAbsenceId}
-              onSelect={setSelectedAbsenceId}
-              highlightAbsenceIds={lineageHighlightOn ? highlightAbsenceIds : []}
-              lineageNodeIds={lineageNodeIds}
-              showUnmapped={false}
-              onAbsenceHover={(_absenceId, summary) => setHoveredAbsence(summary)}
-              onAbsenceSelect={setSelectedAbsenceId}
-            />
+        {selectedAbsence ? (
+          <div className="ph-dock ph-dock-inspector">
+            <div className="ph-glass ph-inspector-card">
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-sm font-semibold text-white/90">{selectedCapabilityLabel}</div>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/70"
+                  onClick={() => setSelectedAbsenceId(null)}
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="mt-1 text-xs text-white/60">
+                {selectedAbsence.horizon ?? "—"} • {severityLabel(selectedAbsence.severity)}
+              </div>
+
+              <dl className="mt-3 space-y-2 text-xs">
+                <div>
+                  <dt className="text-white/50">canonical event</dt>
+                  <dd className="text-white/80">{shortId(selectedAbsence.canonical_event_id)}</dd>
+                </div>
+                <div>
+                  <dt className="text-white/50">emitted</dt>
+                  <dd className="text-white/80">{fmtTs(selectedAbsence.created_at)}</dd>
+                </div>
+                {selectedSummary ? (
+                  <div>
+                    <dt className="text-white/50">summary</dt>
+                    <dd className="text-white/80">{selectedSummary}</dd>
+                  </div>
+                ) : null}
+                {selectedAbsence.details?.capability_node_id ? (
+                  <div>
+                    <dt className="text-white/50">node</dt>
+                    <dd className="text-white/80">{selectedAbsence.details?.capability_node_id}</dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/80"
+                  onClick={() => openTruthForSelectedAbsence("truth")}
+                >
+                  Truth
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/80"
+                  onClick={() => openTruthForSelectedAbsence("causality")}
+                >
+                  Causality
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-black/10 px-3 py-2">
-          <HorizonTimeline
-            snapshot={snapshot}
-            selectedHorizon={selectedHorizon}
-            onSelectHorizon={setSelectedHorizon}
-            onOpenTruth={(h) => openTruthViewForSnapshot("truth", h)}
-            onOpenCausality={(h) => openTruthViewForSnapshot("causality", h)}
-            variant="rail"
-          />
-        </div>
-      </section>
-
-      <div className="fixed bottom-4 right-4 z-40 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white">
-        ProgramHealthPage LIVE
+        ) : null}
       </div>
 
       {truthViewOpen && truthModel ? (
@@ -386,64 +468,6 @@ export function ProgramHealthPage({
           initialTab={truthInitialTab}
           initialRootEventId={truthInitialRootEventId}
         />
-      ) : null}
-
-      {selectedAbsence ? (
-        <aside className="hidden lg:block fixed left-6 top-[140px] w-[300px] max-h-[calc(100vh-180px)] overflow-auto rounded-2xl border border-white/10 bg-black/30 backdrop-blur shadow-sm p-4 text-white/80 pointer-events-auto">
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-sm font-semibold text-white/90">{selectedCapabilityLabel}</div>
-            <button
-              type="button"
-              className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/70"
-              onClick={() => setSelectedAbsenceId(null)}
-            >
-              Clear
-            </button>
-          </div>
-          <div className="mt-1 text-xs text-white/60">
-            {selectedAbsence.horizon ?? "—"} • {severityLabel(selectedAbsence.severity)}
-          </div>
-
-          <dl className="mt-3 space-y-2 text-xs">
-            <div>
-              <dt className="text-white/50">canonical event</dt>
-              <dd className="text-white/80">{shortId(selectedAbsence.canonical_event_id)}</dd>
-            </div>
-            <div>
-              <dt className="text-white/50">emitted</dt>
-              <dd className="text-white/80">{fmtTs(selectedAbsence.created_at)}</dd>
-            </div>
-            {selectedSummary ? (
-              <div>
-                <dt className="text-white/50">summary</dt>
-                <dd className="text-white/80">{selectedSummary}</dd>
-              </div>
-            ) : null}
-            {selectedAbsence.details?.capability_node_id ? (
-              <div>
-                <dt className="text-white/50">node</dt>
-                <dd className="text-white/80">{selectedAbsence.details?.capability_node_id}</dd>
-              </div>
-            ) : null}
-          </dl>
-
-          <div className="mt-4 flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/80"
-              onClick={() => openTruthForSelectedAbsence("truth")}
-            >
-              Truth
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/80"
-              onClick={() => openTruthForSelectedAbsence("causality")}
-            >
-              Causality
-            </button>
-          </div>
-        </aside>
       ) : null}
     </main>
   );

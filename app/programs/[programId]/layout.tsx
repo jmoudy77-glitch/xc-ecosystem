@@ -232,7 +232,7 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
     >
       <div className="xc-program-shell bg-transparent">
       {/* Program hero header (non-negotiable for coach app) */}
-      <header className="relative z-[9999] border-b border-subtle panel-muted">
+      <header className="relative z-[9999] border-b border-subtle panel-muted relative z-50">
         <div className="flex w-full items-center justify-between px-4 py-3 lg:px-8">
               <div className="flex items-center gap-3">
                 {theme.logoUrl && (
@@ -262,8 +262,14 @@ export default async function ProgramLayout({ children, params }: LayoutProps) {
       </header>
 
       {/* Body: left menu + main content, program-scoped */}
-      <div className="flex w-full gap-4 bg-transparent px-4 py-4 lg:px-8">
-        <aside className="w-56 shrink-0 bg-transparent">
+      <div
+        className="flex w-full gap-4 bg-transparent px-4 py-4 lg:px-8"
+        style={{
+          ["--ph-nav-w" as any]: "224px",
+          ["--ph-gutter" as any]: "24px",
+        }}
+      >
+        <aside className="w-56 shrink-0 bg-transparent relative z-50">
           <ProgramNav />
         </aside>
 

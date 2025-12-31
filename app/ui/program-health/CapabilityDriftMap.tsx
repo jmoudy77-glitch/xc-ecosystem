@@ -1,11 +1,20 @@
 "use client";
 
 import * as React from "react";
-import type { ProgramHealthAbsence, ProgramHealthCapabilityNode } from "./types";
+import type {
+  Horizon,
+  ProgramHealthAbsence,
+  ProgramHealthCapabilityNode,
+  ProgramHealthSnapshot,
+} from "./types";
+import { HorizonGlyphRail } from "./HorizonGlyphRail";
 
 type Props = {
   capabilityNodes: ProgramHealthCapabilityNode[];
   absences: ProgramHealthAbsence[];
+  snapshot: ProgramHealthSnapshot | null;
+  selectedHorizon: Horizon;
+  onSelectHorizon: (h: Horizon) => void;
   selectedAbsenceId: string | null;
   onSelect: (absenceId: string) => void;
   highlightAbsenceIds?: string[];
@@ -26,11 +35,57 @@ function normalizeLevel(level: AbsenceLevelInput): AbsenceLevel {
   return "low";
 }
 
-const COLS = 6;
+const SECTORS = [
+  { key: "structure", label: "STRUCTURE" },
+  { key: "readiness", label: "READINESS" },
+  { key: "capacity", label: "CAPACITY" },
+  { key: "recovery", label: "RECOVERY" },
+  { key: "execution", label: "EXECUTION" },
+  { key: "resilience", label: "RESILIENCE" },
+] as const;
 
-function sevBucket(
-  severity: string | null | undefined
-): "critical" | "high" | "medium" | "low" | "unknown" {
+const SLICE_COUNT = 6;
+const SLICE_DEG = 360 / SLICE_COUNT;
+const READ_LINE_DEG = -55;
+const READ_MATH_OFFSET_DEG = -20;
+const DISC_RADIUS_PX = 440;
+
+const SECTOR_SUMMARY: Record<string, string> = {
+  STRUCTURE:
+    "Structural signals map the stability of the underlying system surface. Changes here indicate foundational shifts rather than transient fluctuations.",
+  READINESS:
+    "Readiness captures the system's immediate ability to respond under current conditions. The slice reflects posture and near-term activation state.",
+  CAPACITY:
+    "Capacity represents the available headroom across core resources. It tracks how much load the system can absorb without degradation.",
+  RECOVERY:
+    "Recovery summarizes how the system regains equilibrium after disturbances. It reflects return-to-baseline characteristics rather than momentary strain.",
+  EXECUTION:
+    "Execution tracks throughput and delivery coherence across the operational layer. It highlights how reliably the system is converting intent into action.",
+  RESILIENCE:
+    "Resilience reflects tolerance to stress and the ability to sustain function under pressure. The slice signals durability across adverse conditions.",
+};
+
+function hashStr(value: string) {
+  let h = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    h = (h * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function normalizeDeg(d: number): number {
+  return ((d % 360) + 360) % 360;
+}
+
+function sliceIndexUnderReadLine(rotationDeg: number): number {
+  // NOTE: The visible read line stays at READ_LINE_DEG.
+  // This offset rotates ONLY the math reference ray so the active slice flips on boundary crossing (axis lines).
+  const worldAngle = normalizeDeg((READ_LINE_DEG + READ_MATH_OFFSET_DEG) - rotationDeg);
+  const idx = Math.floor(worldAngle / SLICE_DEG) % SLICE_COUNT;
+  return (idx + SLICE_COUNT) % SLICE_COUNT;
+}
+
+function sevBucket(severity: string | null | undefined): "critical" | "high" | "medium" | "low" | "unknown" {
   const s = (severity ?? "").toLowerCase();
   if (s.includes("critical")) return "critical";
   if (s.includes("high")) return "high";
@@ -55,61 +110,177 @@ function horizonDepthClass(h: string | null | undefined) {
   return "hdepth-h1";
 }
 
-function RadialPlaneScaffold() {
+function RadialPlaneScaffold(props: { hoverHorizon: Horizon | null; activeSliceIdx: number }) {
   const center = 500;
-  const outerRadius = 440;
+  const outerRadius = DISC_RADIUS_PX;
   const ringRadii = [140, 240, 340, 440];
   const ringLabels = ["H0", "H1", "H2", "H3"];
-  const sectorLabels = ["STRUCTURE", "READINESS", "CAPACITY", "RECOVERY"];
-  const sectorAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+
+  const hoverBand = React.useMemo(() => {
+    const h = props.hoverHorizon;
+    if (!h) return null;
+
+    const band =
+      h === "H0"
+        ? { r: 70, w: 140 }
+        : h === "H1"
+        ? { r: 190, w: 100 }
+        : h === "H2"
+        ? { r: 290, w: 100 }
+        : { r: 390, w: 100 };
+
+    return (
+      <circle
+        cx={500}
+        cy={500}
+        r={band.r}
+        fill="none"
+        stroke="rgba(255,255,255,0.10)"
+        strokeWidth={band.w}
+        pointerEvents="none"
+      />
+    );
+  }, [props.hoverHorizon]);
 
   return (
-    <svg className="h-full w-full" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+    <svg
+      className="block h-full w-full"
+      viewBox="0 0 1000 1000"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ pointerEvents: "none" }}
+    >
       <defs>
+        {(() => {
+          const center = 500;
+          const outerRadius = 440;
+          const r = outerRadius - 6;
+          const wedge = 60;
+          const arcSpan = 44;
+
+          const makeArc = (i: number) => {
+            const mid = i * wedge + wedge / 2 + 30;
+            const a0 = (mid - arcSpan / 2) * (Math.PI / 180);
+            const a1 = (mid + arcSpan / 2) * (Math.PI / 180);
+
+            const round = (n: number) => Math.round(n * 1000) / 1000;
+
+            const x0 = round(center + r * Math.cos(a0));
+            const y0 = round(center + r * Math.sin(a0));
+            const x1 = round(center + r * Math.cos(a1));
+            const y1 = round(center + r * Math.sin(a1));
+
+            const d = `M ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1}`;
+            return { id: `ph-perim-arc-${i}`, d };
+          };
+
+          return Array.from({ length: 6 }, (_, i) => {
+            const a = makeArc(i);
+            return <path key={a.id} id={a.id} d={a.d} />;
+          });
+        })()}
         <radialGradient id="phRadialGlow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="rgba(120,200,255,0.18)" />
           <stop offset="55%" stopColor="rgba(120,200,255,0.06)" />
           <stop offset="100%" stopColor="rgba(120,200,255,0.0)" />
         </radialGradient>
+        <radialGradient id="phActiveSectorWash" cx="50%" cy="50%" r="72%">
+          <stop offset="0%" stopColor="color-mix(in oklab, transparent 88%, var(--brand) 12%)" />
+          <stop offset="55%" stopColor="color-mix(in oklab, transparent 90%, var(--brand) 10%)" />
+          <stop offset="100%" stopColor="transparent" />
+        </radialGradient>
       </defs>
 
+      {hoverBand}
       <circle cx={center} cy={center} r={outerRadius} fill="url(#phRadialGlow)" />
-      <circle
-        cx={center}
-        cy={center}
-        r={outerRadius}
-        fill="none"
-        stroke="rgba(255,255,255,0.18)"
-        strokeWidth="2"
-      />
+      {(() => {
+        const idx = ((props.activeSliceIdx % SLICE_COUNT) + SLICE_COUNT) % SLICE_COUNT;
+        const startDeg = idx * SLICE_DEG + 30;
+        const endDeg = startDeg + SLICE_DEG;
 
-      {ringRadii.map((r) => (
-        <circle
-          key={`ring-${r}`}
-          cx={center}
-          cy={center}
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.10)"
-          strokeWidth="2"
-        />
-      ))}
+        const a0 = (startDeg * Math.PI) / 180;
+        const a1 = (endDeg * Math.PI) / 180;
 
-      {sectorAngles.map((angle, i) => {
-        const x2 = center + outerRadius * Math.cos(angle);
-        const y2 = center + outerRadius * Math.sin(angle);
+        const round = (n: number) => Math.round(n * 1000) / 1000;
+
+        const x0 = round(center + outerRadius * Math.cos(a0));
+        const y0 = round(center + outerRadius * Math.sin(a0));
+        const x1 = round(center + outerRadius * Math.cos(a1));
+        const y1 = round(center + outerRadius * Math.sin(a1));
+
+        const d = `M ${center} ${center} L ${x0} ${y0} A ${outerRadius} ${outerRadius} 0 0 1 ${x1} ${y1} Z`;
+
         return (
-          <line
-            key={`spoke-${i}`}
-            x1={center}
-            y1={center}
-            x2={x2}
-            y2={y2}
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth="2"
+          <path
+            d={d}
+            className="ph-active-sector-wash"
+            fill="url(#phActiveSectorWash)"
+            pointerEvents="none"
           />
         );
-      })}
+      })()}
+
+      <g>
+        <circle
+          cx={center}
+          cy={center}
+          r={outerRadius}
+          fill="none"
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth="2"
+        />
+
+        {ringRadii.map((r) => (
+          <circle
+            key={`ring-${r}`}
+            cx={center}
+            cy={center}
+            r={r}
+            fill="none"
+            stroke="rgba(255,255,255,0.10)"
+            strokeWidth="2"
+          />
+        ))}
+
+        {/* Canonical tri-axes (0°, 60°, 120°) -> 6 equal wedges */}
+        {[0, 60, 120].map((deg) => (
+          <line
+            key={`axis-${deg}`}
+            x1={center}
+            y1={center - outerRadius}
+            x2={center}
+            y2={center + outerRadius}
+            transform={`rotate(${deg} ${center} ${center})`}
+            stroke="rgba(255,255,255,0.22)"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+
+        {(() => {
+          const labels = ["Structure", "Readiness", "Capacity", "Recovery", "Execution", "Resilience"];
+          return labels.map((label, i) => (
+            <text
+              key={`perim-${label}`}
+              fontSize={20}
+              letterSpacing={2}
+              fill="rgba(255,255,255,0.48)"
+              style={{ userSelect: "none" }}
+            >
+              <textPath
+                href={`#ph-perim-arc-${i}`}
+                xlinkHref={`#ph-perim-arc-${i}`}
+                startOffset="50%"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                method="align"
+                spacing="auto"
+              >
+                {label.toUpperCase()}
+              </textPath>
+            </text>
+          ));
+        })()}
+      </g>
 
       <circle
         cx={center}
@@ -142,25 +313,6 @@ function RadialPlaneScaffold() {
           {ringLabels[idx]}
         </text>
       ))}
-
-      {sectorLabels.map((label, idx) => {
-        const angle = (Math.PI / 4) + idx * (Math.PI / 2);
-        const x = center + 400 * Math.cos(angle);
-        const y = center + 400 * Math.sin(angle);
-        return (
-          <text
-            key={`sector-${label}`}
-            x={x}
-            y={y}
-            textAnchor="middle"
-            alignmentBaseline="middle"
-            fontSize="22"
-            fill="rgba(255,255,255,0.22)"
-          >
-            {label}
-          </text>
-        );
-      })}
     </svg>
   );
 }
@@ -168,6 +320,9 @@ function RadialPlaneScaffold() {
 export function CapabilityDriftMap({
   capabilityNodes,
   absences,
+  snapshot: _snapshot,
+  selectedHorizon,
+  onSelectHorizon,
   selectedAbsenceId,
   onSelect,
   highlightAbsenceIds,
@@ -176,22 +331,7 @@ export function CapabilityDriftMap({
   onAbsenceHover,
   onAbsenceSelect,
 }: Props) {
-  return (
-    <div className="ph-map-v1 ph-structural-truth relative h-full w-full overflow-hidden">
-      <div className="absolute left-4 bottom-4 z-50 rounded-md border border-white/20 bg-black/60 px-3 py-2 text-xs font-semibold text-white/80">
-        RADIAL R1 ACTIVE (CapabilityDriftMap.tsx)
-      </div>
-      <div className="absolute inset-0 z-0">
-        <RadialPlaneScaffold />
-      </div>
-      <div className="relative z-10" />
-    </div>
-  );
-
-  const highlightSet = React.useMemo(
-    () => new Set(highlightAbsenceIds ?? []),
-    [highlightAbsenceIds]
-  );
+  const highlightSet = React.useMemo(() => new Set(highlightAbsenceIds ?? []), [highlightAbsenceIds]);
   const lineageSet = React.useMemo(() => new Set(lineageNodeIds ?? []), [lineageNodeIds]);
 
   const nodes = React.useMemo(() => {
@@ -207,6 +347,19 @@ export function CapabilityDriftMap({
   const nodeIndexById = React.useMemo(() => {
     const m = new Map<string, number>();
     nodes.forEach((n, i) => m.set(n.id, i));
+    return m;
+  }, [nodes]);
+
+  const nodesBySector = React.useMemo(() => {
+    const m = new Map<string, ProgramHealthCapabilityNode[]>();
+    SECTORS.forEach((s) => m.set(s.key, []));
+    nodes.forEach((n) => {
+      const idx = hashStr(String(n.id)) % SECTORS.length;
+      const key = SECTORS[idx].key;
+      const arr = m.get(key) ?? [];
+      arr.push(n);
+      m.set(key, arr);
+    });
     return m;
   }, [nodes]);
 
@@ -249,9 +402,76 @@ export function CapabilityDriftMap({
     return { mapped: m, unmapped };
   }, [absences, nodeIndexById]);
 
-  const rows = Math.max(1, Math.ceil(nodes.length / COLS));
   const hasSelection = Boolean(selectedAbsenceId);
   const planeRef = React.useRef<HTMLDivElement | null>(null);
+  const discStageRef = React.useRef<HTMLDivElement | null>(null);
+
+  const [discSpinDeg, setDiscSpinDeg] = React.useState(0);
+  const [hoverHorizon, setHoverHorizon] = React.useState<Horizon | null>(null);
+  const [horizonPanelOpen, setHorizonPanelOpen] = React.useState(false);
+  const [panelHorizon, setPanelHorizon] = React.useState<Horizon>("H0");
+
+  const activeHorizon = hoverHorizon ?? selectedHorizon;
+  const isPinnedByClick = hoverHorizon == null;
+
+  const handleHorizonHover = React.useCallback((h: Horizon | null) => {
+    setHoverHorizon(h);
+  }, []);
+
+  const handleHorizonClick = React.useCallback(
+    (h: Horizon) => {
+      onSelectHorizon(h);
+      setPanelHorizon(h);
+      setHorizonPanelOpen((prev) => {
+        if (prev && panelHorizon === h) return false;
+        return true;
+      });
+    },
+    [onSelectHorizon, panelHorizon]
+  );
+
+  const computeHorizonFromDisc = React.useCallback(
+    (evt: React.PointerEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>): Horizon | null => {
+      const el = discStageRef.current;
+      if (!el) return null;
+
+      const rect = el.getBoundingClientRect();
+
+      // Convert to 0..1000 "viewBox-like" coordinates, matching RadialPlaneScaffold math.
+      const px = ((evt.clientX - rect.left) / rect.width) * 1000;
+      const py = ((evt.clientY - rect.top) / rect.height) * 1000;
+
+      const dx = px - 500;
+      const dy = py - 500;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist <= 140) return "H0";
+      if (dist <= 240) return "H1";
+      if (dist <= 340) return "H2";
+      if (dist <= 440) return "H3";
+      return null;
+    },
+    []
+  );
+
+  const lastHoverRef = React.useRef<Horizon | null>(null);
+
+  React.useEffect(() => {
+    const el = planeRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY;
+      setDiscSpinDeg((prev) => {
+        const next = prev + delta * 0.08;
+        return ((next % 360) + 360) % 360;
+      });
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel as EventListener);
+  }, []);
 
   React.useLayoutEffect(() => {
     const plane = planeRef.current;
@@ -266,12 +486,10 @@ export function CapabilityDriftMap({
       if (lineageSet.size < 2) return;
 
       const planeRect = plane.getBoundingClientRect();
-      const plates = Array.from(plane.querySelectorAll<HTMLElement>("[data-node-id]")).filter(
-        (el) => {
-          const id = el.dataset.nodeId ?? "";
-          return lineageSet.has(id);
-        }
-      );
+      const plates = Array.from(plane.querySelectorAll<HTMLElement>("[data-node-id]")).filter((el) => {
+        const id = el.dataset.nodeId ?? "";
+        return lineageSet.has(id);
+      });
 
       if (plates.length < 2) return;
 
@@ -309,148 +527,297 @@ export function CapabilityDriftMap({
         <div>
           <div className="ph-panel-title">Capability Drift Map</div>
         </div>
-
-        <div className="ph-map-v1-legend">
-          <div className="ph-legend-chip">
-            <span className="ph-sev-dot critical" /> critical
-          </div>
-          <div className="ph-legend-chip">
-            <span className="ph-sev-dot high" /> high
-          </div>
-          <div className="ph-legend-chip">
-            <span className="ph-sev-dot medium" /> medium
-          </div>
-          <div className="ph-legend-chip">
-            <span className="ph-sev-dot low" /> low
-          </div>
-        </div>
       </div>
 
-      <div
-        ref={planeRef}
-        className={["ph-plane", "ph-mat", hasSelection ? "has-selection" : ""].join(" ")}
-      >
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
-            backgroundSize: "180px 148px",
-            opacity: 0.06,
-          }}
-        />
-        <div className="pointer-events-none absolute left-3 top-2 text-[10px] uppercase tracking-[0.2em] text-white/20">
-          Capability Axis
-        </div>
-        <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] uppercase tracking-[0.2em] text-white/20">
-          Depth / Horizon
-        </div>
-        <div
-          className="ph-plane-canvas"
-          style={{
-            gridTemplateColumns: `repeat(${COLS}, minmax(180px, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, 148px)`,
-          }}
-        >
-          {nodes.map((n) => {
-            const nodeAbsences = absencesByNodeId.mapped.get(n.id) ?? [];
-            const isFocusedCell = nodeAbsences.some((a) => a.id === selectedAbsenceId);
-
-            return (
+      <div className="ph-map-root">
+        <div ref={planeRef} className="ph-map-plane">
+          <div className="ph-radial-viewport">
+            <div
+              ref={discStageRef}
+              className="ph-disc-stage"
+              onPointerMoveCapture={(evt) => {
+                const h = computeHorizonFromDisc(evt);
+                if (lastHoverRef.current !== h) {
+                  lastHoverRef.current = h;
+                  handleHorizonHover(h);
+                }
+              }}
+              onPointerLeave={() => {
+                lastHoverRef.current = null;
+                handleHorizonHover(null);
+              }}
+              onClickCapture={(evt) => {
+                const h = computeHorizonFromDisc(evt);
+                if (h) handleHorizonClick(h);
+              }}
+              style={{ cursor: hoverHorizon ? "pointer" : "default" }}
+            >
+              {/*<div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: "50%",
+                  width: `${DISC_RADIUS_PX}px`,
+                  height: "1px",
+                  background: "rgba(255,255,255,0.28)",
+                  transformOrigin: "0 50%",
+                  transform: `rotate(${READ_LINE_DEG}deg) translateX(0)`,
+                  pointerEvents: "none",
+                }}
+              />*/}
               <div
-                key={n.id}
-                id={`ph-node-${n.id}`}
-                data-node-id={n.id}
-                className={[
-                  "ph-node-cell",
-                  "ph-node-plate",
-                  isFocusedCell ? "is-focused" : "",
-                  hasSelection && !isFocusedCell ? "is-dimmed" : "",
-                ].join(" ")}
+                className="ph-disc-tilt"
+                style={
+                  {
+                    ["--ph-disc-spin" as any]: `${discSpinDeg}deg`,
+                  } as React.CSSProperties
+                }
               >
-                <div className="ph-node-cell-header">
-                  <div className="ph-node-name" title={n.name}>
-                    {n.name}
-                  </div>
-                  <div className="ph-node-code ph-mono" title={n.node_code}>
-                    {n.node_code}
-                  </div>
-                </div>
+                {(() => {
+                  const activeIdx = sliceIndexUnderReadLine(discSpinDeg);
+                  return <RadialPlaneScaffold hoverHorizon={hoverHorizon} activeSliceIdx={activeIdx} />;
+                })()}
 
-                <div className="ph-node-holes ph-node-holes-plane">
-                  {nodeAbsences.length === 0 ? (
-                    <div className="ph-node-empty">—</div>
-                  ) : (
-                    nodeAbsences.slice(0, 4).map((a, idx) => {
-                      const sev = sevBucket(a.severity);
-                      const size = sizeBucket(sev);
-                      const lvl = normalizeLevel(sev);
-                      const isSelected = selectedAbsenceId === a.id;
-                      const isHighlighted = highlightSet.has(a.id) && !isSelected;
-                      const depthCls = horizonDepthClass(a.horizon);
+                <div className="ph-radial-layer absolute inset-0">
+                  {SECTORS.map((sector, sectorIndex) => {
+                    const angleStart = (sectorIndex * 360) / SECTORS.length;
+                    const sectorNodes = nodesBySector.get(sector.key) ?? [];
 
-                      const offsetCls = `ph-hole-pos-${idx}`;
+                    return (
+                      <div key={sector.key} className="absolute inset-0" style={{ transform: `rotate(${angleStart}deg)` }}>
+                        {sectorNodes.map((n, idx) => {
+                          const nodeAbsences = absencesByNodeId.mapped.get(n.id) ?? [];
+                          const isFocusedCell = nodeAbsences.some((a) => a.id === selectedAbsenceId);
+                          const count = Math.max(1, sectorNodes.length);
+                          const r = 200 + (idx % 4) * 40;
+                          const thetaWithinSector = (idx / count) * (360 / SECTORS.length);
+                          const finalAngle = angleStart + thetaWithinSector;
 
-                      const cls = [
-                        "ph-hole",
-                        "ph-hole-v2",
-                        `sev-${sev}`,
-                        `size-${size}`,
-                        depthCls,
-                        offsetCls,
-                        isSelected ? "is-selected" : "",
-                        isHighlighted ? "is-highlighted" : "",
-                      ].join(" ");
+                          return (
+                            <div
+                              key={n.id}
+                              id={`ph-node-${n.id}`}
+                              data-node-id={n.id}
+                              className={[
+                                "ph-node-cell",
+                                "ph-node-plate",
+                                "ph-node-radial",
+                                isFocusedCell ? "is-focused" : "",
+                                hasSelection && !isFocusedCell ? "is-dimmed" : "",
+                              ].join(" ")}
+                              style={{
+                                position: "absolute",
+                                left: "50%",
+                                top: "50%",
+                                transform: `rotate(${finalAngle}deg) translateX(${r}px) rotate(-${finalAngle}deg)`,
+                              }}
+                            >
+                              <div className="ph-node-cell-header">
+                                <div className="ph-node-name" title={n.name}>
+                                  {n.name}
+                                </div>
+                                <div className="ph-node-code ph-mono" title={n.node_code}>
+                                  {n.node_code}
+                                </div>
+                              </div>
 
-                      const handleSelect = () => {
-                        if (onAbsenceSelect) {
-                          onAbsenceSelect(a.id);
-                          return;
-                        }
-                        onSelect(a.id);
-                      };
+                              <div className="ph-node-holes ph-node-holes-plane">
+                                {nodeAbsences.slice(0, 4).map((a, holeIdx) => {
+                                  const sev = sevBucket(a.severity);
+                                  const size = sizeBucket(sev);
+                                  const lvl = normalizeLevel(sev);
+                                  const isSelected = selectedAbsenceId === a.id;
+                                  const isHighlighted = highlightSet.has(a.id) && !isSelected;
+                                  const depthCls = horizonDepthClass(a.horizon);
 
-                      return (
-                        <button
-                          key={a.id}
-                          type="button"
-                          className={cls}
-                          onClick={handleSelect}
-                          onMouseEnter={() => {
-                            if (!onAbsenceHover) return;
-                            onAbsenceHover(a.id, {
-                              capabilityLabel: n.name ?? n.node_code ?? "Unknown capability",
-                              level: lvl,
-                            });
-                          }}
-                          onMouseLeave={() => {
-                            onAbsenceHover?.(null, null);
-                          }}
-                        >
-                          <span className="ph-hole-rim" />
-                          <span className="ph-hole-void" />
-                          <span className="ph-hole-below" />
-                        </button>
-                      );
-                    })
-                  )}
+                                  const offsetCls = `ph-hole-pos-${holeIdx}`;
 
-                  {nodeAbsences.length > 4 ? (
-                    <div className="ph-node-more ph-mono">+{nodeAbsences.length - 4}</div>
-                  ) : null}
+                                  const cls = [
+                                    "ph-hole",
+                                    "ph-hole-v2",
+                                    `sev-${sev}`,
+                                    `size-${size}`,
+                                    depthCls,
+                                    offsetCls,
+                                    isSelected ? "is-selected" : "",
+                                    isHighlighted ? "is-highlighted" : "",
+                                  ].join(" ");
+
+                                  const handleSelect = () => {
+                                    if (onAbsenceSelect) {
+                                      onAbsenceSelect(a.id);
+                                      return;
+                                    }
+                                    onSelect(a.id);
+                                  };
+
+                                  return (
+                                    <button
+                                      key={a.id}
+                                      type="button"
+                                      className={cls}
+                                      onClick={handleSelect}
+                                      onMouseEnter={() => {
+                                        if (!onAbsenceHover) return;
+                                        onAbsenceHover(a.id, {
+                                          capabilityLabel: n.name ?? n.node_code ?? "Unknown capability",
+                                          level: lvl,
+                                        });
+                                      }}
+                                      onMouseLeave={() => {
+                                        onAbsenceHover?.(null, null);
+                                      }}
+                                    >
+                                      <span className="ph-hole-rim" />
+                                      <span className="ph-hole-void" />
+                                      <span className="ph-hole-below" />
+                                    </button>
+                                  );
+                                })}
+
+                                {nodeAbsences.length > 4 ? (
+                                  <div className="ph-node-more ph-mono">+{nodeAbsences.length - 4}</div>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
 
-        {lineageSet.size > 0 ? (
-          <div className="ph-lineage-overlay" aria-hidden="true">
-            <svg className="ph-lineage-svg" />
+            <div className="ph-map-overlay">
+              <div className="ph-stamp">R3.0 RADIAL COORDINATE SYSTEM LIVE</div>
+              <div className="ph-legend">
+                <div className="ph-legend-chip">
+                  <span className="ph-sev-dot critical" /> critical
+                </div>
+                <div className="ph-legend-chip">
+                  <span className="ph-sev-dot high" /> high
+                </div>
+                <div className="ph-legend-chip">
+                  <span className="ph-sev-dot medium" /> medium
+                </div>
+                <div className="ph-legend-chip">
+                  <span className="ph-sev-dot low" /> low
+                </div>
+              </div>
+            </div>
+
+            {(() => {
+              const rotationDeg = discSpinDeg;
+              const activeIdx = sliceIndexUnderReadLine(rotationDeg);
+              const activeSector = SECTORS[activeIdx];
+              const summary = SECTOR_SUMMARY[activeSector.label] ?? "";
+              const readLineRad = (READ_LINE_DEG * Math.PI) / 180;
+              const tipX = Math.cos(readLineRad) * DISC_RADIUS_PX;
+              const tipY = Math.sin(readLineRad) * DISC_RADIUS_PX;
+
+              return (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `calc(50% + ${tipX + 200}px)`,
+                    top: `calc(50% + ${tipY + 120}px)`,
+                    transform: "translate(-100%, -100%)",
+                    width: "280px",
+                    pointerEvents: "auto",
+                    background: "rgba(0,0,0,0.52)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: "14px",
+                    padding: "12px",
+                    color: "rgba(255,255,255,0.86)",
+                    zIndex: 6,
+                  }}
+                >
+                  <div style={{ fontSize: "12px", letterSpacing: "0.18em", textTransform: "uppercase" }}>
+                    {activeSector.label}
+                  </div>
+                  <div style={{ marginTop: "8px", fontSize: "12px", lineHeight: 1.5 }}>
+                    {summary}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div
+              className="ph-horizon-rail-bottom"
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: "143px",
+                transform: "translateX(-50%)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "10px",
+                pointerEvents: "auto",
+                zIndex: 7,
+              }}
+            >
+              {horizonPanelOpen ? (
+                <div
+                  style={{
+                    width: "820px",
+                    maxWidth: "calc(100vw - 48px)",
+                    background: "rgba(0,0,0,0.52)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: "16px",
+                    padding: "14px",
+                    color: "rgba(255,255,255,0.86)",
+                    boxShadow: "0 16px 60px rgba(0,0,0,0.45)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        letterSpacing: "0.18em",
+                        textTransform: "uppercase",
+                        color: "rgba(255,255,255,0.65)",
+                      }}
+                    >
+                      Horizon Analysis
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setHorizonPanelOpen(false)}
+                      style={{
+                        fontSize: "12px",
+                        color: "rgba(255,255,255,0.70)",
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "999px",
+                        padding: "6px 10px",
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: "10px", fontSize: "13px", lineHeight: 1.5, color: "rgba(255,255,255,0.78)" }}>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.90)" }}>{panelHorizon} — (placeholder)</div>
+                    <div style={{ marginTop: "6px" }}>
+                      This panel is intentionally placeholder. R4 requires only physical layout + interaction surfaces.
+                      Runtime truth wiring will be added after this rail is locked.
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <HorizonGlyphRail activeHorizon={activeHorizon} pinnedHorizon={selectedHorizon} isPinnedByClick={isPinnedByClick} />
+            </div>
+
+            {lineageSet.size > 0 ? (
+              <div className="ph-lineage-overlay z-30" aria-hidden="true">
+                <svg className="ph-lineage-svg" />
+              </div>
+            ) : null}
           </div>
-        ) : null}
-
-        <div className="ph-plane-vignette" aria-hidden="true" />
+        </div>
       </div>
 
       {showUnmapped && absencesByNodeId.unmapped.length > 0 ? (
@@ -472,13 +839,7 @@ export function CapabilityDriftMap({
                 <button
                   key={a.id}
                   type="button"
-                  className={[
-                    "ph-void-token",
-                    `sev-${sev}`,
-                    `size-${size}`,
-                    depthCls,
-                    active ? "is-selected" : "",
-                  ].join(" ")}
+                  className={["ph-void-token", `sev-${sev}`, `size-${size}`, depthCls, active ? "is-selected" : ""].join(" ")}
                   onClick={() => {
                     if (onAbsenceSelect) {
                       onAbsenceSelect(a.id);

@@ -30,10 +30,7 @@ export function SelectionPill({
   if (!selectedAbsence) {
     return (
       <div className="ph-selection-pill is-empty" role="status" aria-live="polite">
-        <div className="ph-selection-left">
-          <div className="ph-selection-title">Selection</div>
-          <div className="ph-selection-body ph-muted">None selected.</div>
-        </div>
+        <div className="ph-selection-body">No selection</div>
       </div>
     );
   }

@@ -1,0 +1,16 @@
+MB-1 Visual Plate Placeholder
+
+Replace this placeholder with the frozen PNG render of the Program Health Disc
+that visually represents:
+
+• Graphite ice saucer body
+• NOW-weighted thickness
+• Saucer rim falloff
+• Icy rim lift highlight
+• Grounding shadow mass
+
+Filename must remain:
+
+mb-1_program_health_disc_plate.png
+
+This placeholder preserves canonical anchoring until the real plate is dropped.

@@ -651,7 +651,10 @@ export function CapabilityDriftMap({
                   } as React.CSSProperties
                 }
               >
-                {(() => {
+                                <div className="ph-disc-sidewall" aria-hidden />
+                <div className="ph-disc-sidewallCore" aria-hidden />
+                <div className="ph-disc-saucer" aria-hidden />
+{(() => {
                   const activeIdx = sliceIndexUnderReadLine(discSpinDeg);
                   return <RadialPlaneScaffold hoverHorizon={hoverHorizon} activeSliceIdx={activeIdx} />;
                 })()}

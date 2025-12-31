@@ -770,8 +770,17 @@
 }
 
 .ph-active-sector-wash {
-  opacity: 0.32;
+  opacity: 0.30;
   transition: opacity 180ms ease;
+}
+
+@keyframes ph-ray-enter {
+  from { opacity: 0; }
+  to { opacity: 0.30; }
+}
+
+.ph-active-sector-wash.ph-ray-enter {
+  animation: ph-ray-enter 280ms ease-out;
 }
 
 .ph-disc-root {

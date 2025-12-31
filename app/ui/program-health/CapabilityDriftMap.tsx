@@ -184,8 +184,8 @@ function RadialPlaneScaffold(props: { hoverHorizon: Horizon | null; activeSliceI
           <stop offset="100%" stopColor="rgba(120,200,255,0.0)" />
         </radialGradient>
         <radialGradient id="phActiveSectorWash" cx="50%" cy="50%" r="72%">
-          <stop offset="0%" stopColor="color-mix(in oklab, transparent 88%, var(--brand) 12%)" />
-          <stop offset="55%" stopColor="color-mix(in oklab, transparent 90%, var(--brand) 10%)" />
+          <stop offset="0%" stopColor="color-mix(in oklab, transparent 78%, var(--brand) 22%)" />
+          <stop offset="55%" stopColor="color-mix(in oklab, transparent 84%, var(--brand) 16%)" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
       </defs>
@@ -211,8 +211,9 @@ function RadialPlaneScaffold(props: { hoverHorizon: Horizon | null; activeSliceI
 
         return (
           <path
+            key={`ph-active-sector-wash-${idx}`}
             d={d}
-            className="ph-active-sector-wash"
+            className="ph-active-sector-wash ph-ray-enter"
             fill="url(#phActiveSectorWash)"
             pointerEvents="none"
           />

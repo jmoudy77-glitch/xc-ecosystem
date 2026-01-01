@@ -1,0 +1,5 @@
+BEGIN PROMOTION
+SURFACE runtime.forge.execute
+TARGET season_code=2024_XC
+ACTION forge
+END PROMOTION

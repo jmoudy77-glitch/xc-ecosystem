@@ -1,0 +1,5 @@
+BEGIN PROMOTION
+SURFACE season.ingest.open
+TARGET season_code=2024_XC
+ACTION open
+END PROMOTION

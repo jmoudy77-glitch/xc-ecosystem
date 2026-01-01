@@ -4,10 +4,24 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+async function getGenesisRuntimeId(): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("runtimes")
+    .select("id")
+    .eq("runtime_type", "genesis")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("genesis runtime not found");
+  return data.id;
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const maxJobs = Math.min(Math.max(Number(body.maxJobs ?? 20), 1), 200);
 
+  const runtime_id = await getGenesisRuntimeId();
   const locker = `api:${process.env.VERCEL_REGION ?? "local"}:${process.pid}`;
 
   const toErrorJson = (e: any) => {
@@ -47,6 +61,7 @@ export async function POST(req: NextRequest) {
         .from("performance_compute_runs")
         .insert([
           {
+            runtime_id,
             queue_id: job.id,
             scope_type: job.scope_type,
             scope_id: job.scope_id,
@@ -76,6 +91,7 @@ export async function POST(req: NextRequest) {
       const { error: closeErr } = await supabaseAdmin
         .from("performance_compute_runs")
         .update({ status: "partial", finished_at: new Date().toISOString() })
+        .eq("runtime_id", runtime_id)
         .eq("id", run.id);
       if (closeErr) throw closeErr;
 
@@ -101,6 +117,7 @@ export async function POST(req: NextRequest) {
             error_json: errJson,
             finished_at: new Date().toISOString(),
           })
+          .eq("runtime_id", runtime_id)
           .eq("id", run.id);
       }
 

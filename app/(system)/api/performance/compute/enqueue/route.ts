@@ -4,7 +4,21 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+async function getGenesisRuntimeId(): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("runtimes")
+    .select("id")
+    .eq("runtime_type", "genesis")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("genesis runtime not found");
+  return data.id;
+}
+
 export async function POST(req: NextRequest) {
+  const runtime_id = await getGenesisRuntimeId();
   const toErrorJson = (e: any) => {
     const out: any = {
       message: e?.message ?? String(e),
@@ -26,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from("performance_compute_queue")
-      .insert([{ scope_type, scope_id, reason, details_json }])
+      .insert([{ runtime_id, scope_type, scope_id, reason, details_json }])
       .select("*")
       .single();
 

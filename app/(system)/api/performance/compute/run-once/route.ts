@@ -317,7 +317,7 @@ export async function POST(req: NextRequest) {
     if (primeRows.length > 0) {
       const { error: upsertErr } = await supabaseAdmin
         .from("performance_primes")
-        .upsert(primeRows, { onConflict: "ruleset_id,performance_id" });
+    .upsert(primeRows, { onConflict: "runtime_id,ruleset_id,performance_id" });
       if (upsertErr) throw upsertErr;
       upserted = primeRows.length;
     }
@@ -578,9 +578,9 @@ export async function POST(req: NextRequest) {
 
           const { error: rollupUpsertErr } = await supabaseAdmin
             .from("team_performance_rollups")
-            .upsert(rollupRow, {
-              onConflict: "ruleset_id,subject_type,subject_id,lens_code",
-            });
+    .upsert(rollupRow, {
+      onConflict: "runtime_id,ruleset_id,subject_type,subject_id,lens_code",
+    });
           if (rollupUpsertErr) throw rollupUpsertErr;
 
           rollupUpserted += 1;

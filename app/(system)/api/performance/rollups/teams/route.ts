@@ -1,6 +1,20 @@
 // app/(system)/api/performance/rollups/teams/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+async function getGenesisRuntimeId(): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("runtimes")
+    .select("id")
+    .eq("runtime_type", "genesis")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("genesis runtime not found");
+  return data.id;
+}
 
 /**
  * Team Performance Rollups (v1)
@@ -69,6 +83,7 @@ export async function GET(req: NextRequest) {
     const rawLimit = url.searchParams.get("limit");
     const limit = Math.min(Math.max(parseInt(rawLimit || "50", 10) || 50, 1), 100);
 
+    const runtime_id = await getGenesisRuntimeId();
     const { supabase } = await supabaseServer(req);
 
     // Auth gate (RLS should also enforce, but we fail fast with a clean message)
@@ -109,6 +124,7 @@ export async function GET(req: NextRequest) {
       let qb = supabase
         .from("performance_balance_snapshots")
         .select("*")
+        .eq("runtime_id", runtime_id)
         .eq("program_id", programId)
         .eq("prime_ruleset_code", rulesetCode)
         .order("computed_at", { ascending: false })
@@ -172,6 +188,7 @@ export async function GET(req: NextRequest) {
       .from("performance_prime_rulesets")
       .select("id, ruleset_code")
       .eq("ruleset_code", rulesetCode)
+      .eq("runtime_id", runtime_id)
       .maybeSingle();
 
     if (rulesetErr) {

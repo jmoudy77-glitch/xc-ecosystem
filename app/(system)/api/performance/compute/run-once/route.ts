@@ -6,8 +6,22 @@ import crypto from "crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+async function getGenesisRuntimeId(): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("runtimes")
+    .select("id")
+    .eq("runtime_type", "genesis")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("genesis runtime not found");
+  return data.id;
+}
+
 export async function POST(req: NextRequest) {
   void req;
+  const runtime_id = await getGenesisRuntimeId();
   const locker = `api:${process.env.VERCEL_REGION ?? "local"}:${process.pid}`;
 
   // Track state so we can reliably fail the job/run on any thrown error.
@@ -46,6 +60,7 @@ export async function POST(req: NextRequest) {
       .from("performance_compute_runs")
       .insert([
         {
+          runtime_id,
           queue_id: job.id,
           scope_type: job.scope_type,
           scope_id: job.scope_id,
@@ -687,6 +702,7 @@ export async function POST(req: NextRequest) {
           ) >= 0.35;
 
         const snapshotRow: any = {
+          runtime_id,
           program_id: scopeId,
           team_id: null,
           team_season_id: null,

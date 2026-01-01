@@ -1,0 +1,6 @@
+BEGIN PROMOTION
+SURFACE season.bind.athlete.attach
+TARGET season_code=2024_XC
+ATHLETE 53f8eeaf-8d78-42b5-b383-483117922f2a
+LABEL "Liam Rodriguez"
+END PROMOTION

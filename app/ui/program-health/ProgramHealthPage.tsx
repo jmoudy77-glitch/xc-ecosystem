@@ -1,3 +1,5 @@
+// FILE: app/ui/program-health/ProgramHealthPage.tsx
+
 "use client";
 
 import * as React from "react";
@@ -10,7 +12,6 @@ import { readLinkedCanonicalEventIds } from "@/app/actions/program-health/readLi
 import "./styles.css";
 
 import { SelectionPill } from "./SelectionPill";
-
 
 function collectCapabilityNodeIds(value: unknown, ids: Set<string>) {
   if (!value) return;
@@ -57,6 +58,7 @@ export function ProgramHealthPage({
     capabilityLabel: string;
     level: "critical" | "high" | "medium" | "low";
   } | null>(null);
+
   const leftDockRef = React.useRef<HTMLDivElement | null>(null);
   const [discTopPx, setDiscTopPx] = React.useState<number | null>(null);
 
@@ -102,12 +104,7 @@ export function ProgramHealthPage({
   const selectedSummary = React.useMemo(() => {
     if (!selectedAbsence) return null;
     const details = (selectedAbsence.details ?? {}) as any;
-    const summary =
-      details?.summary ??
-      details?.reason ??
-      details?.message ??
-      details?.description ??
-      null;
+    const summary = details?.summary ?? details?.reason ?? details?.message ?? details?.description ?? null;
     return typeof summary === "string" ? summary : null;
   }, [selectedAbsence]);
 
@@ -127,10 +124,7 @@ export function ProgramHealthPage({
       }
 
       try {
-        const adjacency = await readLinkedCanonicalEventIds(
-          programId,
-          selectedAbsence.canonical_event_id
-        );
+        const adjacency = await readLinkedCanonicalEventIds(programId, selectedAbsence.canonical_event_id);
 
         const eventIdSet = new Set(adjacency.linkedEventIds);
         const ids = model.absences
@@ -160,10 +154,7 @@ export function ProgramHealthPage({
       }
 
       try {
-        const graph = await readCanonicalEventGraph(
-          programId,
-          selectedAbsence.canonical_event_id
-        );
+        const graph = await readCanonicalEventGraph(programId, selectedAbsence.canonical_event_id);
 
         const ids = new Set<string>();
         if ((selectedAbsence.details as any)?.capability_node_id) {
@@ -190,6 +181,7 @@ export function ProgramHealthPage({
     };
   }, [programId, selectedAbsence]);
 
+  // Disc vertical placement hook (used by styles.css via --ph-disc-top)
   React.useEffect(() => {
     const measure = () => {
       const el = leftDockRef.current;
@@ -312,6 +304,15 @@ export function ProgramHealthPage({
     setTruthInitialRootEventId(undefined);
   }
 
+  console.log("[PH UI]", {
+    programId,
+    nodeCount: model.capabilityNodes?.length ?? 0,
+    absenceCount: model.absences?.length ?? 0,
+    firstAbsenceNodeId:
+      (model.absences?.[0] as any)?.capabilityNodeId ??
+      ((model.absences?.[0] as any)?.details?.capability_node_id ?? null),
+  });
+
   return (
     <main
       className="ph-root ph-field"
@@ -367,9 +368,7 @@ export function ProgramHealthPage({
               <div className="ph-left-subtitle">Capability Drift Map</div>
             </div>
 
-            {truthError ? (
-              <div className="ph-glass ph-error-pill">{truthError}</div>
-            ) : null}
+            {truthError ? <div className="ph-glass ph-error-pill">{truthError}</div> : null}
 
             <SelectionPill
               selectedAbsence={selectedAbsence}

@@ -1,3 +1,5 @@
+/* FILE: app/ui/program-health/styles.css */
+
 .ph-root{
   width: 100%;
   max-width: none;
@@ -35,25 +37,6 @@
   }
 }
 
-@media (max-width: 1100px){
-  .ph-body{
-  display:grid;
-  grid-template-columns: minmax(680px, 1fr) 420px;
-  gap: 18px;
-  align-items: start;
-
-  /* Critical: occupy the viewport so the “instrument” has gravity */
-  min-height: calc(100vh - 210px);
-}
-@media (max-width: 1100px){
-  .ph-body{
-    grid-template-columns: 1fr;
-    min-height: unset;
-  }
-}
-
-}
-
 .ph-main{
   min-width: 0;
   display:flex;
@@ -78,23 +61,6 @@
     max-height: unset;
     overflow: visible;
   }
-}
-
-@media (min-width: 1101px){
-  .ph-side{
-  min-width: 0;
-  /* Rail behavior: sticky + scroll within rail instead of pushing page height */
-  max-height: calc(100vh - 210px);
-  overflow: auto;
-  padding-right: 2px;
-}
-@media (max-width: 1100px){
-  .ph-side{
-    max-height: unset;
-    overflow: visible;
-  }
-}
-
 }
 
 .ph-inspector { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
@@ -752,6 +718,7 @@
   z-index: 1;
 }
 
+
 .ph-disc-tilt {
   width: 100%;
   height: 100%;
@@ -819,6 +786,7 @@
   min-height: calc(100vh - var(--ph-header-h));
   padding-top: var(--ph-header-h);
   overflow: hidden;
+  /* Restore prior baseline: larger disc + lifted translate so the instrument is in-frame at rest */
   --ph-disc-size: 95vmin;
   --ph-disc-translate-x: -55%;
   --ph-disc-translate-y: -58%;
@@ -949,6 +917,48 @@
   box-shadow: 0 10px 40px rgba(0,0,0,0.35);
   padding: 12px;
 }
+
+/* ---------------------------------------------------------
+   R4.1 — Instrument Sovereignty: No Slab/Card Ecology In Field
+   Rule:
+   - The field plane is an instrument surface, not a dashboard.
+   - Slab UI (cards/panels/grids) may exist ONLY inside docks.
+--------------------------------------------------------- */
+
+/* Hard ban any slab/card constructs from rendering inside the field plane. */
+.ph-field-plane .ph-panel,
+.ph-field-plane .ph-card,
+.ph-field-plane .ph-section,
+.ph-field-plane .ph-grid,
+.ph-field-plane .ph-depth-grid,
+.ph-field-plane .ph-depth-card,
+.ph-field-plane .ph-void-token-grid,
+.ph-field-plane .ph-void-token,
+.ph-field-plane .ph-truth,
+.ph-field-plane .ph-truth-row,
+.ph-field-plane .ph-unmapped,
+.ph-field-plane .ph-unmapped-row {
+  display: none !important;
+}
+
+/* Explicit allow-list: slab/card constructs are permitted inside docks only. */
+.ph-dock .ph-panel,
+.ph-dock .ph-card,
+.ph-dock .ph-section,
+.ph-dock .ph-grid,
+.ph-dock .ph-depth-grid,
+.ph-dock .ph-void-token-grid,
+.ph-dock .ph-truth,
+.ph-dock .ph-unmapped {
+  display: block !important;
+}
+
+/* Preserve intended internal layouts when allowed in docks. */
+.ph-dock .ph-depth-grid { display: grid !important; }
+.ph-dock .ph-truth-row { display: grid !important; }
+.ph-dock .ph-depth-card,
+.ph-dock .ph-void-token,
+.ph-dock .ph-unmapped-row { display: flex !important; }
 
 /* Smaller pills reuse the same glass tone but tighter */
 .ph-error-pill,

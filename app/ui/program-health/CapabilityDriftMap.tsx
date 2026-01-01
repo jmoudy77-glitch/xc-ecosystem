@@ -1,4 +1,8 @@
+// FILE: app/ui/program-health/CapabilityDriftMap.tsx
+
 "use client";
+
+// PH_HOLES_DEBUG: temporary forced visibility overlay
 
 import * as React from "react";
 import type {
@@ -8,6 +12,20 @@ import type {
   ProgramHealthSnapshot,
 } from "./types";
 import { HorizonGlyphRail } from "./HorizonGlyphRail";
+
+function normalizeSeverityToken(sev: unknown): string {
+  if (sev == null) return "";
+  if (typeof sev === "string") return sev;
+  if (typeof sev === "number") return String(sev);
+  if (typeof sev === "object") {
+    const anySev = sev as any;
+    if (typeof anySev.severity === "string") return anySev.severity;
+    if (typeof anySev.severity === "number") return String(anySev.severity);
+    if (typeof anySev.value === "string") return anySev.value;
+    if (typeof anySev.value === "number") return String(anySev.value);
+  }
+  return String(sev);
+}
 
 type Props = {
   capabilityNodes: ProgramHealthCapabilityNode[];
@@ -86,7 +104,7 @@ function sliceIndexUnderReadLine(rotationDeg: number): number {
 }
 
 function sevBucket(severity: string | null | undefined): "critical" | "high" | "medium" | "low" | "unknown" {
-  const s = (severity ?? "").toLowerCase();
+  const s = normalizeSeverityToken(severity).toLowerCase();
   if (s.includes("critical")) return "critical";
   if (s.includes("high")) return "high";
   if (s.includes("medium")) return "medium";
@@ -370,7 +388,13 @@ export function CapabilityDriftMap({
 
     for (const a of absences) {
       const details = (a.details ?? {}) as any;
-      const capabilityNodeId = details?.capability_node_id as string | undefined;
+
+      // R4_2_0: Resolve node id from details OR top-level canonical fields.
+      // This prevents lawful absences from going 'unmapped' due to payload shape variance.
+      const capabilityNodeId =
+        (details?.capability_node_id as string | undefined) ??
+        ((a as any).capability_node_id as string | undefined) ??
+        ((a as any).capabilityNodeId as string | undefined);
 
       if (capabilityNodeId && nodeIndexById.has(capabilityNodeId)) {
         const arr = m.get(capabilityNodeId) ?? [];
@@ -702,6 +726,26 @@ export function CapabilityDriftMap({
                                 </div>
                               </div>
 
+                              {nodeAbsences.length > 0 ? (
+                                <div
+                                  className="ph-mono"
+                                  style={{
+                                    position: "absolute",
+                                    right: "10px",
+                                    top: "10px",
+                                    fontSize: "11px",
+                                    padding: "2px 8px",
+                                    borderRadius: "999px",
+                                    background: "rgba(255,0,0,0.65)",
+                                    border: "1px solid rgba(255,255,255,0.35)",
+                                    color: "white",
+                                    zIndex: 50,
+                                    pointerEvents: "none",
+                                  }}
+                                >
+                                  HOLES:{nodeAbsences.length}
+                                </div>
+                              ) : null}
                               <div className="ph-node-holes ph-node-holes-plane">
                                 {nodeAbsences.slice(0, 4).map((a, holeIdx) => {
                                   const sev = sevBucket(a.severity);
@@ -737,6 +781,12 @@ export function CapabilityDriftMap({
                                       key={a.id}
                                       type="button"
                                       className={cls}
+                                      style={{
+                                        outline: "2px solid rgba(255,0,0,0.9)",
+                                        background: "rgba(255,0,0,0.18)",
+                                        pointerEvents: "auto",
+                                        zIndex: 60,
+                                      }}
                                       onClick={handleSelect}
                                       onMouseEnter={() => {
                                         if (!onAbsenceHover) return;
@@ -771,6 +821,29 @@ export function CapabilityDriftMap({
             </div>
 
             <div className="ph-map-overlay">
+              <div
+                className="ph-glass"
+                style={{
+                  position: "absolute",
+                  top: "12px",
+                  left: "12px",
+                  padding: "8px 10px",
+                  borderRadius: "12px",
+                  fontSize: "12px",
+                  color: "rgba(255,255,255,0.80)",
+                  background: "rgba(0,0,0,0.44)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  pointerEvents: "none",
+                  zIndex: 20,
+                }}
+              >
+                <div className="ph-mono" style={{ opacity: 0.85 }}>
+                  nodes: {nodes.length} • absences: {absences.length}
+                </div>
+                <div className="ph-mono" style={{ opacity: 0.65, marginTop: "4px" }}>
+                  mapped: {absencesByNodeId.mapped.size} • unmapped: {absencesByNodeId.unmapped.length}
+                </div>
+              </div>
               <div className="ph-stamp">R3.0 RADIAL COORDINATE SYSTEM LIVE</div>
               <div className="ph-legend">
                 <div className="ph-legend-chip">

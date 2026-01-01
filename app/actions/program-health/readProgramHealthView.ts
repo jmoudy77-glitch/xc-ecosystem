@@ -74,6 +74,36 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
 
   if (absErr) throw absErr;
 
+  // R4_1_1: Runtime truth binding — normalize absence shape for client mapping.
+  // DB canonical column: capability_node_id
+  // Provide legacy alias: capabilityNodeId (some client code may still key on this)
+  // Normalize severity to a number to avoid renderer suppression.
+  const rawAbsences = (absences ?? []) as any[];
+  const normalizedAbsences = rawAbsences.map((a) => {
+    const details = (a.details ?? {}) as Record<string, unknown>;
+    const capabilityNodeId =
+      a.capability_node_id ??
+      a.capabilityNodeId ??
+      (details as any).capability_node_id ??
+      (details as any).capabilityNodeId ??
+      (details as any).capabilityNodeID ??
+      (details as any).node_id ??
+      (details as any).nodeId ??
+      null;
+
+    return {
+      ...a,
+      capability_node_id: capabilityNodeId,
+      capabilityNodeId: capabilityNodeId,
+      severity: a.severity == null ? null : Number(a.severity),
+      details: {
+        ...details,
+        capability_node_id: capabilityNodeId,
+        capabilityNodeId: capabilityNodeId,
+      },
+    };
+  }) as ProgramHealthAbsence[];
+
   // 3) Snapshot history (canonical surface) — latest + recent history per horizon
   const latestSnapshotsByHorizon: Record<string, ProgramHealthSnapshot | null> = {};
   const snapshotHistoryByHorizon: Record<string, ProgramHealthSnapshot[]> = {};
@@ -84,10 +114,18 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
     snapshotHistoryByHorizon[h] = await readSnapshotHistoryForHorizon(supabase, programId, h, 10);
   }
 
+  console.log("[PH readProgramHealthView]", {
+  programId,
+  nodeCount: (capabilityNodes ?? []).length,
+  absenceCount: (normalizedAbsences ?? absences ?? []).length,
+  sampleAbsence: (normalizedAbsences ?? absences ?? [])[0],
+});
+
+
   return {
     snapshot: latestSnapshotsByHorizon.H0 ?? null,
     capabilityNodes: (capabilityNodes ?? []) as ProgramHealthCapabilityNode[],
-    absences: (absences ?? []) as ProgramHealthAbsence[],
+    absences: normalizedAbsences,
     latestSnapshotsByHorizon,
     snapshotHistoryByHorizon,
   };

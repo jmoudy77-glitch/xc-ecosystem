@@ -1,3 +1,5 @@
+// FILE: app/programs/[programId]/program-health/page.tsx
+
 import { readProgramHealthView } from "@/app/actions/program-health/readProgramHealthView";
 import { ProgramHealthPage } from "@/app/ui/program-health/ProgramHealthPage";
 
@@ -8,6 +10,20 @@ export default async function ProgramHealthRoute({
 }) {
   const { programId } = await params;
   const model = await readProgramHealthView(programId);
+
+  // STEP 2 PROOF LOG
+  console.log("[PH PAGE]", {
+    programId,
+    nodeCount: model.capabilityNodes?.length ?? 0,
+    absenceCount: model.absences?.length ?? 0,
+    firstAbsenceId: model.absences?.[0]?.id ?? null,
+    firstAbsenceNodeId:
+      // prefer normalized field if present
+      (model.absences?.[0] as any)?.capabilityNodeId ??
+      // otherwise read from details payload (canonical)
+      ((model.absences?.[0] as any)?.details?.capability_node_id ?? null),
+  });
+
   return (
     <>
       <ProgramHealthPage programId={programId} model={model} />

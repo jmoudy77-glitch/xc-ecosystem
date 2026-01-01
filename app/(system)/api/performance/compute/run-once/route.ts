@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
       .from("performance_prime_rulesets")
       .select("id, ruleset_code")
       .eq("ruleset_code", PRIME_RULESET_CODE)
+      .eq("runtime_id", runtime_id)
       .eq("is_active", true)
       .single();
     if (primeRulesetErr) throw primeRulesetErr;
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest) {
       .from("performance_reference_sets")
       .select("id, set_code")
       .eq("set_code", REF_SET_CODE)
+      .eq("runtime_id", runtime_id)
       .eq("is_active", true)
       .single();
     if (refSetErr) throw refSetErr;
@@ -106,6 +108,7 @@ export async function POST(req: NextRequest) {
       .select(
         "event_code, gender, level, reference_mark_seconds, reference_mark_value, measurement_unit"
       )
+      .eq("runtime_id", runtime_id)
       .eq("set_id", refSet.id);
     if (standardsErr) throw standardsErr;
 
@@ -472,6 +475,7 @@ export async function POST(req: NextRequest) {
             .select(
               "id, athlete_id, canonical_event_code, normalized_index, computed_at, performance:athlete_performances(performance_date)"
             )
+            .eq("runtime_id", runtime_id)
             .eq("ruleset_id", primeRuleset.id);
 
           if (athleteIds.length > 0) {
@@ -748,6 +752,7 @@ export async function POST(req: NextRequest) {
             : {}),
         },
       })
+      .eq("runtime_id", runtime_id)
       .eq("id", run.id);
 
     if (runUpdateErr) throw runUpdateErr;
@@ -766,6 +771,7 @@ export async function POST(req: NextRequest) {
         status: "succeeded",
         finished_at: new Date().toISOString(),
       })
+      .eq("runtime_id", runtime_id)
       .eq("id", run.id);
 
     if (closeErr) throw closeErr;
@@ -774,6 +780,7 @@ export async function POST(req: NextRequest) {
     const { data: finalJob, error: finalJobErr } = await supabaseAdmin
       .from("performance_compute_queue")
       .select("*")
+      .eq("runtime_id", runtime_id)
       .eq("id", job.id)
       .single();
     if (finalJobErr) throw finalJobErr;
@@ -781,6 +788,7 @@ export async function POST(req: NextRequest) {
     const { data: finalRun, error: finalRunErr } = await supabaseAdmin
       .from("performance_compute_runs")
       .select("*")
+      .eq("runtime_id", runtime_id)
       .eq("id", run.id)
       .single();
     if (finalRunErr) throw finalRunErr;
@@ -816,6 +824,7 @@ export async function POST(req: NextRequest) {
           error_json: errJson,
           finished_at: new Date().toISOString(),
         })
+        .eq("runtime_id", runtime_id)
         .eq("id", run.id);
 
       if (failRunErr) {

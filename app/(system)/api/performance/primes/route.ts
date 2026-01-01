@@ -9,8 +9,22 @@ function parseLimit(v: string | null) {
   return Math.min(Math.floor(n), 200);
 }
 
+async function getGenesisRuntimeId(): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("runtimes")
+    .select("id")
+    .eq("runtime_type", "genesis")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("genesis runtime not found");
+  return data.id;
+}
+
 export async function GET(req: NextRequest) {
   try {
+    const runtime_id = await getGenesisRuntimeId();
     const { supabase } = await supabaseServer(req);
 
     // ---- Auth (required) ----
@@ -105,6 +119,7 @@ export async function GET(req: NextRequest) {
         .from("performance_prime_rulesets")
         .select("id, ruleset_code")
         .eq("ruleset_code", rulesetCodeParam)
+        .eq("runtime_id", runtime_id)
         .maybeSingle();
 
       if (rsError) {
@@ -123,6 +138,7 @@ export async function GET(req: NextRequest) {
       const { data: lastRun, error: lastRunError } = await supabaseAdmin
         .from("performance_compute_runs")
         .select("prime_ruleset_code")
+        .eq("runtime_id", runtime_id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -137,6 +153,7 @@ export async function GET(req: NextRequest) {
           .from("performance_prime_rulesets")
           .select("id, ruleset_code")
           .eq("ruleset_code", lastRun.prime_ruleset_code)
+          .eq("runtime_id", runtime_id)
           .maybeSingle();
 
         if (rsError) {
@@ -156,6 +173,7 @@ export async function GET(req: NextRequest) {
           .from("performance_prime_rulesets")
           .select("id, ruleset_code")
           .eq("is_active", true)
+          .eq("runtime_id", runtime_id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -247,6 +265,7 @@ export async function GET(req: NextRequest) {
         )
       `
       )
+      .eq("runtime_id", runtime_id)
       .eq("ruleset_id", rulesetId)
       .in("athlete_id", programAthleteIds)
       .order("computed_at", { ascending: false })

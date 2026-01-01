@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
           },
         ])
         .select("*")
+        .eq("runtime_id", runtime_id)
         .single();
       if (runErr) throw runErr;
       run = createdRun;

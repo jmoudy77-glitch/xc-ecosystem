@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       .from("performance_compute_queue")
       .insert([{ runtime_id, scope_type, scope_id, reason, details_json }])
       .select("*")
+      .eq("runtime_id", runtime_id)
       .single();
 
     if (error) throw error;

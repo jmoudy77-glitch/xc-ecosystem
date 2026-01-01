@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       // 5) close run
       const { error: closeErr } = await supabaseAdmin
         .from("performance_compute_runs")
-        .update({ status: "partial", finished_at: new Date().toISOString() })
+        .update({ runtime_id, status: "partial", finished_at: new Date().toISOString() })
         .eq("runtime_id", runtime_id)
         .eq("id", run.id);
       if (closeErr) throw closeErr;
@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin
           .from("performance_compute_runs")
           .update({
+            runtime_id,
             status: "failed",
             error_json: errJson,
             finished_at: new Date().toISOString(),

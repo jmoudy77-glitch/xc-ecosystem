@@ -1,6 +1,7 @@
 // app/(system)/api/performance/rollups/athletes/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type AthleteRollup = {
   athlete: {
@@ -27,6 +28,19 @@ function toNum(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+async function getGenesisRuntimeId(): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("runtimes")
+    .select("id")
+    .eq("runtime_type", "genesis")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("genesis runtime not found");
+  return data.id;
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
 
@@ -51,11 +65,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401, headers: res.headers });
   }
 
+  const runtime_id = await getGenesisRuntimeId();
+
   // Resolve ruleset_id from ruleset_code (ruleset table introduced in Performance Module v1).
   const { data: rulesetRow, error: rulesetErr } = await supabase
     .from("performance_rulesets")
     .select("id, code")
     .eq("code", rulesetCode)
+    .eq("runtime_id", runtime_id)
     .limit(1)
     .maybeSingle();
 
@@ -113,6 +130,7 @@ export async function GET(req: NextRequest) {
         "athlete:athletes(id, first_name, last_name, grad_year, event_group, gender)",
       ].join(",")
     )
+    .eq("runtime_id", runtime_id)
     .eq("ruleset_id", rulesetRow.id)
     .in("athlete_id", athleteIds);
 

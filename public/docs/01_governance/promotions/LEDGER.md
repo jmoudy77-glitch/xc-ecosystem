@@ -167,3 +167,5 @@ Initial civilization topology primitives.
 - 0071 — 2026-01-01 — P71: workflow violation resolve endpoint (RPC + POST /api/ops/workflow-violations-resolve)
 
 - 0072 — 2026-01-01 — P72: self-heal resolves stale violations (RPC update)
+
+- 0073 — 2026-01-01 — P73: workflow violation detect cron runner (RPC + POST /api/ops/workflow-violations-detect-cron)

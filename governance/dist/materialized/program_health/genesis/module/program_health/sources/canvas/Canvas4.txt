@@ -1,0 +1,55 @@
+# MB-1 — Program Health Disc Material Constitution
+
+**Status:** Ratified — Locked for implementation
+
+This constitution defines the canonical material and physical semantics of the Program Health disc instrument.
+
+---
+
+## 1) Canonical Material
+
+The disc is **graphite-ice**:
+- Matte, dense, dark graphite base
+- Subsurface glacial translucence
+- Minimal reflectivity
+- High mass implication without UI heaviness
+
+---
+
+## 2) Thickness Semantics
+
+Thickness encodes **NOW-weighted tension**:
+- Present pressure thickens the disc subtly
+- Historical pressure is visible but thinner
+- Thickness is not decoration; it is meaning
+
+---
+
+## 3) Rim Behavior
+
+The rim is a structural boundary:
+- Rim tension changes must be causally traceable
+- Rim glow is permitted only as a meaning-carrying signal
+- No neon; no entertainment lighting
+
+---
+
+## 4) Recovery Wave Semantics
+
+Recovery waves express stabilization after a perturbation:
+- A wave must always have a cause (event/proof)
+- Wave propagation must preserve lineage semantics
+- No wave may exist as pure animation
+
+---
+
+## 5) Coach-Legible Diagnostics
+
+All presentation must be coach-legible:
+- Avoid academic language
+- Prefer structural metaphors: void, pressure, drift, recovery, trace
+- Help overlays must be brief and non-patronizing
+
+---
+
+This material constitution is ratified and locked.

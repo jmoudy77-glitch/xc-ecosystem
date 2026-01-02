@@ -1,0 +1,84 @@
+# Program Health Salvaged v0 Clauses (Salvage-Only)
+
+Source: genesis/module/program_health/sources/canvas/Canvas1.txt
+
+Eligibility:
+- Only clauses from the “Program Health UI – v0 Constitutional Contract (Path A)” section are included.
+- No clause may contradict Active Law or UI Constitution v1.
+
+# Program Health UI – v0 Constitutional Contract (Path A)
+
+**Status:** Locked for implementation
+
+This document freezes the v0 Program Health UI execution contract so future threads do not redesign or drift.
+
+---
+
+## 1) Constitutional Purpose
+
+Program Health is a runtime instrument — not a dashboard. It renders structural tension, absence voids, and capability drift as a unified system, grounded in truth-bearing data.
+
+This contract defines Path A: a minimal v0 implementation that makes the UI usable and constitutionally aligned.
+
+---
+
+## 2) Non-Negotiable Constraints (v0)
+
+- No dashboard ecology: no cards/panels/tables/graphs in a typical admin layout.
+- No companion views, secondary dashboards, or detached analysis pages.
+- No “project management” layer inside the instrument.
+- The entire UI must remain a single cohesive instrument surface.
+
+---
+
+## 3) Minimal v0 UI Components (Path A)
+
+### 3.1 Instrument Shell
+- Program Health route must render as a single instrument with a defined field plane.
+- All content lives inside the instrument context.
+
+### 3.2 Capability Drift Map (v0)
+- A simplified drift surface that visualizes sector tension distribution.
+- No mesh plane, no overlays beyond necessary labeling.
+- Must support hover, selection, and a minimal read-ray interaction.
+
+### 3.3 Absence Register (v0)
+- Renders absence void determinations as compact cards.
+- Cards must be minimally styled, with no dashboard panel framing.
+- A card click opens a Health Brief.
+
+### 3.4 Health Brief (v0)
+- Displays core determination details and canonical proof.
+- Proof must be sourced from canonical events or degrade gracefully if unavailable.
+- Must not expand into a multi-page dashboard.
+
+---
+
+## 4) Data Truth Requirements (v0)
+
+- v0 must load the latest snapshot, capability nodes, and absences under RLS.
+- Absence determinations must be backed by deterministic provenance.
+- All read surfaces must be truth-bearing or explicitly marked as inference.
+
+---
+
+## 5) Interaction Requirements (v0)
+
+- Minimal-touch: low click count, self-evident actions.
+- Hover reveals; click confirms; selection is reversible.
+- No modal cascades; no nested drilldowns beyond one layer.
+
+---
+
+## 6) Completion Criteria (v0)
+
+v0 is complete when:
+
+* Program Health route loads latest snapshot + absences under RLS.
+* Absence Register renders compact cards.
+* Clicking a card opens Health Brief.
+* Health Brief displays Proof from canonical events (or gracefully degrades if proof unavailable).
+
+No mesh plane, overlays, or doctrine export are required for v0.
+
+This contract is now locked and must not be redesigned in future threads without explicit override.

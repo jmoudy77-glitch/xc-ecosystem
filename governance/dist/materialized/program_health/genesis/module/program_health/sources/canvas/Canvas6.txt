@@ -1,0 +1,42 @@
+# XC-Ecosystem Runtime Constitution — Canvas I
+
+**Status:** Ratified — Locked
+
+This constitution defines runtime-level governance constraints that apply across modules.
+
+---
+
+## 1) Runtime Doctrine
+
+The runtime is the sovereign execution environment. Representations must never be confused with authority.
+
+---
+
+## 2) Amendment Discipline
+
+Constitutions may be amended only by explicit promotion.
+No silent re-interpretation is permitted.
+
+---
+
+## 3) Reality Anchoring
+
+The ledger is canonical reality. If an action is not recorded, it did not occur.
+
+---
+
+## 4) Jurisdiction
+
+Each module has jurisdictional boundaries.
+Cross-module leakage is forbidden.
+
+---
+
+## 5) Execution Integrity
+
+All changes must be performed via atomic promotions.
+No commentary may interleave with executable blocks.
+
+---
+
+This runtime constitution is ratified and locked.

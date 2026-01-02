@@ -149,3 +149,5 @@ Initial civilization topology primitives.
 - 0062 — 2026-01-01 — P62: workflow runs summary analytics (RPC + GET /api/ops/workflow-runs-summary)
 
 - 0063 — 2026-01-01 — P63: workflow action performance metrics (RPC + GET /api/ops/workflow-action-metrics)
+
+- 0064 — 2026-01-01 — P64: workflow schedule performance metrics (RPC + GET /api/ops/workflow-schedule-metrics)

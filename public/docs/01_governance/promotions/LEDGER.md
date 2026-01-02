@@ -125,3 +125,5 @@ Initial civilization topology primitives.
 - 0050 — 2026-01-01 — P50: cancel workflow run (RPC + POST /api/ops/workflow-cancel)
 
 - 0051 — 2026-01-01 — P51: workflow scheduling primitive (table + POST /api/ops/workflow-schedules)
+
+- 0052 — 2026-01-01 — P52: workflow schedule firing primitive (firings table + RPC + POST /api/ops/workflow-schedule-fire)

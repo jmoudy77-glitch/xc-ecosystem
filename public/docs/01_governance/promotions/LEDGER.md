@@ -87,3 +87,5 @@ Initial civilization topology primitives.
 - 0031 — 2026-01-01 — P31: workflow action registry primitive (table + POST /api/ops/workflow-actions)
 
 - 0032 — 2026-01-01 — P32: bind workflow steps to action registry (FK + route update)
+
+- 0033 — 2026-01-01 — P33: workflow invocation queue primitive (table + POST /api/ops/workflow-invocations)

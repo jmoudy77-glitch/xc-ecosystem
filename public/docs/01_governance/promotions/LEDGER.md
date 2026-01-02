@@ -173,3 +173,5 @@ Initial civilization topology primitives.
 - 0074 — 2026-01-01 — P74: workflow violation metrics (RPC + GET /api/ops/workflow-violation-metrics)
 
 - 0075 — 2026-01-01 — P75: workflow health summary aggregation (RPC + GET /api/ops/workflow-health-summary)
+
+- 0076 — 2026-01-01 — P76: workflow public read gateway (RPC + GET /api/ops/workflow-read)

@@ -93,3 +93,5 @@ Initial civilization topology primitives.
 - 0034 — 2026-01-01 — P34: workflow invocation dispatcher + completion RPC (RPCs + POST /api/ops/workflow-dispatch, /api/ops/workflow-complete)
 
 - 0035 — 2026-01-01 — P35: propagate invocation outcome to run-step + transition ledger (RPC + trigger + POST /api/ops/workflow-apply-invocation)
+
+- 0036 — 2026-01-01 — P36: workflow run advancement primitive (seed run-steps + advance run + POST /api/ops/workflow-advance)

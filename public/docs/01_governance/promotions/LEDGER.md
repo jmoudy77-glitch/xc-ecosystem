@@ -55,3 +55,21 @@ Initial civilization topology primitives.
 
 ## 2026-01-01 — Promotion 0019
 - Ledger Append Entries (0016–0019)
+
+## 2026-01-01 — Promotion 0020
+- Mint Event Primitive (MEP)
+
+## 2026-01-01 — Promotion 0021
+- Temporal Tick Engine (TTE)
+
+## 2026-01-01 — Promotion 0022
+- Lifecycle Automation Executor (LAE)
+
+## 2026-01-01 — Promotion 0023
+- Deterministic Audit Ledger (DAL)
+
+## 2026-01-01 — Promotion 0024
+- Runtime Guardian / Self-Healing Plane (RGP)
+
+## 2026-01-01 — Promotion 0025
+- Ledger Append Entries (0020–0024)

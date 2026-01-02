@@ -97,3 +97,5 @@ Initial civilization topology primitives.
 - 0036 — 2026-01-01 — P36: workflow run advancement primitive (seed run-steps + advance run + POST /api/ops/workflow-advance)
 
 - 0037 — 2026-01-01 — P37: auto-advance run when invocation finalizes (RPC + trigger)
+
+- 0038 — 2026-01-01 — P38: finalize pending run-steps when run completes/fails (trigger)

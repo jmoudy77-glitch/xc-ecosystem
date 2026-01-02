@@ -75,3 +75,5 @@ Initial civilization topology primitives.
 - Ledger Append Entries (0020–0024)
 
 - 0026 — 2026-01-01 — P26: operational workflows primitive (table + POST /api/ops/workflows)
+
+- 0027 — 2026-01-01 — P27: workflow run execution primitive (table + POST /api/ops/workflow-runs)

@@ -135,3 +135,5 @@ Initial civilization topology primitives.
 - 0055 — 2026-01-01 — P55: delete workflow schedules (RPC + POST /api/ops/workflow-schedule-delete)
 
 - 0056 — 2026-01-01 — P56: schedule tick feed for external scheduler (RPC + GET /api/ops/workflow-schedule-tick-feed)
+
+- 0057 — 2026-01-01 — P57: schedule tick receipt + optional fire (ticks table + RPC + POST /api/ops/workflow-schedule-tick)

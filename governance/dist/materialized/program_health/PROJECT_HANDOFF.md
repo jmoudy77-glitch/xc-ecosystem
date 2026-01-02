@@ -20,3 +20,7 @@ Active Kernel: <from KERNEL_VERSION.md>
 Active Module: program_health
 Authoritative Index: MODULE_INDEX.md
 Reality Anchor: LEDGER.md
+
+Release Stamp:
+
+See PROJECT_RELEASE.md for authoritative commit + timestamp

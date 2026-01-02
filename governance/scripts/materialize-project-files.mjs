@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 
 const repoRoot = process.cwd();
 const govRoot = path.join(repoRoot, "governance");
@@ -126,6 +127,23 @@ writeText(
     "Active Module: program_health",
     "Authoritative Index: MODULE_INDEX.md",
     "Reality Anchor: LEDGER.md",
+    "",
+    "Release Stamp:",
+    "",
+    "See PROJECT_RELEASE.md for authoritative commit + timestamp",
+    "",
+  ].join("\n")
+);
+
+// Release stamp
+writeText(
+  path.join(outRoot, "PROJECT_RELEASE.md"),
+  [
+    "# Program Health Project Release (Authoritative)",
+    "",
+    `Repo Commit: ${execSync("git rev-parse HEAD").toString().trim()}`,
+    `Generated At: ${new Date().toISOString()}`,
+    `Kernel Version: ${fs.existsSync(kernelVersionPath) ? readText(kernelVersionPath).match(/version:\\s*(.*)/)?.[1] : "unknown"}`,
     "",
   ].join("\n")
 );

@@ -155,3 +155,5 @@ Initial civilization topology primitives.
 - 0065 — 2026-01-01 — P65: workflow step performance metrics (RPC + GET /api/ops/workflow-step-metrics)
 
 - 0066 — 2026-01-01 — P66: autonomous workflow lifecycle self-healing executor (RPC + POST /api/ops/workflow-self-heal)
+
+- 0067 — 2026-01-01 — P67: workflow lifecycle self-heal full sweep (RPC + POST /api/ops/workflow-self-heal-full)

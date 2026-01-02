@@ -103,3 +103,5 @@ Initial civilization topology primitives.
 - 0039 — 2026-01-01 — P39: idempotent workflow run creation (idempotency key + RPC + route update)
 
 - 0040 — 2026-01-01 — P40: idempotent invocation enqueue (idempotency key + RPC + route update)
+
+- 0041 — 2026-01-01 — P41: bind run-step to invocation + enqueue-next composite (schema + RPC + POST /api/ops/workflow-enqueue)

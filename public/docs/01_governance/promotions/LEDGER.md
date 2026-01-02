@@ -163,3 +163,5 @@ Initial civilization topology primitives.
 - 0069 — 2026-01-01 — P69: workflow violation registry (table + GET /api/ops/workflow-violations)
 
 - 0070 — 2026-01-01 — P70: workflow violation detection + list endpoint (RPC + GET /api/ops/workflow-violations + POST /api/ops/workflow-violations-detect)
+
+- 0071 — 2026-01-01 — P71: workflow violation resolve endpoint (RPC + POST /api/ops/workflow-violations-resolve)

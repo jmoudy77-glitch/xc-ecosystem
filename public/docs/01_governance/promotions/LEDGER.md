@@ -131,3 +131,5 @@ Initial civilization topology primitives.
 - 0053 — 2026-01-01 — P53: list workflow schedules + firings (RPCs + GET /api/ops/workflow-schedules-list, /api/ops/workflow-schedule-firings-list)
 
 - 0054 — 2026-01-01 — P54: update workflow schedules (RPC + POST /api/ops/workflow-schedule-update)
+
+- 0055 — 2026-01-01 — P55: delete workflow schedules (RPC + POST /api/ops/workflow-schedule-delete)

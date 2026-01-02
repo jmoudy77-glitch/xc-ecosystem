@@ -40,3 +40,18 @@ Initial civilization topology primitives.
 
 ## 2026-01-01 — Promotion 0014
 - Promotion Ledger Established
+
+## 2026-01-01 — Promotion 0015
+- Ledger Backfill Initialization
+
+## 2026-01-01 — Promotion 0016
+- Team Roster Read API
+
+## 2026-01-01 — Promotion 0017
+- Athlete Teams Read API
+
+## 2026-01-01 — Promotion 0018
+- Roster Unbind Primitive
+
+## 2026-01-01 — Promotion 0019
+- Ledger Append Entries (0016–0019)

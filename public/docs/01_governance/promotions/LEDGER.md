@@ -175,3 +175,5 @@ Initial civilization topology primitives.
 - 0075 — 2026-01-01 — P75: workflow health summary aggregation (RPC + GET /api/ops/workflow-health-summary)
 
 - 0076 — 2026-01-01 — P76: workflow public read gateway (RPC + GET /api/ops/workflow-read)
+
+- 0077 — 2026-01-01 — P77: governance-safe workflow command ingress (RPC + POST /api/ops/workflow-command)

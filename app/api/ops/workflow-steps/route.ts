@@ -8,6 +8,10 @@ function isUuid(v: unknown): v is string {
   );
 }
 
+function isKey(v: unknown): v is string {
+  return typeof v === "string" && /^[a-z0-9][a-z0-9:_\-\.]{1,127}$/i.test(v);
+}
+
 export async function POST(req: NextRequest) {
   const { supabase } = await supabaseServer(req);
 
@@ -23,7 +27,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const workflow_id = body?.workflow_id;
   const step_order = body?.step_order;
-  const action = body?.action;
+  const action_key = body?.action_key ?? body?.action;
   const config = body?.config;
 
   if (!isUuid(workflow_id)) {
@@ -32,8 +36,8 @@ export async function POST(req: NextRequest) {
   if (typeof step_order !== "number" || !Number.isInteger(step_order) || step_order < 0) {
     return NextResponse.json({ error: "invalid_step_order" }, { status: 400 });
   }
-  if (typeof action !== "string" || !action.trim()) {
-    return NextResponse.json({ error: "invalid_action" }, { status: 400 });
+  if (!isKey(action_key)) {
+    return NextResponse.json({ error: "invalid_action_key" }, { status: 400 });
   }
   if (config !== undefined && (config === null || typeof config !== "object" || Array.isArray(config))) {
     return NextResponse.json({ error: "invalid_config" }, { status: 400 });
@@ -44,7 +48,8 @@ export async function POST(req: NextRequest) {
     .insert({
       workflow_id,
       step_order,
-      action: action.trim(),
+      action_key: String(action_key).toLowerCase(),
+      action: String(action_key).toLowerCase(),
       config: config ?? {},
     })
     .select("id")

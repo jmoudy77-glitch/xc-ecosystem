@@ -141,3 +141,5 @@ Initial civilization topology primitives.
 - 0058 — 2026-01-01 — P58: schedule firing dispatch queue (RPC + POST /api/ops/workflow-schedule-firing-dispatch)
 
 - 0059 — 2026-01-01 — P59: start schedule firing into workflow run (RPC + POST /api/ops/workflow-schedule-firing-start)
+
+- 0060 — 2026-01-01 — P60: complete schedule firing receipt (RPC + POST /api/ops/workflow-schedule-firing-complete)

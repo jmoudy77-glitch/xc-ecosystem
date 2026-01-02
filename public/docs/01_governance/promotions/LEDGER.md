@@ -121,3 +121,5 @@ Initial civilization topology primitives.
 - 0048 — 2026-01-01 — P48: enforce action enablement on invocation enqueue (RPC update)
 
 - 0049 — 2026-01-01 — P49: pause/resume workflows (RPC + start-run enforcement + POST /api/ops/workflow-status)
+
+- 0050 — 2026-01-01 — P50: cancel workflow run (RPC + POST /api/ops/workflow-cancel)

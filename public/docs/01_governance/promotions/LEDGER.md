@@ -177,3 +177,5 @@ Initial civilization topology primitives.
 - 0076 — 2026-01-01 — P76: workflow public read gateway (RPC + GET /api/ops/workflow-read)
 
 - 0077 — 2026-01-01 — P77: governance-safe workflow command ingress (RPC + POST /api/ops/workflow-command)
+
+- 0078 — 2026-01-01 — P78: Phase 3 closure seal (table + RPC + POST /api/ops/genesis-phase3-seal)

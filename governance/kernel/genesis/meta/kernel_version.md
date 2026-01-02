@@ -1,5 +1,5 @@
 # Kernel Version
 
-version: v001
+version: v002
 date: 2026-01-02
-notes: program_health baseline ratified (canvas sources preserved; module kernel populated; Active Law excludes Articles XIV–XXIII)
+notes: elevated Execution Integrity Constitution (Articles XIV–XXIII) into global kernel

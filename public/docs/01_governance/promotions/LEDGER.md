@@ -101,3 +101,5 @@ Initial civilization topology primitives.
 - 0038 — 2026-01-01 — P38: finalize pending run-steps when run completes/fails (trigger)
 
 - 0039 — 2026-01-01 — P39: idempotent workflow run creation (idempotency key + RPC + route update)
+
+- 0040 — 2026-01-01 — P40: idempotent invocation enqueue (idempotency key + RPC + route update)

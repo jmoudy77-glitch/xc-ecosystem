@@ -1,7 +1,3 @@
-# Program Health UI Constitution v1 (Ratified Baseline)
-
-Source: genesis/module/program_health/sources/canvas/Canvas2.txt
-
 # Program Health UI v1 Constitution
 
 **Status:** Ratified — Locked for implementation

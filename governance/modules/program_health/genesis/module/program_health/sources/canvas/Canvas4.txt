@@ -1,7 +1,3 @@
-# MB-1 — Program Health Disc Material Constitution (Ratified Baseline)
-
-Source: genesis/module/program_health/sources/canvas/Canvas4.txt
-
 # MB-1 — Program Health Disc Material Constitution
 
 **Status:** Ratified — Locked for implementation

@@ -1,11 +1,3 @@
-# Program Health Salvaged v0 Clauses (Salvage-Only)
-
-Source: genesis/module/program_health/sources/canvas/Canvas1.txt
-
-Eligibility:
-- Only clauses from the “Program Health UI – v0 Constitutional Contract (Path A)” section are included.
-- No clause may contradict Active Law or UI Constitution v1.
-
 # Program Health UI – v0 Constitutional Contract (Path A)
 
 **Status:** Locked for implementation

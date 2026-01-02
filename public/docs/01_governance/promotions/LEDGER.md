@@ -73,3 +73,5 @@ Initial civilization topology primitives.
 
 ## 2026-01-01 — Promotion 0025
 - Ledger Append Entries (0020–0024)
+
+- 0026 — 2026-01-01 — P26: operational workflows primitive (table + POST /api/ops/workflows)

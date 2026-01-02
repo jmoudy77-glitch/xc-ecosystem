@@ -111,3 +111,5 @@ Initial civilization topology primitives.
 - 0043 — 2026-01-01 — P43: workflow run detail view (RPC + GET /api/ops/workflow-run-detail)
 
 - 0044 — 2026-01-01 — P44: list operational workflows by program (RPC + GET /api/ops/workflows-list)
+
+- 0045 — 2026-01-01 — P45: list workflow runs by workflow (RPC + GET /api/ops/workflow-runs-list)

@@ -115,3 +115,5 @@ Initial civilization topology primitives.
 - 0045 — 2026-01-01 — P45: list workflow runs by workflow (RPC + GET /api/ops/workflow-runs-list)
 
 - 0046 — 2026-01-01 — P46: list workflow invocations by run (RPC + GET /api/ops/workflow-invocations-list)
+
+- 0047 — 2026-01-01 — P47: enable/disable workflow actions (RPC + POST /api/ops/workflow-action-toggle)

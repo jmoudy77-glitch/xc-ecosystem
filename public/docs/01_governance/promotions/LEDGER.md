@@ -109,3 +109,5 @@ Initial civilization topology primitives.
 - 0042 — 2026-01-01 — P42: start workflow run + enqueue first invocation (RPC + POST /api/ops/workflow-start)
 
 - 0043 — 2026-01-01 — P43: workflow run detail view (RPC + GET /api/ops/workflow-run-detail)
+
+- 0044 — 2026-01-01 — P44: list operational workflows by program (RPC + GET /api/ops/workflows-list)

@@ -9,3 +9,4 @@
 - genesis/module/program_health/ratified/50_runtime_data_law.md
 - genesis/module/program_health/ratified/60_registry_schemas.md
 - genesis/module/program_health/ratified/70_read_contract.md
+- genesis/module/program_health/ratified/75_inference_staging_law.md

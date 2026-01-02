@@ -95,3 +95,5 @@ Initial civilization topology primitives.
 - 0035 — 2026-01-01 — P35: propagate invocation outcome to run-step + transition ledger (RPC + trigger + POST /api/ops/workflow-apply-invocation)
 
 - 0036 — 2026-01-01 — P36: workflow run advancement primitive (seed run-steps + advance run + POST /api/ops/workflow-advance)
+
+- 0037 — 2026-01-01 — P37: auto-advance run when invocation finalizes (RPC + trigger)

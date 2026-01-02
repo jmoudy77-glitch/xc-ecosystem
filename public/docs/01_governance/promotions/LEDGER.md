@@ -159,3 +159,5 @@ Initial civilization topology primitives.
 - 0067 — 2026-01-01 — P67: workflow lifecycle self-heal full sweep (RPC + POST /api/ops/workflow-self-heal-full)
 
 - 0068 — 2026-01-01 — P68: workflow self-heal cron runner (RPC + POST /api/ops/workflow-self-heal-cron)
+
+- 0069 — 2026-01-01 — P69: workflow violation registry (table + GET /api/ops/workflow-violations)

@@ -81,3 +81,5 @@ Initial civilization topology primitives.
 - 0028 — 2026-01-01 — P28: workflow step definition primitive (table + POST /api/ops/workflow-steps)
 
 - 0029 — 2026-01-01 — P29: workflow run step tracking primitive (table + POST /api/ops/workflow-run-steps)
+
+- 0030 — 2026-01-01 — P30: workflow run step transition ledger (table + POST /api/ops/workflow-run-step-transitions)

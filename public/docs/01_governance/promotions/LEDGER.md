@@ -107,3 +107,5 @@ Initial civilization topology primitives.
 - 0041 — 2026-01-01 — P41: bind run-step to invocation + enqueue-next composite (schema + RPC + POST /api/ops/workflow-enqueue)
 
 - 0042 — 2026-01-01 — P42: start workflow run + enqueue first invocation (RPC + POST /api/ops/workflow-start)
+
+- 0043 — 2026-01-01 — P43: workflow run detail view (RPC + GET /api/ops/workflow-run-detail)

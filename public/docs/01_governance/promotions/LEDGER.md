@@ -77,3 +77,5 @@ Initial civilization topology primitives.
 - 0026 — 2026-01-01 — P26: operational workflows primitive (table + POST /api/ops/workflows)
 
 - 0027 — 2026-01-01 — P27: workflow run execution primitive (table + POST /api/ops/workflow-runs)
+
+- 0028 — 2026-01-01 — P28: workflow step definition primitive (table + POST /api/ops/workflow-steps)

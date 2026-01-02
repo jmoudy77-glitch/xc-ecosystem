@@ -137,3 +137,5 @@ Initial civilization topology primitives.
 - 0056 — 2026-01-01 — P56: schedule tick feed for external scheduler (RPC + GET /api/ops/workflow-schedule-tick-feed)
 
 - 0057 — 2026-01-01 — P57: schedule tick receipt + optional fire (ticks table + RPC + POST /api/ops/workflow-schedule-tick)
+
+- 0058 — 2026-01-01 — P58: schedule firing dispatch queue (RPC + POST /api/ops/workflow-schedule-firing-dispatch)

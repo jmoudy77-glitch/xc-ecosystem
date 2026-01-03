@@ -414,11 +414,13 @@ export function CapabilityDriftMap({
   onAbsenceHover,
   onAbsenceSelect,
 }: Props) {
+  // Hoist hoverHorizon above all potential reads to avoid TDZ hazards
+  const [hoverHorizon, setHoverHorizon] = React.useState<Horizon | null>(null);
+
   const highlightSet = React.useMemo(() => new Set(highlightAbsenceIds ?? []), [highlightAbsenceIds]);
   const lineageSet = React.useMemo(() => new Set(lineageNodeIds ?? []), [lineageNodeIds]);
   const [selectedCapabilityNodeId, setSelectedCapabilityNodeId] = React.useState<string | null>(null);
   const [hoveredCapabilityNodeId, setHoveredCapabilityNodeId] = React.useState<string | null>(null);
-  const [hoverHorizon, setHoverHorizon] = React.useState<Horizon | null>(null);
 
   const activeCapabilityNodeId = hoveredCapabilityNodeId ?? selectedCapabilityNodeId;
 

@@ -155,19 +155,60 @@ export default function RecruitingM1Client({ model }: { model: RecruitingM1ViewM
                   <div className="text-[11px] font-semibold text-slate-100">{title}</div>
                   <div className="mt-3 space-y-2">
                     {tierRows.slice(0, 8).map((row: any) => (
-                      <div key={row.recruit_id} className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-[11px] font-semibold text-slate-100">
-                            {row.recruit_name ?? row.recruit_id}
+                      <details key={row.recruit_id} className="rounded-md border border-subtle bg-surface/60 p-2">
+                        <summary className="cursor-pointer list-none">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-[11px] font-semibold text-slate-100">
+                                {row.recruit_name ?? row.recruit_id}
+                              </div>
+                              <div className="text-[11px] text-muted">
+                                touches {row.deficit_touch_count ?? 0} deficits
+                              </div>
+                            </div>
+                            <div className="text-[11px] tabular-nums text-muted">
+                              impact {Number(row.total_impact_score ?? 0).toFixed(2)}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-muted">
-                            touches {row.deficit_touch_count ?? 0} deficits
-                          </div>
+                        </summary>
+
+                        <div className="mt-2 space-y-2 text-[11px] text-muted">
+                          <div>Top deficit touches (advisory):</div>
+                          {Array.isArray(row.impacts_detail) && row.impacts_detail.length > 0 ? (
+                            <div className="space-y-2">
+                              {row.impacts_detail.slice(0, 3).map((d: any, idx: number) => {
+                                const r = d?.rationale ?? {};
+                                const coverage = Number(r?.coverage ?? 0);
+                                const confidence = Number(r?.confidence ?? 0);
+                                const timeAlign = Number(r?.time_alignment ?? 0);
+                                const notes = r?.notes;
+                                return (
+                                  <div key={idx} className="rounded-md border border-subtle bg-surface/70 p-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div className="truncate">
+                                        capability {d?.capability_node_id ?? "—"}
+                                      </div>
+                                      <div className="tabular-nums text-muted">
+                                        impact {Number(d?.impact_score ?? 0).toFixed(2)}
+                                      </div>
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                      <span>coverage {coverage.toFixed(2)}</span>
+                                      <span>confidence {confidence.toFixed(2)}</span>
+                                      <span>time {timeAlign.toFixed(2)}</span>
+                                    </div>
+                                    {typeof notes === "string" && notes.trim().length > 0 ? (
+                                      <div className="mt-1">{notes}</div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div>No deficit-level rationale available.</div>
+                          )}
                         </div>
-                        <div className="text-[11px] tabular-nums text-muted">
-                          impact {Number(row.total_impact_score ?? 0).toFixed(2)}
-                        </div>
-                      </div>
+                      </details>
                     ))}
                   </div>
                 </div>

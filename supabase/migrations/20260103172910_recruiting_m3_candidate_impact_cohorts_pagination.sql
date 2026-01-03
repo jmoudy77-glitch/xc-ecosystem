@@ -26,7 +26,7 @@ as $$
   offset greatest(0, p_offset);
 $$;
 
-comment on function public.rpc_recruiting_candidate_impact_cohorts is
+comment on function public.rpc_recruiting_candidate_impact_cohorts(uuid, text, text, integer, integer) is
 'M3 advisory RPC: returns candidate cohorts ranked comparatively by impact; bounded via limit/offset';
 
 revoke all on function public.rpc_recruiting_candidate_impact_cohorts(uuid, text, text, integer, integer) from public;

@@ -63,3 +63,5 @@ This file is the canonical, append-only ledger of all sovereign Codex promotions
 - 0024 — 2026-01-03 — recruiting(m1): seed initial stabilization state signals
   - Migration: 20260103002400_recruiting_m1_seed_state_signal.sql
   - Behavior: bootstrap state signals from current recruitable deficit counts
+
+| 20260103165948 | recruiting | m3 | schema | recruiting_candidate_impacts schema hardening + RLS |

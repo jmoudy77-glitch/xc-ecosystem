@@ -65,3 +65,5 @@ This file is the canonical, append-only ledger of all sovereign Codex promotions
   - Behavior: bootstrap state signals from current recruitable deficit counts
 
 | 20260103165948 | recruiting | m3 | schema | recruiting_candidate_impacts schema hardening + RLS |
+
+| 20260103170139 | recruiting | m3 | compute | materialize recruiting_candidate_impacts |

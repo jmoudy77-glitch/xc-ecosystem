@@ -20,6 +20,8 @@ function sortKey(a: RecruitingM1RecruitableAbsence) {
 
 export default function RecruitingM1Client({ model }: { model: RecruitingM1ViewModel }) {
   const m3Cohorts = model.m3?.cohorts ?? [];
+  const m3Meta = (model.m3 as any)?.meta ?? null;
+  const isDev = process.env.NODE_ENV !== "production";
   const items = React.useMemo(() => {
     const copy = [...(model.recruitableAbsences ?? [])];
     copy.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
@@ -135,6 +137,11 @@ export default function RecruitingM1Client({ model }: { model: RecruitingM1ViewM
           <div className="mt-1 text-[11px] text-muted">
             Comparative risk-reduction tiers under current recruitable deficits. Not a recommendation and not completion.
           </div>
+          {isDev && m3Meta ? (
+            <div className="mt-2 text-[11px] text-muted">
+              dev: {m3Meta.status ?? "—"} • limit {m3Meta.limit ?? "—"} • offset {m3Meta.offset ?? "—"}
+            </div>
+          ) : null}
 
           <div className="mt-4 grid gap-3">
             {[0, 1, 2, 3].map((tier) => {

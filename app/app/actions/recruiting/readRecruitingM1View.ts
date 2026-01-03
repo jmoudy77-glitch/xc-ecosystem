@@ -155,6 +155,8 @@ export async function readRecruitingM1View(
         p_program_id: programId,
         p_sport: sport,
         p_horizon: horizon,
+        p_limit: 50,
+        p_offset: 0,
       }
     );
 
@@ -164,6 +166,12 @@ export async function readRecruitingM1View(
 
     m3.ensure = m3Ensure;
     m3.cohorts = m3Cohorts ?? [];
+    (m3 as any).meta = {
+      limit: 50,
+      offset: 0,
+      status: (m3Ensure as any)?.status ?? null,
+      inputs_hash: (m3Ensure as any)?.inputs_hash ?? null,
+    };
   }
 
   return {

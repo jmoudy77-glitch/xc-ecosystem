@@ -64,7 +64,7 @@ export function ProgramHealthPage({
 
   // Timeline state (navigation only)
   const [selectedHorizon, setSelectedHorizon] = React.useState<"H0" | "H1" | "H2" | "H3">(
-    model.snapshot?.horizon ?? "H0"
+    model.snapshot?.horizon ?? "H1"
   );
 
   const snapshot = model.snapshot ?? null;

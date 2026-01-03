@@ -114,6 +114,13 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
     snapshotHistoryByHorizon[h] = await readSnapshotHistoryForHorizon(supabase, programId, h, 10);
   }
 
+  const defaultSnapshot =
+    latestSnapshotsByHorizon.H1 ??
+    latestSnapshotsByHorizon.H2 ??
+    latestSnapshotsByHorizon.H3 ??
+    latestSnapshotsByHorizon.H0 ??
+    null;
+
   console.log("[PH readProgramHealthView]", {
   programId,
   nodeCount: (capabilityNodes ?? []).length,
@@ -123,7 +130,7 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
 
 
   return {
-    snapshot: latestSnapshotsByHorizon.H0 ?? null,
+    snapshot: defaultSnapshot,
     capabilityNodes: (capabilityNodes ?? []) as ProgramHealthCapabilityNode[],
     absences: normalizedAbsences,
     latestSnapshotsByHorizon,

@@ -35,6 +35,7 @@ export type CapabilityNode = {
   id: string;
   program_id: string;
   node_code: string;
+  sector_key?: string | null;
   name: string;
   scope_type: "program" | "team";
   description: string | null;

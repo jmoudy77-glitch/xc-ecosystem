@@ -372,9 +372,14 @@ export function CapabilityDriftMap({
   const nodesBySector = React.useMemo(() => {
     const m = new Map<string, ProgramHealthCapabilityNode[]>();
     SECTORS.forEach((s) => m.set(s.key, []));
+    const valid = new Set(SECTORS.map((s) => s.key));
     nodes.forEach((n) => {
-      const idx = hashStr(String(n.id)) % SECTORS.length;
-      const key = SECTORS[idx].key;
+      const explicit = String((n as any).sector_key ?? "").trim();
+      const fromCode = String((n as any).node_code ?? "").trim();
+      const key =
+        (explicit && valid.has(explicit) ? explicit : null) ??
+        (fromCode && valid.has(fromCode) ? fromCode : null) ??
+        SECTORS[hashStr(String(n.id)) % SECTORS.length].key;
       const arr = m.get(key) ?? [];
       arr.push(n);
       m.set(key, arr);

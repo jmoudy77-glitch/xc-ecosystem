@@ -58,7 +58,9 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
   // 1) Capability structure (canonical surface)
   const { data: capabilityNodes, error: nodesErr } = await supabase
     .from("capability_nodes")
-    .select("*")
+    .select(
+      "id, program_id, node_code, sector_key, name, scope_type, description, is_active, created_at, updated_at"
+    )
     .eq("program_id", programId)
     .eq("is_active", true)
     .order("name", { ascending: true });

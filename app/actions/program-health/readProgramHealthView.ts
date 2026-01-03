@@ -59,7 +59,7 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
   const { data: capabilityNodes, error: nodesErr } = await supabase
     .from("capability_nodes")
     .select(
-      "id, program_id, node_code, sector_key, name, scope_type, description, is_active, created_at, updated_at"
+      "id, program_id, node_code, sector_key, ui_slot, name, scope_type, description, is_active, created_at, updated_at"
     )
     .eq("program_id", programId)
     .eq("is_active", true)

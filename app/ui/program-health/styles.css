@@ -809,6 +809,21 @@
   padding: 12px;
 }
 
+/* Hole dots rendered on the disc surface */
+.ph-hole-dot{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: currentColor;
+  color: rgba(255,70,70,0.95);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.35), 0 0 18px rgba(255,70,70,0.35);
+}
+
 /* ---------------------------------------------------------
    R4.1 — Instrument Sovereignty: No Slab/Card Ecology In Field
    Rule:

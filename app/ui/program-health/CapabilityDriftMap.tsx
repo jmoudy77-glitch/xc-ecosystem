@@ -336,6 +336,41 @@ function RadialPlaneScaffold(props: { hoverHorizon: Horizon | null; activeSliceI
   );
 }
 
+const HoleDots = ({ absences }: { absences: any[] }) => {
+  const dots = React.useMemo(() => {
+    return (absences ?? [])
+      .map((a) => {
+        const sectorKey = (a?.sector_key ?? "").toString().trim().toLowerCase();
+        const nodeId = (a?.capability_node_id ?? "").toString();
+        return { sectorKey, nodeId };
+      })
+      .filter((d) => d.nodeId);
+  }, [absences]);
+
+  if (!dots.length) return null;
+
+  return (
+    <div className="ph-radial-hole-dots absolute inset-0 pointer-events-none">
+      {dots.map((d, i) => {
+        const sectorIndex = Math.max(0, SECTORS.findIndex((s) => s.key === d.sectorKey));
+        const angleStart = (sectorIndex * 360) / SECTORS.length;
+        const angleMid = angleStart + 360 / SECTORS.length / 2;
+
+        return (
+          <div
+            key={`${d.nodeId}-${i}`}
+            className="ph-hole-dot"
+            style={{
+              transform: `rotate(${angleMid}deg) translateX(var(--ph-hole-dot-r, 340px))`,
+            }}
+            aria-hidden
+          />
+        );
+      })}
+    </div>
+  );
+};
+
 export function CapabilityDriftMap({
   capabilityNodes,
   absences,
@@ -370,21 +405,38 @@ export function CapabilityDriftMap({
   }, [nodes]);
 
   const nodesBySector = React.useMemo(() => {
-    const m = new Map<string, ProgramHealthCapabilityNode[]>();
-    SECTORS.forEach((s) => m.set(s.key, []));
+    const map = new Map<string, ProgramHealthCapabilityNode[]>();
     const valid = new Set(SECTORS.map((s) => s.key));
-    nodes.forEach((n) => {
-      const explicit = String((n as any).sector_key ?? "").trim();
-      const fromCode = String((n as any).node_code ?? "").trim();
-      const key =
-        (explicit && valid.has(explicit) ? explicit : null) ??
-        (fromCode && valid.has(fromCode) ? fromCode : null) ??
-        SECTORS[hashStr(String(n.id)) % SECTORS.length].key;
-      const arr = m.get(key) ?? [];
+    SECTORS.forEach((s) => map.set(s.key, []));
+
+    const sectorForNode = (n: ProgramHealthCapabilityNode) => {
+      const explicit = String(n.sector_key ?? "").trim().toLowerCase();
+      const fromCode = String(n.node_code ?? "").trim().toLowerCase();
+      if (explicit && valid.has(explicit)) return explicit;
+      if (fromCode && valid.has(fromCode)) return fromCode;
+      return "structure";
+    };
+
+    for (const n of nodes) {
+      const key = sectorForNode(n);
+      const arr = map.get(key) ?? [];
       arr.push(n);
-      m.set(key, arr);
-    });
-    return m;
+      map.set(key, arr);
+    }
+
+    for (const [key, arr] of map.entries()) {
+      arr.sort((a, b) => {
+        const as = Number.isFinite(Number(a.ui_slot)) ? Number(a.ui_slot) : 0;
+        const bs = Number.isFinite(Number(b.ui_slot)) ? Number(b.ui_slot) : 0;
+        if (as !== bs) return as - bs;
+        const an = (a.name ?? a.node_code ?? "").toString();
+        const bn = (b.name ?? b.node_code ?? "").toString();
+        return an.localeCompare(bn);
+      });
+      map.set(key, arr);
+    }
+
+    return map;
   }, [nodes]);
 
   const absencesByNodeId = React.useMemo(() => {
@@ -689,6 +741,7 @@ export function CapabilityDriftMap({
                 })()}
 
                 <div className="ph-radial-layer absolute inset-0">
+                  <HoleDots absences={_snapshot?.full_payload?.absences ?? []} />
                   {SECTORS.map((sector, sectorIndex) => {
                     const angleStart = (sectorIndex * 360) / SECTORS.length;
                     const sectorNodes = nodesBySector.get(sector.key) ?? [];

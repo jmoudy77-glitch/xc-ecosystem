@@ -23,6 +23,7 @@ export type ProgramHealthAbsence = {
   horizon: Horizon;
   absence_key: string;
   absence_type: string;
+  sector_key?: string | null;
   severity: string | null;
   details: any;
   canonical_event_id: string;
@@ -36,6 +37,7 @@ export type CapabilityNode = {
   program_id: string;
   node_code: string;
   sector_key?: string | null;
+  ui_slot?: number | null;
   name: string;
   scope_type: "program" | "team";
   description: string | null;

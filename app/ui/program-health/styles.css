@@ -824,6 +824,20 @@
   box-shadow: 0 0 0 2px rgba(0,0,0,0.35), 0 0 18px rgba(255,70,70,0.35);
 }
 
+.ph-disc-hole-layer{
+  pointer-events: none;
+}
+
+.ph-disc-hole-dot{
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 60, 60, 0.95);
+  box-shadow: 0 0 16px rgba(255, 60, 60, 0.45);
+  opacity: 0.95;
+}
+
 /* ---------------------------------------------------------
    R4.1 — Instrument Sovereignty: No Slab/Card Ecology In Field
    Rule:

@@ -103,6 +103,44 @@ function sliceIndexUnderReadLine(rotationDeg: number): number {
   return (idx + SLICE_COUNT) % SLICE_COUNT;
 }
 
+function stableHash(input: string): number {
+  // FNV-1a 32-bit (deterministic, fast, stable)
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function deriveUiSlot(absence: any, maxSlots: number) {
+  const raw = absence?.ui_slot;
+  const n =
+    raw == null
+      ? null
+      : typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+      ? Number(raw)
+      : null;
+  if (Number.isFinite(n as any)) {
+    const slot = Math.max(0, Math.floor(n as number));
+    return slot % maxSlots;
+  }
+
+  const key =
+    absence?.capability_node_id ??
+    `${absence?.absence_type ?? "unknown"}:${absence?.sport ?? "unknown"}`;
+  return stableHash(String(key)) % maxSlots;
+}
+
+function sectorKeyForAbsence(absence: any): string | null {
+  const k = absence?.sector_key;
+  if (k == null) return null;
+  const s = String(k).trim().toLowerCase();
+  return s.length ? s : null;
+}
+
 function sevBucket(severity: string | null | undefined): "critical" | "high" | "medium" | "low" | "unknown" {
   const s = normalizeSeverityToken(severity).toLowerCase();
   if (s.includes("critical")) return "critical";
@@ -335,41 +373,6 @@ function RadialPlaneScaffold(props: { hoverHorizon: Horizon | null; activeSliceI
     </svg>
   );
 }
-
-const HoleDots = ({ absences }: { absences: any[] }) => {
-  const dots = React.useMemo(() => {
-    return (absences ?? [])
-      .map((a) => {
-        const sectorKey = (a?.sector_key ?? "").toString().trim().toLowerCase();
-        const nodeId = (a?.capability_node_id ?? "").toString();
-        return { sectorKey, nodeId };
-      })
-      .filter((d) => d.nodeId);
-  }, [absences]);
-
-  if (!dots.length) return null;
-
-  return (
-    <div className="ph-radial-hole-dots absolute inset-0 pointer-events-none">
-      {dots.map((d, i) => {
-        const sectorIndex = Math.max(0, SECTORS.findIndex((s) => s.key === d.sectorKey));
-        const angleStart = (sectorIndex * 360) / SECTORS.length;
-        const angleMid = angleStart + 360 / SECTORS.length / 2;
-
-        return (
-          <div
-            key={`${d.nodeId}-${i}`}
-            className="ph-hole-dot"
-            style={{
-              transform: `rotate(${angleMid}deg) translateX(var(--ph-hole-dot-r, 340px))`,
-            }}
-            aria-hidden
-          />
-        );
-      })}
-    </div>
-  );
-};
 
 export function CapabilityDriftMap({
   capabilityNodes,
@@ -741,13 +744,42 @@ export function CapabilityDriftMap({
                 })()}
 
                 <div className="ph-radial-layer absolute inset-0">
-                  <HoleDots absences={_snapshot?.full_payload?.absences ?? []} />
                   {SECTORS.map((sector, sectorIndex) => {
                     const angleStart = (sectorIndex * 360) / SECTORS.length;
                     const sectorNodes = nodesBySector.get(sector.key) ?? [];
+                    const sectorAbsences =
+                      (_snapshot?.full_payload?.absences ?? []).filter(
+                        (a: any) => sectorKeyForAbsence(a) === sector.key
+                      ) ?? [];
 
                     return (
                       <div key={sector.key} className="absolute inset-0" style={{ transform: `rotate(${angleStart}deg)` }}>
+                        {sectorAbsences.length > 0 && (
+                          <div className="ph-disc-hole-layer absolute inset-0" aria-hidden>
+                            {(() => {
+                              const maxSlots = 12;
+                              const spanDeg = 360 / SECTORS.length;
+                              const radiusPx = 420;
+                              return sectorAbsences.slice(0, 50).map((a: any) => {
+                                const slot = deriveUiSlot(a, maxSlots);
+                                const t = (slot + 0.5) / maxSlots;
+                                const localDeg = -spanDeg / 2 + t * spanDeg;
+                                const rad = (localDeg * Math.PI) / 180;
+                                const x = Math.cos(rad) * radiusPx;
+                                const y = Math.sin(rad) * radiusPx;
+                                const holeKey = `${sector.key}:${a?.capability_node_id ?? a?.absence_type ?? "hole"}:${slot}`;
+                                return (
+                                  <div
+                                    key={holeKey}
+                                    className="ph-disc-hole-dot"
+                                    style={{ transform: `translate(calc(50% + ${x}px), calc(50% + ${y}px))` }}
+                                    title={String(a?.absence_type ?? "absence")}
+                                  />
+                                );
+                              });
+                            })()}
+                          </div>
+                        )}
                         {sectorNodes.map((n, idx) => {
                           const nodeAbsences = absencesByNodeId.mapped.get(n.id) ?? [];
                           const isFocusedCell = nodeAbsences.some((a) => a.id === selectedAbsenceId);

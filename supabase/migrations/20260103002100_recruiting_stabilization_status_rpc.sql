@@ -46,10 +46,11 @@ as $$
       else 'outside_tolerance'
     end as status_band,
     count(*)::integer as deficit_count,
-    max(severity) as max_severity,
+    max(deficits.severity) as max_severity,
     now() as computed_at
-  from deficits
-  cross join resolved_horizon rh;
+  from resolved_horizon rh
+  left join deficits on true
+  group by rh.horizon;
 $$;
 
 grant execute on function public.rpc_recruiting_stabilization_status(uuid, text, text) to authenticated;

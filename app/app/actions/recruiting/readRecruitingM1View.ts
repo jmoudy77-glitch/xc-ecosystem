@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
 
 const HORIZONS = ["H0", "H1", "H2", "H3"] as const;
 type Horizon = (typeof HORIZONS)[number];
@@ -35,6 +36,10 @@ export type RecruitingM1ViewModel = {
     message: string;
     recruitableAbsenceCount: number;
   };
+  m3?: {
+    ensure: any;
+    cohorts: any[];
+  };
 };
 
 async function readLatestSnapshotForHorizon(
@@ -60,7 +65,10 @@ function isRecruitableAbsence(a: any): boolean {
   return recruitability === "recruitable";
 }
 
-export async function readRecruitingM1View(programId: string): Promise<RecruitingM1ViewModel> {
+export async function readRecruitingM1View(
+  programId: string,
+  opts?: { sport?: string | null; horizon?: string | null }
+): Promise<RecruitingM1ViewModel> {
   const cookieStore = await cookies();
   const { supabase } = await supabaseServer(cookieStore);
 
@@ -109,6 +117,55 @@ export async function readRecruitingM1View(programId: string): Promise<Recruitin
       ? "Recruitable risk is within defined tolerances."
       : "Recruitable risk requires stabilization.";
 
+  const m3: { ensure: any; cohorts: any[] } = { ensure: null, cohorts: [] };
+  const horizon = (chosen?.horizon as string | null) ?? opts?.horizon ?? null;
+  const sport = (chosen?.sport as string | null) ?? opts?.sport ?? null;
+
+  if (horizon && sport) {
+    // M3: on-demand advisory compute trigger (service-role only) + cohort read surface.
+    // This is derived analytics only; it does not mutate Program Health or pipeline truth.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for M3 compute.");
+    }
+
+    const supabaseService = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Best-effort ensure; if no snapshot exists yet, it returns status=no_snapshot.
+    const { data: m3Ensure, error: m3EnsureError } = await supabaseService.rpc(
+      "rpc_recruiting_candidate_impacts_ensure_v1",
+      {
+        p_program_id: programId,
+        p_sport: sport,
+        p_horizon: horizon,
+      }
+    );
+
+    if (m3EnsureError) {
+      throw m3EnsureError;
+    }
+
+    // Cohorts are read under normal membership RLS (advisory surface).
+    const { data: m3Cohorts, error: m3CohortsError } = await supabase.rpc(
+      "rpc_recruiting_candidate_impact_cohorts",
+      {
+        p_program_id: programId,
+        p_sport: sport,
+        p_horizon: horizon,
+      }
+    );
+
+    if (m3CohortsError) {
+      throw m3CohortsError;
+    }
+
+    m3.ensure = m3Ensure;
+    m3.cohorts = m3Cohorts ?? [];
+  }
+
   return {
     programId,
     horizon: (chosen?.horizon as Horizon) ?? null,
@@ -120,5 +177,6 @@ export async function readRecruitingM1View(programId: string): Promise<Recruitin
       message,
       recruitableAbsenceCount,
     },
+    m3,
   };
 }

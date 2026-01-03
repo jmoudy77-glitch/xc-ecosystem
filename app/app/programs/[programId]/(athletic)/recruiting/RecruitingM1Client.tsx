@@ -19,6 +19,7 @@ function sortKey(a: RecruitingM1RecruitableAbsence) {
 }
 
 export default function RecruitingM1Client({ model }: { model: RecruitingM1ViewModel }) {
+  const m3Cohorts = model.m3?.cohorts ?? [];
   const items = React.useMemo(() => {
     const copy = [...(model.recruitableAbsences ?? [])];
     copy.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
@@ -127,6 +128,54 @@ export default function RecruitingM1Client({ model }: { model: RecruitingM1ViewM
           </div>
         </section>
       )}
+
+      {Array.isArray(m3Cohorts) && m3Cohorts.length > 0 ? (
+        <section aria-label="Candidate impact cohorts" className="rounded-xl border border-subtle bg-surface p-5">
+          <div className="text-xs font-semibold text-slate-100">Candidate impact (advisory)</div>
+          <div className="mt-1 text-[11px] text-muted">
+            Comparative risk-reduction tiers under current recruitable deficits. Not a recommendation and not completion.
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {[0, 1, 2, 3].map((tier) => {
+              const tierRows = m3Cohorts.filter((c: any) => c.best_cohort_tier === tier);
+              if (tierRows.length === 0) return null;
+
+              const title =
+                tier === 0
+                  ? "High stabilization contribution"
+                  : tier === 1
+                    ? "Moderate contribution"
+                    : tier === 2
+                      ? "Exploratory / long-horizon"
+                      : "Negligible under current deficits";
+
+              return (
+                <div key={tier} className="rounded-lg border border-subtle bg-surface/70 p-4">
+                  <div className="text-[11px] font-semibold text-slate-100">{title}</div>
+                  <div className="mt-3 space-y-2">
+                    {tierRows.slice(0, 8).map((row: any) => (
+                      <div key={row.recruit_id} className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-[11px] font-semibold text-slate-100">
+                            {row.recruit_name ?? row.recruit_id}
+                          </div>
+                          <div className="text-[11px] text-muted">
+                            touches {row.deficit_touch_count ?? 0} deficits
+                          </div>
+                        </div>
+                        <div className="text-[11px] tabular-nums text-muted">
+                          impact {Number(row.total_impact_score ?? 0).toFixed(2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

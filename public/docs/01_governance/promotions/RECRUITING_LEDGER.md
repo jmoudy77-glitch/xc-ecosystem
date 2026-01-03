@@ -72,3 +72,5 @@ This file is the canonical, append-only ledger of all sovereign Codex promotions
 
 | 20260103171117 | recruiting | m3 | compute-trigger | on-demand ensure impacts by inputs_hash |
 20260103173500 | recruiting(m3) | candidate impacts validation surface (rpc_recruiting_candidate_impacts_validate_v1)
+
+| 20260103172338 | recruiting | m3 | read | cohort read model enrich recruit_name |

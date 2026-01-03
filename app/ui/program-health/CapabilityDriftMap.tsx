@@ -45,6 +45,32 @@ type Props = {
   onAbsenceSelect?: (absenceId: string) => void;
 };
 
+type DriftAbsence = {
+  absence_type: string;
+  capability_node_id: string;
+  sector_key: string | null;
+  id?: string;
+  absence_key?: string;
+  severity?: string | null;
+  horizon?: string | null;
+};
+
+type DriftNode = {
+  id: string;
+  node_code: string;
+  sector_key: string | null;
+  ui_slot: number | null;
+};
+
+type DriftCard = {
+  capability_node_id: string;
+  sector_key: string | null;
+  ui_slot: number | null;
+  node_code: string;
+  absences: DriftAbsence[];
+  severity: number;
+};
+
 type AbsenceLevel = "critical" | "high" | "medium" | "low";
 type AbsenceLevelInput = AbsenceLevel | "unknown" | null | undefined;
 
@@ -68,6 +94,14 @@ const READ_LINE_DEG = -55;
 const READ_MATH_OFFSET_DEG = -20;
 const DISC_RADIUS_PX = 440;
 
+function polarTransform(localDeg: number, radiusPx: number) {
+  // Canonical placement contract for all on-disc elements:
+  // 1) anchor at disc center via left/top 50%
+  // 2) translate element origin to center (-50%,-50%)
+  // 3) rotate to angle, translate outward, rotate back to keep upright
+  return `translate(-50%, -50%) rotate(${localDeg}deg) translateX(${radiusPx}px) rotate(-${localDeg}deg)`;
+}
+
 const SECTOR_SUMMARY: Record<string, string> = {
   STRUCTURE:
     "Structural signals map the stability of the underlying system surface. Changes here indicate foundational shifts rather than transient fluctuations.",
@@ -83,14 +117,6 @@ const SECTOR_SUMMARY: Record<string, string> = {
     "Resilience reflects tolerance to stress and the ability to sustain function under pressure. The slice signals durability across adverse conditions.",
 };
 
-function hashStr(value: string) {
-  let h = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    h = (h * 31 + value.charCodeAt(i)) >>> 0;
-  }
-  return h;
-}
-
 function normalizeDeg(d: number): number {
   return ((d % 360) + 360) % 360;
 }
@@ -103,42 +129,42 @@ function sliceIndexUnderReadLine(rotationDeg: number): number {
   return (idx + SLICE_COUNT) % SLICE_COUNT;
 }
 
-function stableHash(input: string): number {
-  // FNV-1a 32-bit (deterministic, fast, stable)
-  let h = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
+function buildDriftCards(opts: { absences: DriftAbsence[]; nodesById: Map<string, DriftNode> }) {
+  const { absences, nodesById } = opts;
+  const byNode = new Map<string, DriftCard>();
+
+  for (const a of absences) {
+    const node = nodesById.get(a.capability_node_id);
+    if (!node) continue;
+
+    let card = byNode.get(a.capability_node_id);
+    if (!card) {
+      card = {
+        capability_node_id: a.capability_node_id,
+        sector_key: node.sector_key ?? a.sector_key ?? null,
+        ui_slot: node.ui_slot ?? null,
+        node_code: node.node_code,
+        absences: [],
+        severity: 0,
+      };
+      byNode.set(a.capability_node_id, card);
+    }
+
+    card.absences.push(a);
+    card.severity += 1;
   }
-  return h >>> 0;
-}
 
-function deriveUiSlot(absence: any, maxSlots: number) {
-  const raw = absence?.ui_slot;
-  const n =
-    raw == null
-      ? null
-      : typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-      ? Number(raw)
-      : null;
-  if (Number.isFinite(n as any)) {
-    const slot = Math.max(0, Math.floor(n as number));
-    return slot % maxSlots;
-  }
+  return Array.from(byNode.values()).sort((x, y) => {
+    const sx = x.sector_key ?? "";
+    const sy = y.sector_key ?? "";
+    if (sx !== sy) return sx.localeCompare(sy);
 
-  const key =
-    absence?.capability_node_id ??
-    `${absence?.absence_type ?? "unknown"}:${absence?.sport ?? "unknown"}`;
-  return stableHash(String(key)) % maxSlots;
-}
+    const ux = x.ui_slot ?? Number.POSITIVE_INFINITY;
+    const uy = y.ui_slot ?? Number.POSITIVE_INFINITY;
+    if (ux !== uy) return ux - uy;
 
-function sectorKeyForAbsence(absence: any): string | null {
-  const k = absence?.sector_key;
-  if (k == null) return null;
-  const s = String(k).trim().toLowerCase();
-  return s.length ? s : null;
+    return x.node_code.localeCompare(y.node_code);
+  });
 }
 
 function sevBucket(severity: string | null | undefined): "critical" | "high" | "medium" | "low" | "unknown" {
@@ -390,6 +416,11 @@ export function CapabilityDriftMap({
 }: Props) {
   const highlightSet = React.useMemo(() => new Set(highlightAbsenceIds ?? []), [highlightAbsenceIds]);
   const lineageSet = React.useMemo(() => new Set(lineageNodeIds ?? []), [lineageNodeIds]);
+  const [selectedCapabilityNodeId, setSelectedCapabilityNodeId] = React.useState<string | null>(null);
+  const [hoveredCapabilityNodeId, setHoveredCapabilityNodeId] = React.useState<string | null>(null);
+  const [hoverHorizon, setHoverHorizon] = React.useState<Horizon | null>(null);
+
+  const activeCapabilityNodeId = hoveredCapabilityNodeId ?? selectedCapabilityNodeId;
 
   const nodes = React.useMemo(() => {
     return [...capabilityNodes].sort((a, b) => {
@@ -401,65 +432,78 @@ export function CapabilityDriftMap({
     });
   }, [capabilityNodes]);
 
-  const nodeIndexById = React.useMemo(() => {
-    const m = new Map<string, number>();
-    nodes.forEach((n, i) => m.set(n.id, i));
+  const nodesById = React.useMemo(() => {
+    const m = new Map<string, ProgramHealthCapabilityNode>();
+    nodes.forEach((n) => m.set(n.id, n));
     return m;
   }, [nodes]);
 
-  const nodesBySector = React.useMemo(() => {
-    const map = new Map<string, ProgramHealthCapabilityNode[]>();
-    const valid = new Set(SECTORS.map((s) => s.key));
-    SECTORS.forEach((s) => map.set(s.key, []));
-
-    const sectorForNode = (n: ProgramHealthCapabilityNode) => {
-      const explicit = String(n.sector_key ?? "").trim().toLowerCase();
-      const fromCode = String(n.node_code ?? "").trim().toLowerCase();
-      if (explicit && valid.has(explicit)) return explicit;
-      if (fromCode && valid.has(fromCode)) return fromCode;
-      return "structure";
-    };
-
-    for (const n of nodes) {
-      const key = sectorForNode(n);
-      const arr = map.get(key) ?? [];
-      arr.push(n);
-      map.set(key, arr);
-    }
-
-    for (const [key, arr] of map.entries()) {
-      arr.sort((a, b) => {
-        const as = Number.isFinite(Number(a.ui_slot)) ? Number(a.ui_slot) : 0;
-        const bs = Number.isFinite(Number(b.ui_slot)) ? Number(b.ui_slot) : 0;
-        if (as !== bs) return as - bs;
-        const an = (a.name ?? a.node_code ?? "").toString();
-        const bn = (b.name ?? b.node_code ?? "").toString();
-        return an.localeCompare(bn);
+  const driftNodesById = React.useMemo(() => {
+    const m = new Map<string, DriftNode>();
+    nodes.forEach((n) => {
+      m.set(n.id, {
+        id: n.id,
+        node_code: n.node_code,
+        sector_key: n.sector_key ?? null,
+        ui_slot: n.ui_slot ?? null,
       });
-      map.set(key, arr);
-    }
-
-    return map;
+    });
+    return m;
   }, [nodes]);
 
+  const snapshotAbsences = React.useMemo<DriftAbsence[]>(() => {
+    const raw = (_snapshot as any)?.full_payload?.absences;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((a: any) => {
+      const h = (a?.horizon ?? "").toString().toUpperCase();
+      const effectiveHorizon = (hoverHorizon ?? selectedHorizon).toString().toUpperCase();
+      return h === effectiveHorizon;
+    });
+  }, [_snapshot, hoverHorizon, selectedHorizon]);
+
+  const driftCards = React.useMemo(() => {
+    return buildDriftCards({ absences: snapshotAbsences, nodesById: driftNodesById });
+  }, [snapshotAbsences, driftNodesById]);
+
+  type SectorKey = (typeof SECTORS)[number]["key"];
+
+  const cardsBySector = React.useMemo(() => {
+    const valid = new Set<SectorKey>(SECTORS.map((s) => s.key as SectorKey));
+    const map = new Map<SectorKey, DriftCard[]>();
+    for (const card of driftCards) {
+      const keyRaw = (card.sector_key ?? "").toString().trim().toLowerCase();
+      if (!keyRaw) continue;
+      if (!valid.has(keyRaw as SectorKey)) continue;
+      const key = keyRaw as SectorKey;
+      const arr = map.get(key) ?? [];
+      arr.push(card);
+      map.set(key, arr);
+    }
+    return map;
+  }, [driftCards]);
+
+  const driftCardIds = React.useMemo(() => {
+    return new Set(driftCards.map((c) => c.capability_node_id));
+  }, [driftCards]);
+
+  React.useEffect(() => {
+    if (selectedCapabilityNodeId && !driftCardIds.has(selectedCapabilityNodeId)) {
+      setSelectedCapabilityNodeId(null);
+    }
+    if (hoveredCapabilityNodeId && !driftCardIds.has(hoveredCapabilityNodeId)) {
+      setHoveredCapabilityNodeId(null);
+    }
+  }, [driftCardIds, selectedCapabilityNodeId, hoveredCapabilityNodeId]);
+
   const absencesByNodeId = React.useMemo(() => {
-    const m = new Map<string, ProgramHealthAbsence[]>();
-    const unmapped: ProgramHealthAbsence[] = [];
+    const m = new Map<string, DriftAbsence[]>();
+    const unmapped: DriftAbsence[] = [];
 
-    for (const a of absences) {
-      const details = (a.details ?? {}) as any;
-
-      // R4_2_0: Resolve node id from details OR top-level canonical fields.
-      // This prevents lawful absences from going 'unmapped' due to payload shape variance.
-      const capabilityNodeId =
-        (details?.capability_node_id as string | undefined) ??
-        ((a as any).capability_node_id as string | undefined) ??
-        ((a as any).capabilityNodeId as string | undefined);
-
-      if (capabilityNodeId && nodeIndexById.has(capabilityNodeId)) {
-        const arr = m.get(capabilityNodeId) ?? [];
+    for (const a of snapshotAbsences) {
+      if (a.capability_node_id && driftNodesById.has(a.capability_node_id)) {
+        const arr = m.get(a.capability_node_id) ?? [];
         arr.push(a);
-        m.set(capabilityNodeId, arr);
+        m.set(a.capability_node_id, arr);
       } else {
         unmapped.push(a);
       }
@@ -485,14 +529,13 @@ export function CapabilityDriftMap({
     });
 
     return { mapped: m, unmapped };
-  }, [absences, nodeIndexById]);
+  }, [snapshotAbsences, driftNodesById]);
 
   const hasSelection = Boolean(selectedAbsenceId);
   const planeRef = React.useRef<HTMLDivElement | null>(null);
   const discStageRef = React.useRef<HTMLDivElement | null>(null);
 
   const [discSpinDeg, setDiscSpinDeg] = React.useState(0);
-  const [hoverHorizon, setHoverHorizon] = React.useState<Horizon | null>(null);
   const [horizonPanelOpen, setHorizonPanelOpen] = React.useState(false);
   const [panelHorizon, setPanelHorizon] = React.useState<Horizon>("H0");
   const dragActiveRef = React.useRef(false);
@@ -561,7 +604,6 @@ export function CapabilityDriftMap({
     dragActiveRef.current = false;
   };
 
-  const activeHorizon = hoverHorizon ?? selectedHorizon;
   const isPinnedByClick = hoverHorizon == null;
 
   const handleHorizonHover = React.useCallback((h: Horizon | null) => {
@@ -746,65 +788,100 @@ export function CapabilityDriftMap({
                 <div className="ph-radial-layer absolute inset-0">
                   {SECTORS.map((sector, sectorIndex) => {
                     const angleStart = (sectorIndex * 360) / SECTORS.length;
-                    const sectorNodes = nodesBySector.get(sector.key) ?? [];
-                    const sectorAbsences =
-                      (_snapshot?.full_payload?.absences ?? []).filter(
-                        (a: any) => sectorKeyForAbsence(a) === sector.key
-                      ) ?? [];
+                    const sectorCards = cardsBySector.get(sector.key) ?? [];
+                    const sectorCount = Math.max(1, sectorCards.length);
+                    const sectorAbsencesAll = snapshotAbsences.filter((a) => {
+                      const k = (a.sector_key ?? "").toString().trim().toLowerCase();
+                      return k === sector.key;
+                    });
+                    // Canonical truth list for this sector: snapshot payload filtered to active horizon.
+                    const sectorAbsences = sectorAbsencesAll;
 
                     return (
                       <div key={sector.key} className="absolute inset-0" style={{ transform: `rotate(${angleStart}deg)` }}>
-                        {sectorAbsences.length > 0 && (
+                        {sectorCards.length > 0 && (
                           <div className="ph-disc-hole-layer absolute inset-0" aria-hidden>
                             {(() => {
-                              const maxSlots = 12;
                               const spanDeg = 360 / SECTORS.length;
                               const radiusPx = 420;
-                              return sectorAbsences.slice(0, 50).map((a: any) => {
-                                const slot = deriveUiSlot(a, maxSlots);
-                                const t = (slot + 0.5) / maxSlots;
+                              return sectorCards.map((card, idx) => {
+                                const t = (idx + 0.5) / sectorCount;
                                 const localDeg = -spanDeg / 2 + t * spanDeg;
-                                const rad = (localDeg * Math.PI) / 180;
-                                const x = Math.cos(rad) * radiusPx;
-                                const y = Math.sin(rad) * radiusPx;
-                                const holeKey = `${sector.key}:${a?.capability_node_id ?? a?.absence_type ?? "hole"}:${slot}`;
+                                const holeKey = `${sector.key}:${card.capability_node_id}:${card.ui_slot ?? "na"}:${idx}`;
+                                const isActive = activeCapabilityNodeId === card.capability_node_id;
                                 return (
                                   <div
                                     key={holeKey}
-                                    className="ph-disc-hole-dot"
-                                    style={{ transform: `translate(calc(50% + ${x}px), calc(50% + ${y}px))` }}
-                                    title={String(a?.absence_type ?? "absence")}
+                                    className={["ph-disc-hole-dot", isActive ? "is-active" : ""].join(" ")}
+                                    style={{
+                                      position: "absolute",
+                                      left: "50%",
+                                      top: "50%",
+                                      transform: polarTransform(localDeg, radiusPx),
+                                    }}
+                                    title={card.node_code}
+                                    onPointerEnter={() => setHoveredCapabilityNodeId(card.capability_node_id)}
+                                    onPointerLeave={() => setHoveredCapabilityNodeId(null)}
+                                    onClick={(evt) => {
+                                      evt.stopPropagation();
+                                      setSelectedCapabilityNodeId((prev) =>
+                                        prev === card.capability_node_id ? null : card.capability_node_id
+                                      );
+                                    }}
                                   />
                                 );
                               });
                             })()}
                           </div>
                         )}
-                        {sectorNodes.map((n, idx) => {
-                          const nodeAbsences = absencesByNodeId.mapped.get(n.id) ?? [];
+                        {sectorCards.map((card, idx) => {
+                          const n = nodesById.get(card.capability_node_id);
+                          if (!n) return null;
+
+                          // Plates must be backed by snapshot payload (disc truth), not prop absences (can drift).
+                          // Plates use the same horizon-filtered payload list as the disc dots (1:1 truth).
+                          const nodeAbsences = sectorAbsences.filter((a: any) => {
+                            const id = (a?.capability_node_id ?? a?.capabilityNodeId) as string | undefined;
+                            return id === n.id;
+                          });
                           const isFocusedCell = nodeAbsences.some((a) => a.id === selectedAbsenceId);
-                          const count = Math.max(1, sectorNodes.length);
-                          const r = 200 + (idx % 4) * 40;
-                          const thetaWithinSector = (idx / count) * (360 / SECTORS.length);
-                          const finalAngle = angleStart + thetaWithinSector;
+                          const isActive = activeCapabilityNodeId === card.capability_node_id;
+                          // Anchor node plates to the same deterministic sloting model as disc holes.
+                          // Parent wrapper already applies `rotate(angleStart)`; child must use LOCAL sector angle only.
+                          const spanDeg = 360 / SECTORS.length;
+                          const maxSlots = 12;
+                          const rawSlot = Number.isFinite(Number(card.ui_slot)) ? Number(card.ui_slot) : idx;
+                          const slot = ((Math.floor(rawSlot) % maxSlots) + maxSlots) % maxSlots;
+                          const t = (slot + 0.5) / maxSlots;
+                          const localDeg = -spanDeg / 2 + t * spanDeg;
+                          const stack = Math.floor(idx / maxSlots);
+                          // Canonical plate radius: keep inside the disc while remaining legible.
+                          const r = 260 + stack * 56;
 
                           return (
                             <div
-                              key={n.id}
-                              id={`ph-node-${n.id}`}
-                              data-node-id={n.id}
+                              key={card.capability_node_id}
+                              id={`ph-node-${card.capability_node_id}`}
+                              data-node-id={card.capability_node_id}
                               className={[
                                 "ph-node-cell",
                                 "ph-node-plate",
                                 "ph-node-radial",
                                 isFocusedCell ? "is-focused" : "",
                                 hasSelection && !isFocusedCell ? "is-dimmed" : "",
+                                isActive ? "is-active" : "",
                               ].join(" ")}
                               style={{
                                 position: "absolute",
                                 left: "50%",
                                 top: "50%",
-                                transform: `rotate(${finalAngle}deg) translateX(${r}px) rotate(-${finalAngle}deg)`,
+                                transform: polarTransform(localDeg, r),
+                              }}
+                              onMouseEnter={() => setHoveredCapabilityNodeId(card.capability_node_id)}
+                              onMouseLeave={() => setHoveredCapabilityNodeId(null)}
+                              onClick={(evt) => {
+                                evt.stopPropagation();
+                                setSelectedCapabilityNodeId(card.capability_node_id);
                               }}
                             >
                               <div className="ph-node-cell-header">
@@ -841,8 +918,10 @@ export function CapabilityDriftMap({
                                   const sev = sevBucket(a.severity);
                                   const size = sizeBucket(sev);
                                   const lvl = normalizeLevel(sev);
-                                  const isSelected = selectedAbsenceId === a.id;
-                                  const isHighlighted = highlightSet.has(a.id) && !isSelected;
+                                  const absenceId: string | null =
+                                    (a?.id ?? a?.absence_key ?? null) as string | null;
+                                  const isSelected = absenceId != null && selectedAbsenceId === absenceId;
+                                  const isHighlighted = absenceId != null && highlightSet.has(absenceId) && !isSelected;
                                   const depthCls = horizonDepthClass(a.horizon);
 
                                   const offsetCls = `ph-hole-pos-${holeIdx}`;
@@ -859,16 +938,21 @@ export function CapabilityDriftMap({
                                   ].join(" ");
 
                                   const handleSelect = () => {
+                                    if (!absenceId) return;
                                     if (onAbsenceSelect) {
-                                      onAbsenceSelect(a.id);
+                                      onAbsenceSelect(absenceId);
                                       return;
                                     }
-                                    onSelect(a.id);
+                                    onSelect(absenceId);
                                   };
 
                                   return (
                                     <button
-                                      key={a.id}
+                                      key={
+                                        a.id ??
+                                        a.absence_key ??
+                                        `${n.id}:${a.absence_type ?? "absence"}:${holeIdx}`
+                                      }
                                       type="button"
                                       className={cls}
                                       style={{
@@ -880,7 +964,7 @@ export function CapabilityDriftMap({
                                       onClick={handleSelect}
                                       onMouseEnter={() => {
                                         if (!onAbsenceHover) return;
-                                        onAbsenceHover(a.id, {
+                                        onAbsenceHover(absenceId, {
                                           capabilityLabel: n.name ?? n.node_code ?? "Unknown capability",
                                           level: lvl,
                                         });
@@ -1052,7 +1136,11 @@ export function CapabilityDriftMap({
                 </div>
               ) : null}
 
-              <HorizonGlyphRail activeHorizon={activeHorizon} pinnedHorizon={selectedHorizon} isPinnedByClick={isPinnedByClick} />
+              <HorizonGlyphRail
+                activeHorizon={hoverHorizon ?? selectedHorizon}
+                pinnedHorizon={selectedHorizon}
+                isPinnedByClick={isPinnedByClick}
+              />
             </div>
 
             {lineageSet.size > 0 ? (
@@ -1076,23 +1164,25 @@ export function CapabilityDriftMap({
               const sev = sevBucket(a.severity);
               const size = sizeBucket(sev);
               const lvl = normalizeLevel(sev);
-              const active = a.id === selectedAbsenceId;
+              const absenceId: string | null = (a?.id ?? a?.absence_key ?? null) as string | null;
+              const active = absenceId != null && absenceId === selectedAbsenceId;
               const depthCls = horizonDepthClass(a.horizon);
 
               return (
                 <button
-                  key={a.id}
+                  key={a.id ?? a.absence_key ?? `${a.absence_type ?? "absence"}:${a.capability_node_id ?? "unmapped"}`}
                   type="button"
                   className={["ph-void-token", `sev-${sev}`, `size-${size}`, depthCls, active ? "is-selected" : ""].join(" ")}
                   onClick={() => {
+                    if (!absenceId) return;
                     if (onAbsenceSelect) {
-                      onAbsenceSelect(a.id);
+                      onAbsenceSelect(absenceId);
                       return;
                     }
-                    onSelect(a.id);
+                    onSelect(absenceId);
                   }}
                   onMouseEnter={() => {
-                    onAbsenceHover?.(a.id, {
+                    onAbsenceHover?.(absenceId, {
                       capabilityLabel: "Unmapped",
                       level: lvl,
                     });

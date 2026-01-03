@@ -2,7 +2,8 @@
 **Authority Level:** Operational Module (binding)  
 **Scope:** Coach-facing recruiting pipeline management and evaluation workflows  
 **Dependencies:** `01_governance/*`, `02_architecture/*`, `03_domain_models/recruiting_domain.md`  
-**Boundary:** Downstream of Program Health; upstream of Roster-building
+**Boundary:** Downstream (diagnostic authority) of Program Health; upstream of Roster-building  
+**Governance:** `governance/modules/recruiting/genesis/module/recruiting/ratified/*`
 
 ---
 
@@ -84,7 +85,8 @@ A coach should be able to:
 ---
 
 ## 6. Non-negotiables
-- Recruiting must remain downstream of Program Health and upstream of Roster-building. fileciteturn2file4L12-L12
-- No silent automation of pipeline state changes.
-- Any forecast must be labeled as forecast with uncertainty.
-- Minimal-touch is mandatory: high-frequency actions must be single-click or drag-first.
+- Recruiting must consume Program Health as canonical diagnostic authority and remain upstream of Roster-building.
+- Recruiting operates exclusively on recruitable deficits (mitigatable via athlete additions).
+- Recruiting must not surface non-recruitable absences in Recruiting UI or summaries.
+- Recruiting is continuous and coach-owned; the system may signal sufficiency via tone decay but must not declare completion.
+- AI outputs are comparative and advisory; the system adapts silently to coach decisions.

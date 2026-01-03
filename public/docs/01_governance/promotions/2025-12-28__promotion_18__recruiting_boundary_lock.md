@@ -34,3 +34,9 @@ Recruiting must expose stable, deterministic outputs for:
 ## 4) Finalization
 
 No future feature, model, or UI surface may violate this contract.
+
+---
+## Alignment note (2026-01-03)
+Recruiting governance is now ratified in `governance/modules/recruiting/genesis/module/recruiting/ratified/*`.
+Where earlier language implied context visibility of non-recruitable absences inside Recruiting, the ratified Recruiting law prevails:
+non-recruitable absences are invisible within Recruiting and require intentional navigation to Program Health.

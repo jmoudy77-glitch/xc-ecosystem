@@ -29,3 +29,8 @@ Mitigation may not:
 ## 4) Finalization
 
 No future recruiting feature, model, or UI surface may violate this contract.
+
+---
+## Alignment note (2026-01-03)
+Absence mitigation remains canonical for recruitable deficits only. Non-recruitable absences are not surfaced inside Recruiting UI per
+`governance/modules/recruiting/genesis/module/recruiting/ratified/30_visibility_tone_constraints.md`.

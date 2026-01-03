@@ -67,3 +67,5 @@ This file is the canonical, append-only ledger of all sovereign Codex promotions
 | 20260103165948 | recruiting | m3 | schema | recruiting_candidate_impacts schema hardening + RLS |
 
 | 20260103170139 | recruiting | m3 | compute | materialize recruiting_candidate_impacts |
+
+| 20260103170243 | recruiting | m3 | read | candidate impact cohort read surface |

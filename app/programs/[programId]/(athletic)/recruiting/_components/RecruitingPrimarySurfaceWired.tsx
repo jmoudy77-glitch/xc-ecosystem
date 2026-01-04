@@ -21,7 +21,13 @@ type Props = {
 };
 
 export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props) {
-  const { rows, dispatch } = useRecruitingSlots(initialRows);
+  const { rows, dispatch } = useRecruitingSlots(initialRows, {
+    onRecruitReturn: (ev) => {
+      // Recruit discovery portal will consume this to restore to Favorites or Surfaced.
+      // Intentionally side-effect free for now.
+      console.info("[recruiting] recruit return", ev);
+    },
+  });
 
   const [expanded, setExpanded] = React.useState<ExpandedKey>(null);
   const [modalOpen, setModalOpen] = React.useState(false);

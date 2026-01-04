@@ -51,6 +51,13 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
     [dispatch]
   );
 
+  const onRemoveAthlete = React.useCallback(
+    (eventGroupKey: string, slotId: string, athleteId: string) => {
+      dispatch({ type: "REMOVE_ATHLETE", eventGroupKey, slotId, athleteId });
+    },
+    [dispatch]
+  );
+
   const renderDropZone = React.useCallback(
     (slot: RecruitingSlot) => (
       <SlotDropZone
@@ -77,6 +84,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
         onToggleExpand={onToggleExpand}
         onOpenAthlete={onOpenAthlete}
         onSetPrimary={onSetPrimary}
+        onRemoveAthlete={onRemoveAthlete}
         renderDropZone={renderDropZone}
       />
 

@@ -10,6 +10,7 @@ import type {
   RecruitingAthleteSummary,
 } from "./types";
 import { DraggableAthleteChip } from "./DraggableAthleteChip";
+import { SlotRemoveDropZone } from "./SlotRemoveDropZone";
 
 type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
@@ -22,6 +23,7 @@ type Props = {
 
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
 
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 };
@@ -33,6 +35,7 @@ export function RecruitingPrimarySurfaceSkeleton({
   onToggleExpand,
   onOpenAthlete,
   onSetPrimary,
+  onRemoveAthlete,
   renderDropZone,
 }: Props) {
   return (
@@ -62,11 +65,17 @@ export function RecruitingPrimarySurfaceSkeleton({
               onToggleExpand={onToggleExpand}
               onOpenAthlete={onOpenAthlete}
               onSetPrimary={onSetPrimary}
+              onRemoveAthlete={onRemoveAthlete}
               renderDropZone={renderDropZone}
             />
           ))
         )}
       </div>
+
+      <SlotRemoveDropZone
+        slot={slot}
+        onRemoveAthlete={(athleteId) => onRemoveAthlete(row.eventGroupKey, slot.slotId, athleteId)}
+      />
     </div>
   );
 }
@@ -88,6 +97,7 @@ function EventGroupRow({
   onToggleExpand,
   onOpenAthlete,
   onSetPrimary,
+  onRemoveAthlete,
   renderDropZone,
 }: {
   row: RecruitingEventGroupRow;
@@ -95,6 +105,7 @@ function EventGroupRow({
   onToggleExpand: (eventGroupKey: string, slotId: string) => void;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 }) {
   const expandedSlot =
@@ -135,6 +146,7 @@ function EventGroupRow({
               slot={expandedSlot}
               onOpenAthlete={onOpenAthlete}
               onSetPrimary={onSetPrimary}
+              onRemoveAthlete={onRemoveAthlete}
             />
           ) : (
             <div className="rounded-xl border border-subtle bg-surface p-4">
@@ -154,6 +166,7 @@ function EventGroupRow({
             slot={expandedSlot}
             onOpenAthlete={onOpenAthlete}
             onSetPrimary={onSetPrimary}
+            onRemoveAthlete={onRemoveAthlete}
           />
         </div>
       ) : null}
@@ -231,11 +244,13 @@ function ExpandedSlotPanel({
   slot,
   onOpenAthlete,
   onSetPrimary,
+  onRemoveAthlete,
 }: {
   row: RecruitingEventGroupRow;
   slot: RecruitingSlot;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
 }) {
   const athletes = slot.athleteIds.map((id) => slot.athletesById[id]).filter(Boolean);
   const requiresSelection = slot.primaryAthleteId === null && slot.athleteIds.length >= 2;

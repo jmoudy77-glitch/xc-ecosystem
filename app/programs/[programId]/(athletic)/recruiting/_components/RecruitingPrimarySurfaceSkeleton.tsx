@@ -71,11 +71,6 @@ export function RecruitingPrimarySurfaceSkeleton({
           ))
         )}
       </div>
-
-      <SlotRemoveDropZone
-        slot={slot}
-        onRemoveAthlete={(athleteId) => onRemoveAthlete(row.eventGroupKey, slot.slotId, athleteId)}
-      />
     </div>
   );
 }
@@ -84,9 +79,7 @@ function EmptyState() {
   return (
     <div className="rounded-xl border border-subtle bg-surface p-6">
       <p className="text-xs font-semibold text-slate-100">No event groups</p>
-      <p className="mt-1 text-[11px] text-muted">
-        Data wiring is not yet connected.
-      </p>
+      <p className="mt-1 text-[11px] text-muted">Data wiring is not yet connected.</p>
     </div>
   );
 }
@@ -151,9 +144,7 @@ function EventGroupRow({
           ) : (
             <div className="rounded-xl border border-subtle bg-surface p-4">
               <div className="text-xs font-semibold text-slate-100">Slot details</div>
-              <div className="mt-1 text-[11px] text-muted">
-                Click a slot to expand (no hover semantics).
-              </div>
+              <div className="mt-1 text-[11px] text-muted">Click a slot to expand (no hover semantics).</div>
             </div>
           )}
         </div>
@@ -190,9 +181,7 @@ function SlotCard({
 
   return (
     <div className="relative">
-      {renderDropZone ? (
-        <div className="absolute inset-0 z-10">{renderDropZone(slot)}</div>
-      ) : null}
+      {renderDropZone ? <div className="absolute inset-0 z-10">{renderDropZone(slot)}</div> : null}
 
       <button
         type="button"
@@ -214,9 +203,7 @@ function SlotCard({
             </span>
           </div>
 
-          <div className="text-[10px] text-muted">
-            {slot.primaryAthleteId ? "PRIMARY set" : "PRIMARY empty"}
-          </div>
+          <div className="text-[10px] text-muted">{slot.primaryAthleteId ? "PRIMARY set" : "PRIMARY empty"}</div>
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3">
@@ -297,6 +284,11 @@ function ExpandedSlotPanel({
           })
         )}
       </div>
+
+      <SlotRemoveDropZone
+        slot={slot}
+        onRemoveAthlete={(athleteId) => onRemoveAthlete(row.eventGroupKey, slot.slotId, athleteId)}
+      />
     </div>
   );
 }
@@ -326,9 +318,7 @@ function PrimaryAvatar({
         aria-label="Primary athlete avatar"
       >
         {primary?.displayName ? (
-          <span className="text-[12px] font-semibold text-slate-100">
-            {initials(primary.displayName)}
-          </span>
+          <span className="text-[12px] font-semibold text-slate-100">{initials(primary.displayName)}</span>
         ) : (
           <span className="text-[12px] text-slate-400">+</span>
         )}
@@ -355,11 +345,7 @@ function PrimaryAvatar({
 
 function PresenceMeter({ primary }: { primary: RecruitingAthleteSummary | null }) {
   if (!primary) {
-    return (
-      <div className="text-[10px] text-muted">
-        Meter renders only on PRIMARY (locked behavior)
-      </div>
-    );
+    return <div className="text-[10px] text-muted">Meter renders only on PRIMARY (locked behavior)</div>;
   }
 
   const fillPct = primary.type === "recruit" ? 0 : 58;

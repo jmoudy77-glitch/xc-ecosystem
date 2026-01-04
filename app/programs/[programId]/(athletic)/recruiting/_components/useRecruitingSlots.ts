@@ -1,96 +1,146 @@
 // app/programs/[programId]/(athletic)/recruiting/_components/useRecruitingSlots.ts
+
 "use client";
 
 import * as React from "react";
 import { RECRUITING_UI } from "./recruitingUiConstants";
-import type { RecruitingEventGroupRow } from "./types";
-
-type State = RecruitingEventGroupRow[];
+import type {
+  RecruitingEventGroupRow,
+  RecruitingSlot,
+  RecruitingAthleteSummary,
+} from "./types";
 
 type Action =
   | { type: "DROP_IN_SLOT"; eventGroupKey: string; slotId: string; athleteId: string }
-  | { type: "REMOVE_ATHLETE"; eventGroupKey: string; slotId: string; athleteId: string }
-  | { type: "SET_PRIMARY"; eventGroupKey: string; slotId: string; athleteId: string };
+  | { type: "SET_PRIMARY"; eventGroupKey: string; slotId: string; athleteId: string }
+  | { type: "REMOVE_ATHLETE"; eventGroupKey: string; slotId: string; athleteId: string };
 
-export function useRecruitingSlots(initial: State) {
-  const [rows, dispatch] = React.useReducer(reducer, initial);
-  return { rows, dispatch };
+type State = {
+  rows: RecruitingEventGroupRow[];
+};
+
+export function useRecruitingSlots(initialRows: RecruitingEventGroupRow[]) {
+  const [state, dispatch] = React.useReducer(reducer, { rows: initialRows });
+
+  return { rows: state.rows, dispatch } as const;
 }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "DROP_IN_SLOT": {
-      return state.map((row) => {
-        if (row.eventGroupKey !== action.eventGroupKey) return row;
+      const { eventGroupKey, slotId, athleteId } = action;
+      return {
+        rows: state.rows.map((row) => {
+          if (row.eventGroupKey !== eventGroupKey) return row;
 
-        return {
-          ...row,
-          slots: row.slots.map((slot) => {
-            if (slot.slotId !== action.slotId) return slot;
+          // Recruits: may exist in only one slot at a time.
+          // Returning athletes: allowed to exist in this slot; uniqueness not enforced across rows in this mock.
+          const nextSlots = row.slots.map((slot) => {
+            // If athlete already in this slot, no-op
+            if (slot.athleteIds.includes(athleteId)) return slot;
 
-            // cap enforcement
-            if (slot.athleteIds.length >= RECRUITING_UI.slotMaxOccupancy) return slot;
+            // Enforce cap
+            if (slot.slotId === slotId && slot.athleteIds.length >= RECRUITING_UI.slotMaxOccupancy) return slot;
 
-            // uniqueness within slot
-            if (slot.athleteIds.includes(action.athleteId)) return slot;
-
-            const athleteIds = [...slot.athleteIds, action.athleteId];
-
-            // deterministic: empty slot -> dropped athlete becomes PRIMARY
-            // deterministic: filled slot -> dropped athlete becomes SECONDARY (no primary change)
-            const primaryAthleteId = slot.primaryAthleteId ?? action.athleteId;
-
-            return { ...slot, athleteIds, primaryAthleteId };
-          }),
-        };
-      });
-    }
-
-    case "REMOVE_ATHLETE": {
-      return state.map((row) => {
-        if (row.eventGroupKey !== action.eventGroupKey) return row;
-
-        return {
-          ...row,
-          slots: row.slots.map((slot) => {
-            if (slot.slotId !== action.slotId) return slot;
-
-            if (!slot.athleteIds.includes(action.athleteId)) return slot;
-
-            const athleteIds = slot.athleteIds.filter((id) => id !== action.athleteId);
-            let primaryAthleteId = slot.primaryAthleteId;
-
-            // deterministic primary removal behavior (selection-state UI will be added later):
-            // - if exactly 1 secondary remains -> auto-promote to PRIMARY
-            // - if 2-3 secondaries remain -> PRIMARY becomes null (requires selection)
-            if (slot.primaryAthleteId === action.athleteId) {
-              if (athleteIds.length === 1) primaryAthleteId = athleteIds[0];
-              else primaryAthleteId = null;
+            // Remove from any other slot in this event group (recruit uniqueness primitive).
+            if (slot.slotId !== slotId) {
+              if (!slot.athleteIds.includes(athleteId)) return slot;
+              return removeFromSlotDeterministic(slot, athleteId);
             }
 
-            return { ...slot, athleteIds, primaryAthleteId };
-          }),
-        };
-      });
+            // Add to target slot:
+            // - empty slot -> becomes PRIMARY
+            // - filled slot -> added as SECONDARY (PRIMARY unchanged)
+            const next = addToSlot(slot, athleteId);
+            return next;
+          });
+
+          return { ...row, slots: nextSlots };
+        }),
+      };
     }
 
     case "SET_PRIMARY": {
-      return state.map((row) => {
-        if (row.eventGroupKey !== action.eventGroupKey) return row;
+      const { eventGroupKey, slotId, athleteId } = action;
+      return {
+        rows: state.rows.map((row) => {
+          if (row.eventGroupKey !== eventGroupKey) return row;
+          return {
+            ...row,
+            slots: row.slots.map((slot) => {
+              if (slot.slotId !== slotId) return slot;
+              if (!slot.athleteIds.includes(athleteId)) return slot;
+              return { ...slot, primaryAthleteId: athleteId };
+            }),
+          };
+        }),
+      };
+    }
 
-        return {
-          ...row,
-          slots: row.slots.map((slot) => {
-            if (slot.slotId !== action.slotId) return slot;
-            if (!slot.athleteIds.includes(action.athleteId)) return slot;
+    case "REMOVE_ATHLETE": {
+      const { eventGroupKey, slotId, athleteId } = action;
 
-            return { ...slot, primaryAthleteId: action.athleteId };
-          }),
-        };
-      });
+      return {
+        rows: state.rows.map((row) => {
+          if (row.eventGroupKey !== eventGroupKey) return row;
+          return {
+            ...row,
+            slots: row.slots.map((slot) => {
+              if (slot.slotId !== slotId) return slot;
+              if (!slot.athleteIds.includes(athleteId)) return slot;
+
+              // Constitutionally locked: Returning athletes cannot be removed via Recruiting.
+              const athlete = slot.athletesById[athleteId];
+              if (athlete?.type === "returning") return slot;
+
+              return removeFromSlotDeterministic(slot, athleteId);
+            }),
+          };
+        }),
+      };
     }
 
     default:
       return state;
   }
+}
+
+function addToSlot(slot: RecruitingSlot, athleteId: string): RecruitingSlot {
+  const nextIds = [...slot.athleteIds, athleteId];
+
+  // If empty, promote to PRIMARY (locked behavior)
+  if (slot.athleteIds.length === 0) {
+    return { ...slot, athleteIds: nextIds, primaryAthleteId: athleteId };
+  }
+
+  return { ...slot, athleteIds: nextIds };
+}
+
+/**
+ * Deterministic removal semantics:
+ * - If removed athlete is PRIMARY:
+ *   - If exactly 1 secondary remains -> auto-promote to PRIMARY
+ *   - If 2-3 secondaries remain -> PRIMARY becomes null (required selection)
+ * - If removed athlete is SECONDARY -> PRIMARY unchanged
+ */
+function removeFromSlotDeterministic(slot: RecruitingSlot, athleteId: string): RecruitingSlot {
+  const wasPrimary = slot.primaryAthleteId === athleteId;
+  const nextIds = slot.athleteIds.filter((id) => id !== athleteId);
+
+  if (!wasPrimary) {
+    return { ...slot, athleteIds: nextIds };
+  }
+
+  const remaining = nextIds.length;
+
+  if (remaining === 0) {
+    return { ...slot, athleteIds: nextIds, primaryAthleteId: null };
+  }
+
+  if (remaining === 1) {
+    return { ...slot, athleteIds: nextIds, primaryAthleteId: nextIds[0] };
+  }
+
+  // remaining is 2-3
+  return { ...slot, athleteIds: nextIds, primaryAthleteId: null };
 }

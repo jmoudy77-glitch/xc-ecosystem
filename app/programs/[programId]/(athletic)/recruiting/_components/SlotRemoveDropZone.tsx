@@ -9,17 +9,26 @@ import type { RecruitingSlot } from "./types";
 type Props = {
   slot: RecruitingSlot;
   onRemoveAthlete: (athleteId: string) => void;
+  disabled?: boolean;
+  disabledReason?: string;
 };
 
-export function SlotRemoveDropZone({ slot, onRemoveAthlete }: Props) {
+export function SlotRemoveDropZone({
+  slot,
+  onRemoveAthlete,
+  disabled,
+  disabledReason,
+}: Props) {
   const [isOver, setIsOver] = React.useState(false);
 
   const onDragOver = (e: React.DragEvent) => {
+    if (disabled) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
 
   const onDragEnter = (e: React.DragEvent) => {
+    if (disabled) return;
     e.preventDefault();
     setIsOver(true);
   };
@@ -29,6 +38,7 @@ export function SlotRemoveDropZone({ slot, onRemoveAthlete }: Props) {
   };
 
   const onDrop = (e: React.DragEvent) => {
+    if (disabled) return;
     e.preventDefault();
     setIsOver(false);
 
@@ -51,12 +61,20 @@ export function SlotRemoveDropZone({ slot, onRemoveAthlete }: Props) {
       onDrop={onDrop}
       className={[
         "mt-3 rounded-lg border border-dashed px-3 py-2 text-[11px]",
-        isOver ? "border-red-400/50 bg-red-500/10 text-red-200" : "border-subtle bg-slate-900/20 text-muted",
+        disabled
+          ? "border-subtle bg-slate-900/10 text-muted opacity-70"
+          : isOver
+            ? "border-red-400/50 bg-red-500/10 text-red-200"
+            : "border-subtle bg-slate-900/20 text-muted",
       ].join(" ")}
       aria-label="Remove athlete drop zone"
-      title="Drag an athlete chip here to remove them from this slot."
+      title={
+        disabled
+          ? disabledReason ?? "Removal disabled"
+          : "Drag an athlete chip here to remove them from this slot."
+      }
     >
-      Drag here to remove from slot
+      {disabled ? (disabledReason ?? "Removal disabled") : "Drag here to remove from slot"}
     </div>
   );
 }

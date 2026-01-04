@@ -287,6 +287,8 @@ function ExpandedSlotPanel({
 
       <SlotRemoveDropZone
         slot={slot}
+        disabled={slot.athleteIds.some((id) => slot.athletesById[id]?.type === "returning")}
+        disabledReason="Returning athletes cannot be removed via Recruiting"
         onRemoveAthlete={(athleteId) => onRemoveAthlete(row.eventGroupKey, slot.slotId, athleteId)}
       />
     </div>

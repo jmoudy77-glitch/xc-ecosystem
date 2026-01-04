@@ -1,9 +1,9 @@
-// app/programs/[programId]/recruiting/RecruitingM1Client.tsx
+// app/programs/[programId]/(athletic)/recruiting/RecruitingM1Client.tsx
 
 "use client";
 
 import * as React from "react";
-import { RecruitingPrimarySurfaceSkeleton } from "./_components/RecruitingPrimarySurfaceSkeleton";
+import { RecruitingPrimarySurfaceWired } from "./_components/RecruitingPrimarySurfaceWired";
 import type { RecruitingEventGroupRow } from "./_components/types";
 
 type Props = {
@@ -11,31 +11,28 @@ type Props = {
 };
 
 export default function RecruitingM1Client({ programId }: Props) {
-  const rows = React.useMemo<RecruitingEventGroupRow[]>(
+  const initialRows = React.useMemo<RecruitingEventGroupRow[]>(
     () => [
       {
         eventGroupKey: "distance",
         label: "Distance",
-        slots: [
-          makeEmptySlot("distance", "D1"),
-          makeEmptySlot("distance", "D2"),
-        ],
+        slots: [makeEmptySlot("distance", "D1"), makeEmptySlot("distance", "D2")],
       },
       {
         eventGroupKey: "mid",
         label: "Mid-Distance",
         slots: [makeEmptySlot("mid", "M1")],
       },
-      {
-        eventGroupKey: "sprint",
-        label: "Sprints",
-        slots: [makeEmptySlot("sprint", "S1")],
-      },
     ],
     []
   );
 
-  return <RecruitingPrimarySurfaceSkeleton programId={programId} rows={rows} />;
+  return (
+    <RecruitingPrimarySurfaceWired
+      programId={programId}
+      initialRows={initialRows}
+    />
+  );
 }
 
 function makeEmptySlot(eventGroupKey: string, slotId: string) {

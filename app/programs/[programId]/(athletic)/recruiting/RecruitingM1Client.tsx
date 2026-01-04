@@ -23,16 +23,16 @@ export default function RecruitingM1Client({ programId }: Props) {
         label: "Mid-Distance",
         slots: [makeEmptySlot("mid", "M1")],
       },
+      {
+        eventGroupKey: "sprint",
+        label: "Sprints",
+        slots: [makeEmptySlot("sprint", "S1")],
+      },
     ],
     []
   );
 
-  return (
-    <RecruitingPrimarySurfaceWired
-      programId={programId}
-      initialRows={initialRows}
-    />
-  );
+  return <RecruitingPrimarySurfaceWired programId={programId} initialRows={initialRows} />;
 }
 
 function makeEmptySlot(eventGroupKey: string, slotId: string) {

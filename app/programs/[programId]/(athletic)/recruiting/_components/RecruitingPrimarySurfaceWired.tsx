@@ -5,9 +5,15 @@
 import * as React from "react";
 import { RecruitingPrimarySurfaceSkeleton } from "./RecruitingPrimarySurfaceSkeleton";
 import { SlotDropZone } from "./RecruitingPrimarySurfaceInteractions";
-import { PrimaryInteractionLayer } from "./PrimaryInteractionLayer";
+import { AthleteFactsModal } from "./AthleteFactsModal";
 import { useRecruitingSlots } from "./useRecruitingSlots";
-import type { RecruitingEventGroupRow, RecruitingSlot } from "./types";
+import type {
+  RecruitingEventGroupRow,
+  RecruitingSlot,
+  RecruitingAthleteSummary,
+} from "./types";
+
+type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
 type Props = {
   programId: string;
@@ -17,43 +23,64 @@ type Props = {
 export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props) {
   const { rows, dispatch } = useRecruitingSlots(initialRows);
 
+  const [expanded, setExpanded] = React.useState<ExpandedKey>(null);
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [modalAthlete, setModalAthlete] = React.useState<RecruitingAthleteSummary | null>(null);
+
+  const onToggleExpand = React.useCallback((eventGroupKey: string, slotId: string) => {
+    setExpanded((prev) => {
+      if (prev?.eventGroupKey === eventGroupKey && prev.slotId === slotId) return null;
+      return { eventGroupKey, slotId };
+    });
+  }, []);
+
+  const onOpenAthlete = React.useCallback((athlete: RecruitingAthleteSummary) => {
+    setModalAthlete(athlete);
+    setModalOpen(true);
+  }, []);
+
+  const onCloseModal = React.useCallback(() => {
+    setModalOpen(false);
+    setModalAthlete(null);
+  }, []);
+
+  const onSetPrimary = React.useCallback(
+    (eventGroupKey: string, slotId: string, athleteId: string) => {
+      dispatch({ type: "SET_PRIMARY", eventGroupKey, slotId, athleteId });
+    },
+    [dispatch]
+  );
+
+  const renderDropZone = React.useCallback(
+    (slot: RecruitingSlot) => (
+      <SlotDropZone
+        slot={slot}
+        onDropAthlete={(athleteId) =>
+          dispatch({
+            type: "DROP_IN_SLOT",
+            eventGroupKey: slot.eventGroupKey,
+            slotId: slot.slotId,
+            athleteId,
+          })
+        }
+      />
+    ),
+    [dispatch]
+  );
+
   return (
-    <div>
+    <>
       <RecruitingPrimarySurfaceSkeleton
         programId={programId}
-        rows={rows.map(row => ({
-          ...row,
-          slots: row.slots.map(slot => ({
-            ...slot,
-            __primaryLayer: (
-              <PrimaryInteractionLayer
-                slot={slot}
-                onSetPrimary={(athleteId) =>
-                  dispatch({
-                    type: "SET_PRIMARY",
-                    eventGroupKey: row.eventGroupKey,
-                    slotId: slot.slotId,
-                    athleteId,
-                  })
-                }
-              />
-            ),
-            __dropZone: (
-              <SlotDropZone
-                slot={slot}
-                onDropAthlete={(athleteId) =>
-                  dispatch({
-                    type: "DROP_IN_SLOT",
-                    eventGroupKey: row.eventGroupKey,
-                    slotId: slot.slotId,
-                    athleteId,
-                  })
-                }
-              />
-            ),
-          })) as RecruitingSlot[],
-        }))}
+        rows={rows}
+        expanded={expanded}
+        onToggleExpand={onToggleExpand}
+        onOpenAthlete={onOpenAthlete}
+        onSetPrimary={onSetPrimary}
+        renderDropZone={renderDropZone}
       />
-    </div>
+
+      <AthleteFactsModal open={modalOpen} athlete={modalAthlete} onClose={onCloseModal} />
+    </>
   );
 }

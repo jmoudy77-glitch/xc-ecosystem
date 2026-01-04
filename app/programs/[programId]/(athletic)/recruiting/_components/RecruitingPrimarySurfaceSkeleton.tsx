@@ -1,26 +1,49 @@
-// app/programs/[programId]/recruiting/_components/RecruitingPrimarySurfaceSkeleton.tsx
+// app/programs/[programId]/(athletic)/recruiting/_components/RecruitingPrimarySurfaceSkeleton.tsx
 
 "use client";
 
 import * as React from "react";
 import { RECRUITING_UI } from "./recruitingUiConstants";
-import type { RecruitingEventGroupRow, RecruitingSlot, RecruitingAthleteSummary } from "./types";
+import type {
+  RecruitingEventGroupRow,
+  RecruitingSlot,
+  RecruitingAthleteSummary,
+} from "./types";
+
+type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
 type Props = {
   programId: string;
   rows: RecruitingEventGroupRow[];
+
+  expanded: ExpandedKey;
+  onToggleExpand: (eventGroupKey: string, slotId: string) => void;
+
+  onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
+  onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+
+  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 };
 
-export function RecruitingPrimarySurfaceSkeleton({ programId, rows }: Props) {
+export function RecruitingPrimarySurfaceSkeleton({
+  programId,
+  rows,
+  expanded,
+  onToggleExpand,
+  onOpenAthlete,
+  onSetPrimary,
+  renderDropZone,
+}: Props) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-100">Recruiting</h2>
           <p className="mt-1 text-[11px] text-muted">
-            Primary surface (skeleton): event groups → slots → open slot rendering.
+            Primary surface: click slot to expand. Left-click athlete for modal. Right-click athlete to set PRIMARY.
           </p>
         </div>
+
         <div className="hidden text-right text-[11px] text-muted sm:block">
           <div className="font-mono text-[10px] text-slate-300">{programId}</div>
         </div>
@@ -31,7 +54,15 @@ export function RecruitingPrimarySurfaceSkeleton({ programId, rows }: Props) {
           <EmptyState />
         ) : (
           rows.map((row) => (
-            <EventGroupRow key={row.eventGroupKey} row={row} />
+            <EventGroupRow
+              key={row.eventGroupKey}
+              row={row}
+              expanded={expanded}
+              onToggleExpand={onToggleExpand}
+              onOpenAthlete={onOpenAthlete}
+              onSetPrimary={onSetPrimary}
+              renderDropZone={renderDropZone}
+            />
           ))
         )}
       </div>
@@ -44,13 +75,32 @@ function EmptyState() {
     <div className="rounded-xl border border-subtle bg-surface p-6">
       <p className="text-xs font-semibold text-slate-100">No event groups</p>
       <p className="mt-1 text-[11px] text-muted">
-        Data wiring is not yet connected. This screen is the UI skeleton only.
+        Data wiring is not yet connected.
       </p>
     </div>
   );
 }
 
-function EventGroupRow({ row }: { row: RecruitingEventGroupRow }) {
+function EventGroupRow({
+  row,
+  expanded,
+  onToggleExpand,
+  onOpenAthlete,
+  onSetPrimary,
+  renderDropZone,
+}: {
+  row: RecruitingEventGroupRow;
+  expanded: ExpandedKey;
+  onToggleExpand: (eventGroupKey: string, slotId: string) => void;
+  onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
+  onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+}) {
+  const expandedSlot =
+    expanded?.eventGroupKey === row.eventGroupKey
+      ? row.slots.find((s) => s.slotId === expanded.slotId) ?? null
+      : null;
+
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between gap-3">
@@ -60,69 +110,196 @@ function EventGroupRow({ row }: { row: RecruitingEventGroupRow }) {
             {row.slots.length} slots
           </span>
         </div>
-        <div className="text-[10px] text-muted">
-          Primary surface only (drag/drop not yet implemented)
+
+        <div className="text-[10px] text-muted">Expansion is horizontal; other rows do not reflow.</div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div className="grid gap-3">
+          {row.slots.map((slot) => (
+            <SlotCard
+              key={slot.slotId}
+              slot={slot}
+              isExpanded={!!expandedSlot && expandedSlot.slotId === slot.slotId}
+              onToggleExpand={() => onToggleExpand(row.eventGroupKey, slot.slotId)}
+              renderDropZone={renderDropZone}
+            />
+          ))}
+        </div>
+
+        <div className="hidden lg:block">
+          {expandedSlot ? (
+            <ExpandedSlotPanel
+              row={row}
+              slot={expandedSlot}
+              onOpenAthlete={onOpenAthlete}
+              onSetPrimary={onSetPrimary}
+            />
+          ) : (
+            <div className="rounded-xl border border-subtle bg-surface p-4">
+              <div className="text-xs font-semibold text-slate-100">Slot details</div>
+              <div className="mt-1 text-[11px] text-muted">
+                Click a slot to expand (no hover semantics).
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-3">
-        {row.slots.map((slot) => (
-          <SlotCard key={slot.slotId} slot={slot} />
-        ))}
-      </div>
+      {expandedSlot ? (
+        <div className="lg:hidden">
+          <ExpandedSlotPanel
+            row={row}
+            slot={expandedSlot}
+            onOpenAthlete={onOpenAthlete}
+            onSetPrimary={onSetPrimary}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function SlotCard({ slot }: { slot: RecruitingSlot }) {
+function SlotCard({
+  slot,
+  isExpanded,
+  onToggleExpand,
+  renderDropZone,
+}: {
+  slot: RecruitingSlot;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+}) {
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
 
   return (
+    <div className="relative">
+      {renderDropZone ? (
+        <div className="absolute inset-0 z-10">{renderDropZone(slot)}</div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className={[
+          "w-full text-left",
+          "rounded-xl border bg-surface p-4 transition",
+          isExpanded ? "border-slate-200/30" : "border-subtle hover:border-slate-200/20",
+        ].join(" ")}
+        aria-expanded={isExpanded}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="text-[11px] font-semibold text-slate-100">
+              Slot <span className="font-mono text-slate-300">{slot.slotId}</span>
+            </div>
+            <span className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
+              {total}/{RECRUITING_UI.slotMaxOccupancy}
+            </span>
+          </div>
+
+          <div className="text-[10px] text-muted">
+            {slot.primaryAthleteId ? "PRIMARY set" : "PRIMARY empty"}
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <PrimaryAvatar primary={primary} totalInSlot={total} />
+            <div className="min-w-0">
+              <div className="truncate text-xs font-semibold text-slate-100">
+                {primary?.displayName ?? "Open slot"}
+              </div>
+              <div className="mt-0.5 text-[11px] text-muted">
+                {primary ? `PRIMARY • ${primary.type}` : "Drop into empty slot → PRIMARY (locked behavior)"}
+              </div>
+            </div>
+          </div>
+
+          <PresenceMeter primary={primary} />
+        </div>
+      </button>
+    </div>
+  );
+}
+
+function ExpandedSlotPanel({
+  row,
+  slot,
+  onOpenAthlete,
+  onSetPrimary,
+}: {
+  row: RecruitingEventGroupRow;
+  slot: RecruitingSlot;
+  onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
+  onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+}) {
+  const athletes = slot.athleteIds.map((id) => slot.athletesById[id]).filter(Boolean);
+  const requiresSelection = slot.primaryAthleteId === null && slot.athleteIds.length >= 2;
+
+  return (
     <div className="rounded-xl border border-subtle bg-surface p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="text-[11px] font-semibold text-slate-100">
-            Slot <span className="font-mono text-slate-300">{slot.slotId}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold text-slate-100">
+            {row.label} • Slot <span className="font-mono text-slate-300">{slot.slotId}</span>
           </div>
-          <span className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
-            {total}/{RECRUITING_UI.slotMaxOccupancy}
-          </span>
+          <div className="mt-1 text-[11px] text-muted">
+            Left-click athlete for modal. Right-click athlete to set PRIMARY.
+          </div>
         </div>
-        <div className="text-[10px] text-muted">
-          {slot.primaryAthleteId ? "PRIMARY set" : "PRIMARY empty"}
+
+        <div className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
+          {slot.athleteIds.length}/{RECRUITING_UI.slotMaxOccupancy}
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <PrimaryAvatar primary={primary} totalInSlot={total} />
-          <div className="min-w-0">
-            <div className="truncate text-xs font-semibold text-slate-100">
-              {primary?.displayName ?? "Open slot"}
-            </div>
-            <div className="mt-0.5 text-[11px] text-muted">
-              {primary ? `PRIMARY • ${primary.type}` : "Drop into empty slot → PRIMARY (locked behavior)"}
-            </div>
-          </div>
+      {requiresSelection ? (
+        <div className="mt-3 rounded-lg border border-dashed border-yellow-400/40 bg-yellow-400/5 px-2 py-1 text-[10px] text-yellow-200">
+          PRIMARY required — choose one (locked behavior).
         </div>
-        <PresenceMeter primary={primary} />
-      </div>
+      ) : null}
 
-      <div className="mt-3">
-        <div className="text-[10px] text-muted">SECONDARIES</div>
-        <div className="mt-1 flex flex-wrap gap-2">
-          {slot.athleteIds
-            .filter((id) => id !== slot.primaryAthleteId)
-            .map((id) => slot.athletesById[id])
-            .filter(Boolean)
-            .map((a) => (
-              <SecondaryPill key={a.athleteId} athlete={a} />
-            ))}
-          {slot.athleteIds.filter((id) => id !== slot.primaryAthleteId).length === 0 ? (
-            <span className="text-[11px] text-muted">None</span>
-          ) : null}
-        </div>
+      <div className="mt-3 space-y-2">
+        {athletes.length === 0 ? (
+          <div className="text-[11px] text-muted">No athletes in slot.</div>
+        ) : (
+          athletes.map((a) => {
+            const isPrimary = slot.primaryAthleteId === a.athleteId;
+            return (
+              <button
+                key={a.athleteId}
+                type="button"
+                onClick={() => onOpenAthlete(a)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  onSetPrimary(row.eventGroupKey, slot.slotId, a.athleteId);
+                }}
+                className={[
+                  "w-full rounded-lg border px-3 py-2 text-left",
+                  isPrimary ? "border-slate-200/30 bg-slate-900/30" : "border-subtle hover:border-slate-200/20",
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[12px] font-semibold text-slate-100">
+                      {a.displayName}
+                      {isPrimary ? <span className="ml-2 text-[10px] text-slate-300">PRIMARY</span> : null}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-muted">
+                      {a.type === "returning" ? "Returning athlete" : "Recruit"} • Event group: {row.label}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-muted">
+                    {isPrimary ? "Presence renders" : "Secondary"}
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -150,6 +327,7 @@ function PrimaryAvatar({
           ringClass,
           "flex items-center justify-center",
         ].join(" ")}
+        aria-label="Primary athlete avatar"
       >
         {primary?.displayName ? (
           <span className="text-[12px] font-semibold text-slate-100">
@@ -169,6 +347,8 @@ function PrimaryAvatar({
             width: RECRUITING_UI.badge.sizePx,
             height: RECRUITING_UI.badge.sizePx,
           }}
+          aria-label="Slot athlete count"
+          title="Total athletes in slot (informational)"
         >
           {Math.min(Math.max(totalInSlot, 1), RECRUITING_UI.slotMaxOccupancy)}
         </div>
@@ -197,6 +377,8 @@ function PresenceMeter({ primary }: { primary: RecruitingAthleteSummary | null }
           height: RECRUITING_UI.meter.heightPx,
           borderRadius: RECRUITING_UI.meter.radiusPx,
         }}
+        aria-label="Slot presence meter"
+        title="Historical contribution to event group (athlete-based)."
       >
         <div className="h-full bg-slate-100/70" style={{ width: `${fillPct}%` }} />
       </div>
@@ -205,22 +387,9 @@ function PresenceMeter({ primary }: { primary: RecruitingAthleteSummary | null }
   );
 }
 
-function SecondaryPill({ athlete }: { athlete: RecruitingAthleteSummary }) {
-  const ring =
-    athlete.type === "returning"
-      ? "border-blue-500/40 text-blue-200"
-      : "border-yellow-400/40 text-yellow-200";
-
-  return (
-    <span className={["rounded-full border px-2 py-0.5 text-[10px]", ring].join(" ")}>
-      {athlete.displayName}
-    </span>
-  );
-}
-
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (parts[0].slice(0, 1) + parts[parts.length - 1].slice(0, 1)).toUpperCase();
 }

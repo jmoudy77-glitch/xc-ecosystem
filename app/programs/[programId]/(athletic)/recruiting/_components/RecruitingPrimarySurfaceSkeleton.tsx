@@ -9,6 +9,7 @@ import type {
   RecruitingSlot,
   RecruitingAthleteSummary,
 } from "./types";
+import { DraggableAthleteChip } from "./DraggableAthleteChip";
 
 type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
@@ -269,34 +270,14 @@ function ExpandedSlotPanel({
           athletes.map((a) => {
             const isPrimary = slot.primaryAthleteId === a.athleteId;
             return (
-              <button
+              <DraggableAthleteChip
                 key={a.athleteId}
-                type="button"
-                onClick={() => onOpenAthlete(a)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  onSetPrimary(row.eventGroupKey, slot.slotId, a.athleteId);
-                }}
-                className={[
-                  "w-full rounded-lg border px-3 py-2 text-left",
-                  isPrimary ? "border-slate-200/30 bg-slate-900/30" : "border-subtle hover:border-slate-200/20",
-                ].join(" ")}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[12px] font-semibold text-slate-100">
-                      {a.displayName}
-                      {isPrimary ? <span className="ml-2 text-[10px] text-slate-300">PRIMARY</span> : null}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-muted">
-                      {a.type === "returning" ? "Returning athlete" : "Recruit"} • Event group: {row.label}
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-muted">
-                    {isPrimary ? "Presence renders" : "Secondary"}
-                  </div>
-                </div>
-              </button>
+                athlete={a}
+                eventGroupKey={row.eventGroupKey}
+                isPrimary={isPrimary}
+                onOpen={() => onOpenAthlete(a)}
+                onSetPrimary={() => onSetPrimary(row.eventGroupKey, slot.slotId, a.athleteId)}
+              />
             );
           })
         )}

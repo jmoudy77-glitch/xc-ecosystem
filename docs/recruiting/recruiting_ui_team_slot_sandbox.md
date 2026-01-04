@@ -178,3 +178,68 @@ No implicit authority transfer
 
 Any change requires explicit discussion and promotion.
 This document is canonical.
+
+## 14. Edge Cases & Deterministic Behaviors (Binding)
+
+This section locks all non-obvious behaviors to prevent UI ambiguity or drift.
+
+### 14.1 Event Group Scope
+- Recruits may belong to **one event group only**.
+- All placement, movement, and list-return logic applies strictly within that event group.
+
+### 14.2 Slot Occupancy Cap
+- A slot may contain a **maximum of 4 athletes total** (1 PRIMARY + up to 3 SECONDARIES).
+- If a slot already has 4 athletes, additional drops are rejected silently (cursor revert only).
+
+### 14.3 Recruit List Membership
+- Favorites are **recruits-only** and act as a **placement source**, not a tracking list.
+- Once a recruit is present in any slot (PRIMARY or SECONDARY), they are removed from all placement lists for that event group.
+- If a recruit is removed from all slots, they return to their origin list (Favorites or surfaced list).
+- Returning athletes cannot be favorited.
+
+### 14.4 Drag-and-Drop Uniqueness
+- A recruit may exist in **only one slot** within their event group.
+- To move a recruit to a different slot, the coach must drag them from their current slot.
+- Dropping a recruit into a new slot removes them from the previous slot.
+
+### 14.5 Returning Athlete Constraints
+- Returning athletes **cannot be removed** from slots via Recruiting.
+- Removal of returning athletes occurs only through admin functions outside Recruiting.
+- Returning athletes may be demoted from PRIMARY to SECONDARY but remain in the slot.
+
+### 14.6 PRIMARY Removal and Reassignment
+
+If the PRIMARY athlete is dragged out of a slot:
+
+- **No secondaries remain**
+  - Slot becomes PRIMARY-empty (Open).
+  - No forced action.
+
+- **Exactly one secondary remains**
+  - That athlete is **auto-promoted to PRIMARY**.
+
+- **Two or three secondaries remain**
+  - Slot enters a **required selection state**:
+    - Slot remains expanded (or auto-expands).
+    - Coach must right-click one remaining athlete to set as PRIMARY.
+    - Slot cannot collapse until a PRIMARY is chosen.
+
+This preserves coach agency while preventing ambiguous PRIMARY states.
+
+### 14.7 Meter Semantics Clarification
+
+- The presence meter is **athlete-based**, not slot-based.
+- It represents the PRIMARY athlete’s historical contribution to the event group.
+- Recruits inherently render with an empty (0-fill) meter due to no prior contribution.
+- Meter renders only when an athlete is PRIMARY.
+
+### 14.8 Slot Athlete Count Badge
+
+- A numeric badge is rendered on the PRIMARY avatar indicating total athletes in the slot.
+- Values range from **1–4**.
+- Badge updates immediately on add/remove.
+- Badge is informational only:
+  - no hover
+  - no tooltip
+  - no click behavior
+- Badge must not obscure the identity ring.

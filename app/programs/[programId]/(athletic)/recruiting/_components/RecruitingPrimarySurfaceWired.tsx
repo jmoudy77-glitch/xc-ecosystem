@@ -5,6 +5,7 @@
 import * as React from "react";
 import { RecruitingPrimarySurfaceSkeleton } from "./RecruitingPrimarySurfaceSkeleton";
 import { SlotDropZone } from "./RecruitingPrimarySurfaceInteractions";
+import { PrimaryInteractionLayer } from "./PrimaryInteractionLayer";
 import { useRecruitingSlots } from "./useRecruitingSlots";
 import type { RecruitingEventGroupRow, RecruitingSlot } from "./types";
 
@@ -24,6 +25,19 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
           ...row,
           slots: row.slots.map(slot => ({
             ...slot,
+            __primaryLayer: (
+              <PrimaryInteractionLayer
+                slot={slot}
+                onSetPrimary={(athleteId) =>
+                  dispatch({
+                    type: "SET_PRIMARY",
+                    eventGroupKey: row.eventGroupKey,
+                    slotId: slot.slotId,
+                    athleteId,
+                  })
+                }
+              />
+            ),
             __dropZone: (
               <SlotDropZone
                 slot={slot}

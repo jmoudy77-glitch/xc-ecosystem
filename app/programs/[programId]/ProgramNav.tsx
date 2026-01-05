@@ -630,6 +630,7 @@ export function ProgramNav() {
   const pathname = usePathname();
   const [navCtx, setNavCtx] = useState<PersistedContext>({});
   const [openGroup, setOpenGroup] = useState<ProgramNavModeId | null>(null);
+  const [manageResourcesOpen, setManageResourcesOpen] = useState(false);
 
   if (!programId) return null;
 
@@ -663,6 +664,14 @@ export function ProgramNav() {
   useEffect(() => {
     if (openGroup === null && activeGroupId) setOpenGroup(activeGroupId);
   }, [openGroup, activeGroupId]);
+
+  useEffect(() => {
+    const manageGroup = sortedGroups.find((group) => group.id === "manage");
+    const resourcesItem = manageGroup?.items.find((item) => item.id === "resources");
+    const children = resourcesItem?.children ?? [];
+    const anyActive = children.some((child) => isNavItemActive(child, pathname, ctx));
+    if (anyActive) setManageResourcesOpen(true);
+  }, [sortedGroups, pathname, ctx]);
 
   const dashboardHref = `/programs/${programId}/dashboard`;
   const isDashboardActive =
@@ -733,47 +742,59 @@ export function ProgramNav() {
                       const childrenActive = childrenSorted.some((child) =>
                         isNavItemActive(child, pathname, ctx)
                       );
+                      const isResources = group.id === "manage" && item.id === "resources";
+                      const isOpen = isResources ? manageResourcesOpen : true;
 
                       return (
                         <div key={item.id} className="space-y-1 bg-transparent">
-                          <div
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isResources) setManageResourcesOpen((value) => !value);
+                            }}
                             className={[
                               "glass-pill flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 text-[11px] transition-colors",
                               childrenActive
                                 ? "glass-pill--brand glass-pill--active"
                                 : "glass-pill--brand-soft text-muted",
+                              isResources ? "" : "cursor-default",
                             ].join(" ")}
+                            aria-expanded={isOpen}
                           >
                             <span>{item.label}</span>
-                            <span className="text-[9px] opacity-60">▾</span>
-                          </div>
+                            <span className="text-[9px] opacity-60">
+                              {isResources ? (isOpen ? "▾" : "▸") : "▾"}
+                            </span>
+                          </button>
 
-                          <div className="space-y-1 pl-3 bg-transparent">
-                            {childrenSorted.map((child) => {
-                              const href = resolveNavHref(child, ctx);
-                              const isActive = isNavItemActive(
-                                child,
-                                pathname,
-                                ctx
-                              );
+                          {isOpen && (
+                            <div className="space-y-1 pl-3 bg-transparent">
+                              {childrenSorted.map((child) => {
+                                const href = resolveNavHref(child, ctx);
+                                const isActive = isNavItemActive(
+                                  child,
+                                  pathname,
+                                  ctx
+                                );
 
-                              return (
-                                <Link
-                                  key={child.id}
-                                  href={href}
-                                  className={[
-                                    "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                                    isActive
-                                      ? "glass-pill--brand glass-pill--active"
-                                      : "glass-pill--brand-soft text-muted",
-                                  ].join(" ")}
-                                >
-                                  <span>{child.label}</span>
-                                  <span className="text-[9px] opacity-60">→</span>
-                                </Link>
-                              );
-                            })}
-                          </div>
+                                return (
+                                  <Link
+                                    key={child.id}
+                                    href={href}
+                                    className={[
+                                      "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                                      isActive
+                                        ? "glass-pill--brand glass-pill--active"
+                                        : "glass-pill--brand-soft text-muted",
+                                    ].join(" ")}
+                                  >
+                                    <span>{child.label}</span>
+                                    <span className="text-[9px] opacity-60">→</span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     }

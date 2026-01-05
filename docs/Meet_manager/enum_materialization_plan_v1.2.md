@@ -1,7 +1,7 @@
 # Meet Manager — Enum Materialization Plan v1.2 (LOCKED)
 
-**File:** `/docs/Meet_manager/enum_materialization_plan_v1.2.md`  
-**Status:** Canonical (v1.2)  
+**File:** `/docs/Meet_manager/enum_materialization_plan_v1.2.md`
+**Status:** Canonical (v1.2)
 **Scope:** Defines which governed enums become Postgres ENUM types vs lookup tables, and establishes naming rules and usage constraints.
 
 ---
@@ -25,9 +25,9 @@
 - Prefix all Postgres enum types with: `mm_`
 - Use snake_case: `mm_meet_lifecycle_state`
 
-### 1.2 Value Names
-- Use UPPER_SNAKE_CASE: `DRAFT`, `PUBLISHED`, `REVOKED`
-- Values must match governance docs exactly.
+### 1.2 Value Names (LOCKED)
+- **Values must match canonical governance docs exactly.**
+- Canonical v1.2 enum values are **lowercase snake_case** (e.g., `draft`, `published_live`, `not_started`).
 - No UI labels inside values.
 
 ### 1.3 Column Names
@@ -67,7 +67,7 @@ These must be created as Postgres enums and referenced directly by table columns
   - `TF`
 
 - `mm_meet_lifecycle_state`
-  - Source: `state_machines_v1.2.md` (Meet lifecycle)
+  - Source: `state_machines_v1.2.md` (MEET_STATUS)
 
 ### 3.2 Participation / Submission
 - `mm_participation_role`
@@ -75,17 +75,17 @@ These must be created as Postgres enums and referenced directly by table columns
   - `ATTENDEE`
 
 - `mm_participation_state`
-  - Source: `state_machines_v1.2.md` (Participation state machine)
+  - Source: `state_machines_v1.2.md` (PARTICIPATION_STATUS)
 
 - `mm_roster_submission_state`
-  - Source: `state_machines_v1.2.md` (Roster submission/lock state machine)
+  - Source: `state_machines_v1.2.md` (SUBMISSION_STATUS for roster)
 
 - `mm_entries_submission_state`
-  - Source: `state_machines_v1.2.md` (Entries submission/lock state machine)
+  - Source: `state_machines_v1.2.md` (SUBMISSION_STATUS for entries)
 
 ### 3.3 Athlete Ops
 - `mm_athlete_attendance_state`
-  - Source: `state_machines_v1.2.md` (attendance/check-in/scratch)
+  - Source: `state_machines_v1.2.md` (ATTENDANCE_STATE)
 
 ### 3.4 Event Domain
 - `mm_event_type`
@@ -94,38 +94,38 @@ These must be created as Postgres enums and referenced directly by table columns
   - `FIELD`
 
 - `mm_xc_race_state`
-  - Source: `state_machines_v1.2.md` (XC race states)
+  - Source: `state_machines_v1.2.md` (XC_RACE_STATUS)
 
 - `mm_tf_event_state`
-  - Source: `state_machines_v1.2.md` (Track & Field event states)
+  - Source: `state_machines_v1.2.md` (TF_EVENT_STATUS)
 
 - `mm_field_scoring_state`
-  - Source: `state_machines_v1.2.md` (Field event scoring states)
+  - Source: `state_machines_v1.2.md` (FIELD_EVENT_STATE)
 
 ### 3.5 Leg Flags
 - `mm_leg_readiness_state`
-  - Source: `state_machines_v1.2.md` (leg readiness)
+  - Source: `state_machines_v1.2.md` (LEG_READINESS_STATUS)
 
 ### 3.6 Results & Publication
 - `mm_results_revision_state`
-  - Source: `state_machines_v1.2.md` (results revision lifecycle)
+  - Source: `state_machines_v1.2.md` (RESULTS_REVISION_STATUS)
 
 - `mm_results_pipeline_stage`
-  - Source: `results_pipeline_contracts_v1.2.md` (pipeline stages)
+  - Source: `results_pipeline_contracts_v1.2.md` (Pipeline Stages)
 
 - `mm_results_publication_state`
-  - Source: `results_pipeline_contracts_v1.2.md` (publication gates)
+  - Source: `results_pipeline_contracts_v1.2.md` (Publication Rules)
 
 ### 3.7 Display
 - `mm_display_channel_state`
-  - Source: `state_machines_v1.2.md` (display channel states)
+  - Source: `state_machines_v1.2.md` (DISPLAY_CHANNEL_STATUS)
 
 ### 3.8 Ops Tokens
 - `mm_ops_token_type`
-  - Source: `ops_token_lifecycle_v1.2.md` (OPS_TIMER, OPS_FIELD_SCORING, OPS_CHECKIN, OPS_SCRATCH, OPS_DISPLAY)
+  - Source: `ops_token_lifecycle_v1.2.md` (OPS_TOKEN_ROLE equivalent for v1.2 DB token types)
 
 - `mm_ops_token_state`
-  - Source: `ops_token_lifecycle_v1.2.md` (ISSUED, ACTIVE, EXPIRED, REVOKED, INVALID)
+  - Source: `ops_token_lifecycle_v1.2.md` (token lifecycle states)
 
 ---
 
@@ -162,7 +162,7 @@ This plan is binding for the following table columns (from `supabase_schema_rls_
 - `meet_participants.role` → `mm_participation_role`
 - `meet_participants.join_state` → `mm_participation_state`
 - `meet_rosters.roster_state` → `mm_roster_submission_state`
-- `meet_entries.entry_state` → `mm_entries_submission_state` (or entry-specific enum if defined in state machines)
+- `meet_entries.entry_state` → `mm_entries_submission_state`
 - `meet_events.event_type` → `mm_event_type`
 - `meet_results.publication_state` → `mm_results_publication_state`
 - `ops_tokens.token_type` → `mm_ops_token_type`

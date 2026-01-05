@@ -454,14 +454,34 @@ export function CapabilityDriftMap({
   }, [nodes]);
 
   const snapshotAbsences = React.useMemo<DriftAbsence[]>(() => {
-    const raw = (_snapshot as any)?.full_payload?.absences;
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((a: any) => {
-      const h = (a?.horizon ?? "").toString().toUpperCase();
-      const effectiveHorizon = (hoverHorizon ?? selectedHorizon).toString().toUpperCase();
-      return h === effectiveHorizon;
-    });
-  }, [_snapshot, hoverHorizon, selectedHorizon]);
+    // Canonical UI truth for holes/plates must derive from the view-model absences list,
+    // because overlay layers (A1/A2) operate on ProgramHealthViewModel.absences.
+    // Snapshot.full_payload is retained for diagnostics but is not authoritative for rendering.
+    const effectiveHorizon = (hoverHorizon ?? selectedHorizon).toString().toUpperCase();
+
+    return (absences ?? [])
+      .filter((a) => (a?.horizon ?? "").toString().toUpperCase() === effectiveHorizon)
+      .map((a) => {
+        const details: any = (a as any)?.details ?? {};
+        const capability_node_id =
+          typeof details?.capability_node_id === "string"
+            ? details.capability_node_id
+            : typeof (a as any)?.capability_node_id === "string"
+              ? (a as any).capability_node_id
+              : "";
+
+        return {
+          id: (a as any)?.id,
+          absence_key: (a as any)?.absence_key,
+          absence_type: (a as any)?.absence_type,
+          horizon: (a as any)?.horizon,
+          severity: (a as any)?.severity ?? null,
+          sector_key: (a as any)?.sector_key ?? null,
+          capability_node_id,
+        } satisfies DriftAbsence;
+      })
+      .filter((a) => !!a.capability_node_id);
+  }, [absences, hoverHorizon, selectedHorizon]);
 
   const driftCards = React.useMemo(() => {
     return buildDriftCards({ absences: snapshotAbsences, nodesById: driftNodesById });

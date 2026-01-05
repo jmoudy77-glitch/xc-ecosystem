@@ -51,8 +51,24 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
   }, []);
 
   const onSetPrimary = React.useCallback(
-    (eventGroupKey: string, slotId: string, athleteId: string) => {
+    async (eventGroupKey: string, slotId: string, athleteId: string) => {
       dispatch({ type: "SET_PRIMARY", eventGroupKey, slotId, athleteId });
+      try {
+        const slot = rows.find(r => r.eventGroupKey === eventGroupKey)?.slots.find(s => s.slotId === slotId);
+        const athlete = slot?.athletesById[athleteId];
+        if (!athlete) return;
+        const mod = await import("@/app/actions/recruiting/persistRecruitingPrimary");
+        await mod.persistRecruitingPrimary({
+          programId,
+          eventGroupKey,
+          slotId,
+          primaryAthleteId: athleteId,
+          athleteType: athlete.type,
+        });
+      } catch {}
+    },
+    [dispatch, rows, programId]
+  );
     },
     [dispatch]
   );

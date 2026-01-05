@@ -1,4 +1,4 @@
-// app/app/programs/[programId]/(athletic)/recruiting/discovery/RecruitDiscoveryPortalClient.tsx
+// app/programs/[programId]/(athletic)/recruiting/discovery/RecruitDiscoveryPortalClient.tsx
 
 "use client";
 

@@ -80,11 +80,11 @@ Latest snapshot (example):
 Recruiting M1 UI is implemented and live.
 
 ### 4.1 Route
-- `app/app/programs/[programId]/(athletic)/recruiting/page.tsx`
+- `app/programs/[programId]/(athletic)/recruiting/page.tsx`
 
 ### 4.2 Components/actions
 - Server action: `app/app/actions/recruiting/readRecruitingM1View.ts`
-- Client UI: `app/app/programs/[programId]/(athletic)/recruiting/RecruitingM1Client.tsx`
+- Client UI: `app/programs/[programId]/(athletic)/recruiting/RecruitingM1Client.tsx`
 
 ### 4.3 Behavior guarantees
 - UI surfaces **only recruitable deficits**

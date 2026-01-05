@@ -10,11 +10,11 @@ import { TruthView } from "./TruthView";
 import { readAbsenceTruth } from "@/app/actions/program-health/readAbsenceTruth";
 import { readCanonicalEventGraph } from "@/app/actions/program-health/readCanonicalEventGraph";
 import { readLinkedCanonicalEventIds } from "@/app/actions/program-health/readLinkedCanonicalEventIds";
-import { ProgramHealthA2OverlayToggle } from "@/app/app/programs/[programId]/(athletic)/program-health/ProgramHealthA2OverlayToggle";
 import "./styles.css";
 
 import { SelectionPill } from "./SelectionPill";
 
+import { ProgramHealthA2OverlayToggle } from "../../programs/[programId]/(athletic)/program-health/ProgramHealthA2OverlayToggle";
 function collectCapabilityNodeIds(value: unknown, ids: Set<string>) {
   if (!value) return;
   if (Array.isArray(value)) {

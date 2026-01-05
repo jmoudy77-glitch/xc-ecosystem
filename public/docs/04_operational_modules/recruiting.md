@@ -73,7 +73,7 @@ Non-recruitable absences must never appear in Recruiting UI or Recruiting analyt
   - `recruiting_m1_audit_view`
 
 ### 2.4 UI route (App Router)
-- `app/app/programs/[programId]/(athletic)/recruiting/page.tsx`
+- `app/programs/[programId]/(athletic)/recruiting/page.tsx`
 - `RecruitingM1Client.tsx`
 - Server action: `app/app/actions/recruiting/readRecruitingM1View.ts`
 

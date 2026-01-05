@@ -2,7 +2,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabaseServer";
 import type {
   ProgramHealthAbsence,
@@ -56,23 +55,6 @@ async function readSnapshotHistoryForHorizon(
 export async function readProgramHealthView(programId: string): Promise<ProgramHealthViewModel> {
   const cookieStore = await cookies();
   const { supabase } = await supabaseServer(cookieStore);
-
-  // DIAGNOSTICS (temporary): prove auth context + RLS visibility for absences.
-  const { data: authUserData, error: authUserErr } = await supabase.auth.getUser();
-  console.log("[PH DIAG auth.getUser]", {
-    programId,
-    hasUser: !!authUserData?.user,
-    userId: authUserData?.user?.id ?? null,
-    authUserErr: authUserErr?.message ?? null,
-  });
-
-  
-  const { data: authUidViaPostgrest, error: authUidErr } = await supabase.rpc("rpc_auth_uid");
-  console.log("[PH DIAG auth.uid via PostgREST]", {
-    programId,
-    authUidViaPostgrest: authUidViaPostgrest ?? null,
-    authUidErr: authUidErr?.message ?? null,
-  });
 // 1) Capability structure (canonical surface)
   const { data: capabilityNodes, error: nodesErr } = await supabase
     .from("capability_nodes")
@@ -95,43 +77,6 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
     .order("updated_at", { ascending: false });
 
   if (absErr) throw absErr;
-
-  console.log("[PH DIAG absences user-client]", {
-    programId,
-    userAbsenceRows: (absences ?? []).length,
-    firstRow: (absences ?? [])[0] ?? null,
-  });
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
-  const serviceRoleKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE ??
-    process.env.SUPABASE_SERVICE_KEY ??
-    null;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.log("[PH DIAG absences admin-client]", {
-      programId,
-      adminEnabled: false,
-      reason: !supabaseUrl ? "missing NEXT_PUBLIC_SUPABASE_URL" : "missing service role key env",
-    });
-  } else {
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { count: adminCount, error: adminErr } = await admin
-      .from("program_health_absences")
-      .select("id", { count: "exact", head: true })
-      .or(`program_id.eq.${programId},scope_id.eq.${programId}`);
-
-    console.log("[PH DIAG absences admin-client]", {
-      programId,
-      adminEnabled: true,
-      adminCount: adminCount ?? null,
-      adminErr: adminErr?.message ?? null,
-    });
-  }
 
   // R4_1_1: Runtime truth binding — normalize absence shape for client mapping.
   // DB canonical column: capability_node_id
@@ -179,13 +124,6 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
     latestSnapshotsByHorizon.H3 ??
     latestSnapshotsByHorizon.H0 ??
     null;
-
-  console.log("[PH readProgramHealthView]", {
-  programId,
-  nodeCount: (capabilityNodes ?? []).length,
-  absenceCount: (normalizedAbsences ?? absences ?? []).length,
-  sampleAbsence: (normalizedAbsences ?? absences ?? [])[0],
-});
 
 
   return {

@@ -5,38 +5,24 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Props = {
   programId: string;
-  disabled?: boolean;
-  disabledLabel?: string;
 };
 
 // A1/A2 overlay toggle contract:
 // - OFF => A1 overlays (default)
 // - ON  => A2 overlays via query param phOverlay=a2
 
-// A2 overlays are strictly additive and read-only.
-// Enable via: NEXT_PUBLIC_PH_A2_OVERLAYS=1
-const A2_ENABLED = process.env.NEXT_PUBLIC_PH_A2_OVERLAYS === "1";
-
-export function ProgramHealthA2OverlayToggle({
-  programId,
-  disabled: disabledProp,
-  disabledLabel: disabledLabelProp,
-}: Props) {
+export function ProgramHealthA2OverlayToggle({ programId }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
 
   const isA2 = sp.get("phOverlay") === "a2";
   const horizon = sp.get("horizon");
-  const disabled = Boolean(disabledProp) || !A2_ENABLED;
-  const disabledLabel =
-    disabledLabelProp ?? "Overlays available in Program Health";
 
   const [loading, setLoading] = React.useState(false);
   const [hasA2Data, setHasA2Data] = React.useState<boolean | null>(null);
 
   const toggle = () => {
-    if (disabled) return;
     const next = new URLSearchParams(sp.toString());
     if (isA2) next.delete("phOverlay");
     else next.set("phOverlay", "a2");
@@ -48,7 +34,7 @@ export function ProgramHealthA2OverlayToggle({
     let cancelled = false;
 
     async function run() {
-      if (!isA2 || disabled) {
+      if (!isA2) {
         setHasA2Data(null);
         return;
       }
@@ -75,7 +61,7 @@ export function ProgramHealthA2OverlayToggle({
     return () => {
       cancelled = true;
     };
-  }, [isA2, programId, horizon, disabled]);
+  }, [isA2, programId, horizon]);
 
   return (
     <div className="flex items-center justify-between gap-3">
@@ -83,17 +69,11 @@ export function ProgramHealthA2OverlayToggle({
       <button
         type="button"
         onClick={toggle}
-        className={[
-          "rounded-md border px-2 py-1 text-[11px]",
-          disabled
-            ? "cursor-not-allowed border-slate-800/60 text-slate-400"
-            : "border-slate-800 text-slate-200 hover:bg-slate-900/40",
-        ].join(" ")}
+        className="rounded-md border border-slate-800 px-2 py-1 text-[11px] text-slate-200 hover:bg-slate-900/40"
         aria-pressed={isA2}
-        disabled={disabled}
-        title={disabled ? disabledLabel : "Switch overlays (A1/A2)"}
+        title="Switch overlays (A1/A2)"
       >
-        {disabled ? "A1/A2" : isA2 ? "A2" : "A1"}
+        {isA2 ? "A2" : "A1"}
       </button>
 
       {isA2 ? (

@@ -115,6 +115,55 @@ const A2_LAYERING = {
   pointerEvents: "none" as const,
 } as const;
 
+const A2_CONFIDENCE = {
+  unknown: { dash: "0", alpha: 0 },
+  low: { dash: "2 4", alpha: 0.25 },
+  medium: { dash: "4 4", alpha: 0.35 },
+  high: { dash: "6 3", alpha: 0.45 },
+} as const;
+
+const A2_PROVENANCE = {
+  present: { glyph: "●", color: "rgba(255,255,255,0.6)", sizePx: 10 },
+  missing: { glyph: "○", color: "rgba(255,255,255,0.35)", sizePx: 10 },
+} as const;
+
+const A2_BADGE = {
+  fontSizePx: 11,
+  paddingX: 8,
+  paddingY: 3,
+  radiusPx: 999,
+  bg: "rgba(0,0,0,0.35)",
+  border: "rgba(255,255,255,0.25)",
+  text: "rgba(255,255,255,0.85)",
+  maxWidthPx: 120,
+} as const;
+
+function a2ConfidenceKey(a: any): keyof typeof A2_CONFIDENCE {
+  const v = (a?.details?.confidence ?? a?.confidence ?? a?.meta?.confidence ?? "")
+    .toString()
+    .trim()
+    .toLowerCase();
+  if (v === "low" || v === "medium" || v === "high") return v;
+  return "unknown";
+}
+
+function a2HasProvenance(a: any): boolean {
+  return Boolean(
+    a?.canonical_event_id ??
+      a?.ledger_id ??
+      a?.event_id ??
+      a?.details?.event_id ??
+      a?.details?.ledger_id
+  );
+}
+
+function a2GroupLabel(a: any): string | null {
+  const v = a?.details?.group_key ?? a?.details?.cohort ?? a?.group_key ?? a?.cohort ?? null;
+  if (v == null) return null;
+  const s = v.toString().trim();
+  return s.length ? s : null;
+}
+
 type A1AbsenceClass = "capability" | "structural" | "readiness";
 
 const A1_CLASS_COLOR = {
@@ -1151,9 +1200,14 @@ export function CapabilityDriftMap({
                                                   : isHighlighted
                                                     ? A2_STROKE.hoverBoostColor
                                                     : A2_STROKE.color;
+                                                const ck = a2ConfidenceKey(a as any);
+                                                const ct = A2_CONFIDENCE[ck];
+                                                const borderAlpha = ct.alpha > 0 ? ct.alpha : 0.35;
+                                                const borderColor = a1SetAlpha(stroke, borderAlpha);
                                                 return {
-                                                  outline: `${A2_STROKE.widthPx}px solid ${stroke}`,
-                                                  background: "rgba(255,255,255,0.04)",
+                                                  outline: "none",
+                                                  background: "transparent",
+                                                  border: `${A2_STROKE.widthPx}px ${ct.dash === "0" ? "solid" : "dashed"} ${borderColor}`,
                                                   boxShadow: "none",
                                                   filter: "none",
                                                 };
@@ -1183,6 +1237,56 @@ export function CapabilityDriftMap({
                                         onAbsenceHover?.(null, null);
                                       }}
                                     >
+                                      {A2_ENABLED && overlayMode === "a2" && (
+                                        <>
+                                          <span
+                                            aria-hidden="true"
+                                            style={{
+                                              position: "absolute",
+                                              top: 2,
+                                              right: 4,
+                                              fontSize: A2_PROVENANCE.present.sizePx,
+                                              lineHeight: 1,
+                                              color: a2HasProvenance(a as any)
+                                                ? A2_PROVENANCE.present.color
+                                                : A2_PROVENANCE.missing.color,
+                                              pointerEvents: "none",
+                                              userSelect: "none",
+                                            }}
+                                          >
+                                            {a2HasProvenance(a as any)
+                                              ? A2_PROVENANCE.present.glyph
+                                              : A2_PROVENANCE.missing.glyph}
+                                          </span>
+
+                                          {a2GroupLabel(a as any) && (
+                                            <span
+                                              aria-hidden="true"
+                                              style={{
+                                                position: "absolute",
+                                                left: "50%",
+                                                top: "100%",
+                                                transform: "translate(-50%, 8px)",
+                                                maxWidth: A2_BADGE.maxWidthPx,
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                fontSize: A2_BADGE.fontSizePx,
+                                                padding: `${A2_BADGE.paddingY}px ${A2_BADGE.paddingX}px`,
+                                                borderRadius: A2_BADGE.radiusPx,
+                                                background: A2_BADGE.bg,
+                                                border: `1px solid ${A2_BADGE.border}`,
+                                                color: A2_BADGE.text,
+                                                pointerEvents: "none",
+                                                userSelect: "none",
+                                              }}
+                                              title={a2GroupLabel(a as any) ?? undefined}
+                                            >
+                                              {a2GroupLabel(a as any)}
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
                                       <span className="ph-hole-rim" />
                                       <span className="ph-hole-void" />
                                       <span className="ph-hole-below" />

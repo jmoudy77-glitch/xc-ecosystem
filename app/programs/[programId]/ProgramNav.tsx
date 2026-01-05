@@ -472,11 +472,13 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
         id: "performance",
         label: "Performance",
         href: (ctx) => `/programs/${ctx.programId}/performance`,
+        order: 10,
       },
       {
         id: "program_health",
         label: "Program Health",
         href: (ctx) => `/programs/${ctx.programId}/program-health`,
+        order: 20,
       },
     ],
   },
@@ -489,6 +491,7 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
         id: "recruiting",
         label: "Recruiting",
         href: (ctx) => `/programs/${ctx.programId}/recruiting`,
+        order: 10,
       },
       {
         id: "roster_planning",
@@ -497,12 +500,20 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
           ctx.teamId
             ? `/programs/${ctx.programId}/teams/${ctx.teamId}/roster-planning`
             : `/programs/${ctx.programId}/teams`,
-        isActive: (pathname) =>
-          pathname.includes("/roster-planning") ||
-          pathname.includes("/scenarios/") ||
-          (pathname.includes("/seasons/") &&
-            (pathname.includes("/roster") || pathname.includes("/scholarship-history"))) ||
-          pathname.includes("/active-roster"),
+        isActive: (pathname, ctx) => {
+          const base = `/programs/${ctx.programId}`;
+          return (
+            pathname.includes("/roster-planning") ||
+            pathname.includes("/scenarios/") ||
+            (pathname.includes("/seasons/") &&
+              (pathname.includes("/roster") ||
+                pathname.includes("/scholarship-history"))) ||
+            pathname.includes("/active-roster") ||
+            (pathname.startsWith(`${base}/teams/`) &&
+              pathname.includes("/roster-planning"))
+          );
+        },
+        order: 20,
       },
     ],
   },
@@ -512,19 +523,16 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
     order: 30,
     items: [
       {
-        id: "dashboard",
-        label: "Dashboard",
-        href: (ctx) => `/programs/${ctx.programId}/dashboard`,
-      },
-      {
         id: "athletes",
         label: "Athletes",
         href: (ctx) => `/programs/${ctx.programId}/athletes`,
+        order: 10,
       },
       {
         id: "training",
         label: "Training",
         href: (ctx) => `/programs/${ctx.programId}/training`,
+        order: 20,
       },
       { id: "knowledge", label: "Knowledge", href: "/knowledge" },
       { id: "files", label: "Files", href: "/files" },
@@ -543,6 +551,7 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
         href: (ctx) => `/programs/${ctx.programId}/meets`,
         disabled: true,
         badge: "Coming Soon",
+        order: 10,
       },
     ],
   },
@@ -555,31 +564,37 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
         id: "teams",
         label: "Teams",
         href: (ctx) => `/programs/${ctx.programId}/teams`,
+        order: 10,
       },
       {
         id: "facilities",
         label: "Facilities",
         href: (ctx) => `/programs/${ctx.programId}/facilities`,
+        order: 20,
       },
       {
         id: "staff",
         label: "Staff",
         href: (ctx) => `/programs/${ctx.programId}/staff`,
+        order: 30,
       },
       {
         id: "branding",
         label: "Branding",
         href: (ctx) => `/programs/${ctx.programId}/settings/branding`,
+        order: 40,
       },
       {
         id: "billing",
         label: "Billing",
         href: (ctx) => `/programs/${ctx.programId}/billing`,
+        order: 50,
       },
       {
         id: "account",
         label: "Account",
         href: (ctx) => `/programs/${ctx.programId}/account`,
+        order: 60,
       },
     ],
   },
@@ -604,6 +619,7 @@ export function ProgramNav() {
   const programId = params?.programId;
   const pathname = usePathname();
   const [navCtx, setNavCtx] = useState<PersistedContext>({});
+  const [openGroup, setOpenGroup] = useState<ProgramNavModeId | null>(null);
 
   if (!programId) return null;
 
@@ -612,58 +628,118 @@ export function ProgramNav() {
   }, [programId, pathname]);
 
   const ctx = useMemo<ProgramNavContext>(
-    () => ({ programId, teamId: navCtx.teamId }),
+    () => ({ programId, teamId: navCtx.teamId ?? null }),
     [programId, navCtx.teamId]
   );
 
   const sortedGroups = useMemo(() => {
-    return [...PROGRAM_NAV_GROUPS].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    return [...PROGRAM_NAV_GROUPS]
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((group) => ({
+        ...group,
+        items: [...group.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+      }));
   }, []);
+
+  const activeGroupId = useMemo(() => {
+    for (const group of sortedGroups) {
+      if (group.items.some((item) => isNavItemActive(item, pathname, ctx))) {
+        return group.id;
+      }
+    }
+    return null;
+  }, [sortedGroups, pathname, ctx]);
+
+  useEffect(() => {
+    if (openGroup === null && activeGroupId) setOpenGroup(activeGroupId);
+  }, [openGroup, activeGroupId]);
+
+  const dashboardHref = `/programs/${programId}/dashboard`;
+  const isDashboardActive =
+    pathname === dashboardHref || pathname.startsWith(`${dashboardHref}/`);
 
   return (
     <div className="flex flex-col gap-4 bg-transparent text-[11px]">
       {/* Primary program navigation */}
       <nav className="space-y-1 bg-transparent">
-        {sortedGroups.map((group) => (
-          <div key={group.id} className="space-y-1 bg-transparent">
-            <div className="px-3 pt-2 text-[10px] uppercase tracking-wide text-muted/70">
-              {group.label}
+        <Link
+          href={dashboardHref}
+          className={[
+            "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+            isDashboardActive
+              ? "glass-pill--brand glass-pill--active"
+              : "glass-pill--brand-soft text-muted",
+          ].join(" ")}
+        >
+          <span>Dashboard</span>
+          <span className="text-[9px] opacity-60">→</span>
+        </Link>
+
+        {sortedGroups.map((group) => {
+          const groupIsActive = group.items.some((item) =>
+            isNavItemActive(item, pathname, ctx)
+          );
+          const isOpen = openGroup === group.id;
+
+          return (
+            <div key={group.id} className="space-y-1 bg-transparent">
+              <button
+                type="button"
+                onClick={() => setOpenGroup((cur) => (cur === group.id ? null : group.id))}
+                className={[
+                  "glass-pill flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 text-[11px] transition-colors",
+                  isOpen || groupIsActive
+                    ? "glass-pill--brand glass-pill--active"
+                    : "glass-pill--brand-soft text-muted",
+                ].join(" ")}
+                aria-expanded={isOpen}
+              >
+                <span>{group.label.toUpperCase()}</span>
+                <span className="text-[9px] opacity-60">{isOpen ? "▾" : "▸"}</span>
+              </button>
+
+              {isOpen && (
+                <div className="space-y-1 pl-3 bg-transparent">
+                  {group.items.map((item) => {
+                    if (item.disabled) {
+                      return (
+                        <div
+                          key={item.id}
+                          className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted opacity-60 cursor-not-allowed"
+                        >
+                          <span>
+                            {item.label}
+                            {item.badge ? ` (${item.badge})` : ""}
+                          </span>
+                          <span className="text-[9px] opacity-60">•</span>
+                        </div>
+                      );
+                    }
+
+                    const href = resolveNavHref(item, ctx);
+                    const isActive = isNavItemActive(item, pathname, ctx);
+
+                    return (
+                      <Link
+                        key={item.id}
+                        href={href}
+                        className={[
+                          "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                          isActive
+                            ? "glass-pill--brand glass-pill--active"
+                            : "glass-pill--brand-soft text-muted",
+                        ].join(" ")}
+                      >
+                        <span>{item.label}</span>
+                        <span className="text-[9px] opacity-60">→</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            {group.items.map((item) => {
-              const href = resolveNavHref(item, ctx);
-              const isActive = isNavItemActive(item, pathname, ctx);
-              const baseClasses =
-                "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors";
-              const activeClasses = isActive
-                ? "glass-pill--brand glass-pill--active"
-                : "glass-pill--brand-soft text-muted";
-
-              if (item.disabled) {
-                return (
-                  <div
-                    key={item.id}
-                    className={`${baseClasses} ${activeClasses} cursor-not-allowed opacity-60`}
-                    aria-disabled="true"
-                  >
-                    <span>{item.label}</span>
-                    <span className="text-[9px] opacity-60">{item.badge ?? "•"}</span>
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.id}
-                  href={href}
-                  className={[baseClasses, activeClasses].join(" ")}
-                >
-                  <span>{item.label}</span>
-                  <span className="text-[9px] opacity-60">{item.badge ?? "→"}</span>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+          );
+        })}
       </nav>
     </div>
   );

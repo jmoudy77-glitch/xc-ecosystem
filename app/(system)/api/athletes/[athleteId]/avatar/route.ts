@@ -84,3 +84,12 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     );
   }
 }
+
+
+export async function GET() {
+  return new NextResponse(null, { status: 204 });
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 204 });
+}

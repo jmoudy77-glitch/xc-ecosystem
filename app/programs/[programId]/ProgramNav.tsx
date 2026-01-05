@@ -5,9 +5,57 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 
-type NavItem = {
+type ProgramNavModeId =
+  | "analyze"
+  | "plan"
+  | "manage"
+  | "compete"
+  | "administrate";
+
+type ProgramNavItemId =
+  | "dashboard"
+  | "athletes"
+  | "training"
+  | "recruiting"
+  | "roster_planning"
+  | "performance"
+  | "program_health"
+  | "knowledge"
+  | "files"
+  | "media"
+  | "gear"
+  | "meets"
+  | "teams"
+  | "facilities"
+  | "staff"
+  | "branding"
+  | "billing"
+  | "account";
+
+type ProgramNavContext = {
+  programId: string;
+  teamId?: string | null;
+};
+
+type ProgramNavHref = string | ((ctx: ProgramNavContext) => string);
+
+type ProgramNavItem = {
+  id: ProgramNavItemId;
   label: string;
-  href: (programId: string) => string;
+  href: ProgramNavHref;
+  disabled?: boolean;
+  badge?: string;
+  isActive?: (pathname: string, ctx: ProgramNavContext) => boolean;
+  order?: number;
+};
+
+type ProgramNavGroup = {
+  id: ProgramNavModeId;
+  label: string;
+  description?: string;
+  items: ProgramNavItem[];
+  collapsible?: boolean;
+  order?: number;
 };
 
 type PersistedContext = {
@@ -414,43 +462,147 @@ export function ProgramContextBar({
   );
 }
 
-const NAV_ITEMS: NavItem[] = [
+const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
   {
-    label: "Dashboard",
-    href: (programId) => `/programs/${programId}/dashboard`,
+    id: "analyze",
+    label: "Analyze",
+    order: 10,
+    items: [
+      {
+        id: "performance",
+        label: "Performance",
+        href: (ctx) => `/programs/${ctx.programId}/performance`,
+      },
+      {
+        id: "program_health",
+        label: "Program Health",
+        href: (ctx) => `/programs/${ctx.programId}/program-health`,
+      },
+    ],
   },
   {
-    label: "Athletes",
-    href: (programId) => `/programs/${programId}/athletes`,
+    id: "plan",
+    label: "Plan",
+    order: 20,
+    items: [
+      {
+        id: "recruiting",
+        label: "Recruiting",
+        href: (ctx) => `/programs/${ctx.programId}/recruiting`,
+      },
+      {
+        id: "roster_planning",
+        label: "Roster Planning",
+        href: (ctx) =>
+          ctx.teamId
+            ? `/programs/${ctx.programId}/teams/${ctx.teamId}/roster-planning`
+            : `/programs/${ctx.programId}/teams`,
+        isActive: (pathname) =>
+          pathname.includes("/roster-planning") ||
+          pathname.includes("/scenarios/") ||
+          (pathname.includes("/seasons/") &&
+            (pathname.includes("/roster") || pathname.includes("/scholarship-history"))) ||
+          pathname.includes("/active-roster"),
+      },
+    ],
   },
   {
-    label: "Training",
-    href: (programId) => `/programs/${programId}/training`,
+    id: "manage",
+    label: "Manage",
+    order: 30,
+    items: [
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        href: (ctx) => `/programs/${ctx.programId}/dashboard`,
+      },
+      {
+        id: "athletes",
+        label: "Athletes",
+        href: (ctx) => `/programs/${ctx.programId}/athletes`,
+      },
+      {
+        id: "training",
+        label: "Training",
+        href: (ctx) => `/programs/${ctx.programId}/training`,
+      },
+      { id: "knowledge", label: "Knowledge", href: "/knowledge" },
+      { id: "files", label: "Files", href: "/files" },
+      { id: "media", label: "Media", href: "/media" },
+      { id: "gear", label: "Gear", href: "/gear" },
+    ],
   },
   {
-    label: "Recruiting",
-    href: (programId) => `/programs/${programId}/recruiting`,
+    id: "compete",
+    label: "Compete",
+    order: 40,
+    items: [
+      {
+        id: "meets",
+        label: "Meets",
+        href: (ctx) => `/programs/${ctx.programId}/meets`,
+        disabled: true,
+        badge: "Coming Soon",
+      },
+    ],
   },
   {
-    label: "Performance",
-    href: (programId) => `/programs/${programId}/performance`,
-  },
-  {
-    label: "Program Health",
-    href: (programId) => `/programs/${programId}/program-health`,
-  },
-  {
-    label: "Resources",
-    href: () => `#`,
+    id: "administrate",
+    label: "Administrate",
+    order: 50,
+    items: [
+      {
+        id: "teams",
+        label: "Teams",
+        href: (ctx) => `/programs/${ctx.programId}/teams`,
+      },
+      {
+        id: "facilities",
+        label: "Facilities",
+        href: (ctx) => `/programs/${ctx.programId}/facilities`,
+      },
+      {
+        id: "staff",
+        label: "Staff",
+        href: (ctx) => `/programs/${ctx.programId}/staff`,
+      },
+      {
+        id: "branding",
+        label: "Branding",
+        href: (ctx) => `/programs/${ctx.programId}/settings/branding`,
+      },
+      {
+        id: "billing",
+        label: "Billing",
+        href: (ctx) => `/programs/${ctx.programId}/billing`,
+      },
+      {
+        id: "account",
+        label: "Account",
+        href: (ctx) => `/programs/${ctx.programId}/account`,
+      },
+    ],
   },
 ];
+
+function resolveNavHref(item: ProgramNavItem, ctx: ProgramNavContext): string {
+  return typeof item.href === "function" ? item.href(ctx) : item.href;
+}
+
+function isNavItemActive(
+  item: ProgramNavItem,
+  pathname: string,
+  ctx: ProgramNavContext
+): boolean {
+  if (item.isActive) return item.isActive(pathname, ctx);
+  const href = resolveNavHref(item, ctx);
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function ProgramNav() {
   const params = useParams<{ programId: string }>();
   const programId = params?.programId;
   const pathname = usePathname();
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [resourcesOpen, setResourcesOpen] = useState(false);
   const [navCtx, setNavCtx] = useState<PersistedContext>({});
 
   if (!programId) return null;
@@ -459,229 +611,59 @@ export function ProgramNav() {
     setNavCtx(readCtx(programId));
   }, [programId, pathname]);
 
-  useEffect(() => {
-    setAdminOpen(false);
-    setResourcesOpen(false);
-  }, [programId, pathname]);
+  const ctx = useMemo<ProgramNavContext>(
+    () => ({ programId, teamId: navCtx.teamId }),
+    [programId, navCtx.teamId]
+  );
 
-  const billingHref = `/programs/${programId}/billing`;
-  const brandingHref = `/programs/${programId}/settings/branding`;
-  const staffHref = `/programs/${programId}/staff`;
-  const accountHref = `/programs/${programId}/account`;
-  const teamsHref = `/programs/${programId}/teams`;
-  const facilitiesHref = `/programs/${programId}/facilities`;
-  const rosterPlanningHref = navCtx.teamId
-    ? `/programs/${programId}/teams/${navCtx.teamId}/roster-planning`
-    : teamsHref;
-
-  const isBillingActive =
-    pathname === billingHref || pathname.startsWith(billingHref);
-  const isBrandingActive =
-    pathname === brandingHref || pathname.startsWith(brandingHref);
-  const isStaffActive = pathname === staffHref || pathname.startsWith(staffHref);
-  const isAccountActive =
-    pathname === accountHref || pathname.startsWith(accountHref);
-  const isTeamsActive = pathname === teamsHref || pathname.startsWith(teamsHref + "/");
-  const isFacilitiesActive =
-    pathname === facilitiesHref || pathname.startsWith(facilitiesHref + "/");
-
-  const isRosterPlanningActive =
-    pathname.includes("/roster-planning") ||
-    pathname.startsWith(rosterPlanningHref + "/") ||
-    pathname.includes("/scenarios/") ||
-    (pathname.includes("/seasons/") &&
-      (pathname.includes("/roster") || pathname.includes("/scholarship-history"))) ||
-    pathname.includes("/active-roster");
+  const sortedGroups = useMemo(() => {
+    return [...PROGRAM_NAV_GROUPS].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, []);
 
   return (
     <div className="flex flex-col gap-4 bg-transparent text-[11px]">
       {/* Primary program navigation */}
       <nav className="space-y-1 bg-transparent">
-        {NAV_ITEMS.map((item) => {
-          const href = item.href(programId);
-          const isActive =
-            pathname === href ||
-            (href !== `/programs/${programId}` && pathname.startsWith(href));
-
-          if (item.label === "Resources") {
-            return (
-              <div key={item.label} className="space-y-1 bg-transparent">
-                <button
-                  type="button"
-                  onClick={() => setResourcesOpen((open) => !open)}
-                  className="glass-pill glass-pill--brand-soft flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 text-[11px] text-muted transition-colors"
-                  aria-expanded={resourcesOpen}
-                >
-                  <span>Resources</span>
-                  <span className="text-[9px] opacity-60">{resourcesOpen ? "▾" : "▸"}</span>
-                </button>
-
-                {resourcesOpen && (
-                  <div className="space-y-1 pl-3 bg-transparent">
-                    <Link
-                      href="/knowledge"
-                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
-                    >
-                      <span>Knowledge</span>
-                      <span className="text-[9px] opacity-60">→</span>
-                    </Link>
-
-                    <Link
-                      href="/files"
-                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
-                    >
-                      <span>Files</span>
-                      <span className="text-[9px] opacity-60">→</span>
-                    </Link>
-
-                    <Link
-                      href="/media"
-                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
-                    >
-                      <span>Media</span>
-                      <span className="text-[9px] opacity-60">→</span>
-                    </Link>
-
-                    <Link
-                      href="/gear"
-                      className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted transition-colors"
-                    >
-                      <span>Gear</span>
-                      <span className="text-[9px] opacity-60">→</span>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <Link
-              key={item.label}
-              href={href}
-              className={[
-                "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                isActive
-                  ? "glass-pill--brand glass-pill--active"
-                  : "glass-pill--brand-soft text-muted",
-              ].join(" ")}
-            >
-              <span>{item.label}</span>
-              <span className="text-[9px] opacity-60">→</span>
-            </Link>
-          );
-        })}
-
-        <div className="glass-pill glass-pill--brand-soft flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-muted opacity-60 cursor-not-allowed">
-          <span>Meets (Coming Soon)</span>
-          <span className="text-[9px] opacity-60">•</span>
-        </div>
-
-        {/* Administration group (collapsible) */}
-        <div className="mt-2 space-y-1 bg-transparent">
-          <button
-            type="button"
-            onClick={() => setAdminOpen((open) => !open)}
-            className="glass-pill glass-pill--brand-soft flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 text-[11px] text-muted transition-colors"
-            aria-expanded={adminOpen}
-          >
-            <span>Administration</span>
-            <span className="text-[9px] opacity-60">{adminOpen ? "▾" : "▸"}</span>
-          </button>
-
-          {adminOpen && (
-            <div className="space-y-1 pl-3 bg-transparent">
-              <Link
-                href={teamsHref}
-                className={[
-                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isTeamsActive
-                    ? "glass-pill--brand glass-pill--active"
-                    : "glass-pill--brand-soft text-muted",
-                ].join(" ")}
-              >
-                <span>Teams</span>
-                <span className="text-[9px] opacity-60">→</span>
-              </Link>
-              <Link
-                href={facilitiesHref}
-                className={[
-                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isFacilitiesActive
-                    ? "glass-pill--brand glass-pill--active"
-                    : "glass-pill--brand-soft text-muted",
-                ].join(" ")}
-              >
-                <span>Facilities</span>
-                <span className="text-[9px] opacity-60">→</span>
-              </Link>
-              <Link
-                href={rosterPlanningHref}
-                className={[
-                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isRosterPlanningActive
-                    ? "glass-pill--brand glass-pill--active"
-                    : "glass-pill--brand-soft text-muted",
-                ].join(" ")}
-              >
-                <span>Roster Planning</span>
-                <span className="text-[9px] opacity-60">→</span>
-              </Link>
-
-              <Link
-                href={staffHref}
-                className={[
-                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isStaffActive
-                    ? "glass-pill--brand glass-pill--active"
-                    : "glass-pill--brand-soft text-muted",
-                ].join(" ")}
-              >
-                <span>Staff</span>
-                <span className="text-[9px] opacity-60">→</span>
-              </Link>
-
-              <Link
-                href={brandingHref}
-                className={[
-                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isBrandingActive
-                    ? "glass-pill--brand glass-pill--active"
-                    : "glass-pill--brand-soft text-muted",
-                ].join(" ")}
-              >
-                <span>Branding</span>
-                <span className="text-[9px] opacity-60">→</span>
-              </Link>
-
-              <Link
-                href={billingHref}
-                className={[
-                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isBillingActive
-                    ? "glass-pill--brand glass-pill--active"
-                    : "glass-pill--brand-soft text-muted",
-                ].join(" ")}
-              >
-                <span>Billing</span>
-                <span className="text-[9px] opacity-60">→</span>
-              </Link>
-
-              <Link
-                href={accountHref}
-                className={[
-                  "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
-                  isAccountActive
-                    ? "glass-pill--brand glass-pill--active"
-                    : "glass-pill--brand-soft text-muted",
-                ].join(" ")}
-              >
-                <span>Account</span>
-                <span className="text-[9px] opacity-60">→</span>
-              </Link>
+        {sortedGroups.map((group) => (
+          <div key={group.id} className="space-y-1 bg-transparent">
+            <div className="px-3 pt-2 text-[10px] uppercase tracking-wide text-muted/70">
+              {group.label}
             </div>
-          )}
-        </div>
+            {group.items.map((item) => {
+              const href = resolveNavHref(item, ctx);
+              const isActive = isNavItemActive(item, pathname, ctx);
+              const baseClasses =
+                "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors";
+              const activeClasses = isActive
+                ? "glass-pill--brand glass-pill--active"
+                : "glass-pill--brand-soft text-muted";
+
+              if (item.disabled) {
+                return (
+                  <div
+                    key={item.id}
+                    className={`${baseClasses} ${activeClasses} cursor-not-allowed opacity-60`}
+                    aria-disabled="true"
+                  >
+                    <span>{item.label}</span>
+                    <span className="text-[9px] opacity-60">{item.badge ?? "•"}</span>
+                  </div>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.id}
+                  href={href}
+                  className={[baseClasses, activeClasses].join(" ")}
+                >
+                  <span>{item.label}</span>
+                  <span className="text-[9px] opacity-60">{item.badge ?? "→"}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
     </div>
   );

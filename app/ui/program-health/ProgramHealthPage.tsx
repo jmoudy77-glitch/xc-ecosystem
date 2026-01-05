@@ -350,7 +350,6 @@ export function ProgramHealthPage({
           <div className="ph-topbar">
             <div className="ph-title">Program Health</div>
             <div className="ph-controls">
-              <ProgramHealthA2OverlayToggle programId={programId} />
               <button
                 className="ph-btn"
                 disabled={!selectedAbsenceId || truthLoading}
@@ -401,6 +400,10 @@ export function ProgramHealthPage({
               />
               <span>Lineage highlight</span>
             </label>
+
+            <div className="pt-2 border-t border-white/10">
+              <ProgramHealthA2OverlayToggle programId={programId} />
+            </div>
           </div>
         </div>
 

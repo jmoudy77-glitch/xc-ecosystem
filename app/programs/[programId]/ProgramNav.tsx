@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { ProgramHealthA2OverlayToggle } from "@/app/app/programs/[programId]/(athletic)/program-health/ProgramHealthA2OverlayToggle";
 
 type ProgramNavModeId =
   | "analyze"
@@ -677,11 +676,6 @@ export function ProgramNav() {
   const dashboardHref = `/programs/${programId}/dashboard`;
   const isDashboardActive =
     pathname === dashboardHref || pathname.startsWith(`${dashboardHref}/`);
-  const isProgramHealth =
-    pathname.includes("program-health") ||
-    pathname.includes("capability-drift") ||
-    pathname.includes("capabilitydrift") ||
-    pathname.includes("drift-map");
 
   return (
     <div className="flex h-full flex-col gap-4 bg-transparent text-[11px]">
@@ -831,13 +825,6 @@ export function ProgramNav() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-subtle px-3 py-3">
-        <ProgramHealthA2OverlayToggle
-          programId={programId}
-          disabled={!isProgramHealth}
-          disabledLabel="Open Program Health to switch overlays"
-        />
-      </div>
     </div>
   );
 }

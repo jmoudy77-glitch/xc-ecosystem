@@ -94,6 +94,92 @@ const READ_LINE_DEG = -55;
 const READ_MATH_OFFSET_DEG = -20;
 const DISC_RADIUS_PX = 440;
 
+// A1 overlays (feature-flagged)
+// Enable via: NEXT_PUBLIC_PH_A1_OVERLAYS=1
+const A1_ENABLED = process.env.NEXT_PUBLIC_PH_A1_OVERLAYS === "1";
+
+type A1AbsenceClass = "capability" | "structural" | "readiness";
+
+const A1_CLASS_COLOR = {
+  capability: {
+    base: "rgba(88, 132, 255, 1)",
+    glow: "rgba(88, 132, 255, 0.35)",
+  },
+  structural: {
+    base: "rgba(245, 158, 11, 1)",
+    glow: "rgba(245, 158, 11, 0.35)",
+  },
+  readiness: {
+    base: "rgba(167, 139, 250, 1)",
+    glow: "rgba(167, 139, 250, 0.35)",
+  },
+} as const;
+
+const A1_SEVERITY_TOKENS = {
+  low: { depthPct: 0.12, opacity: 0.25 },
+  medium: { depthPct: 0.22, opacity: 0.45 },
+  high: { depthPct: 0.35, opacity: 0.65 },
+  critical: { depthPct: 0.5, opacity: 0.85 },
+} as const;
+
+const A1_HORIZON_EDGE = {
+  H0: { blurPx: 0, featherPx: 0 },
+  H1: { blurPx: 1, featherPx: 2 },
+  H2: { blurPx: 2, featherPx: 4 },
+  H3: { blurPx: 3, featherPx: 6 },
+} as const;
+
+const A1_STRUCTURAL_PATTERN = {
+  dashOpacityMultiplier: 0.85,
+} as const;
+
+const A1_INTERACTION = {
+  hover: {
+    outlinePx: 1.5,
+    outlineColor: "rgba(255,255,255,0.6)",
+    liftOpacityDelta: 0.1,
+  },
+  selected: {
+    outlinePx: 2,
+    outlineColor: "rgba(255,255,255,0.85)",
+    liftOpacityDelta: 0.2,
+  },
+} as const;
+
+function a1SetAlpha(rgba: string, alpha: number): string {
+  const a = Math.max(0, Math.min(1, alpha));
+  const m = rgba.match(
+    /rgba\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9.]+)\s*\)/i
+  );
+  if (!m) return rgba;
+  const r = m[1];
+  const g = m[2];
+  const b = m[3];
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+function a1NormalizeHorizon(
+  h: string | null | undefined
+): keyof typeof A1_HORIZON_EDGE {
+  const x = (h ?? "").toString().toUpperCase();
+  if (x === "H0" || x === "H1" || x === "H2" || x === "H3") return x;
+  return "H1";
+}
+
+function a1ClassForAbsence(a: DriftAbsence): A1AbsenceClass {
+  const t = (a.absence_type ?? "").toString().trim().toLowerCase();
+  const sector = (a.sector_key ?? "").toString().trim().toLowerCase();
+
+  // Readiness is explicitly keyed by sector or type.
+  if (sector === "readiness" || t.includes("readiness")) return "readiness";
+
+  // Structural gaps: authority / certification / structural.
+  if (t.includes("authority") || t.includes("cert") || t.includes("struct")) return "structural";
+
+  // Default: capability (coverage/redundancy/etc).
+  return "capability";
+}
+
 function polarTransform(localDeg: number, radiusPx: number) {
   // Canonical placement contract for all on-disc elements:
   // 1) anchor at disc center via left/top 50%
@@ -978,8 +1064,70 @@ export function CapabilityDriftMap({
                                       type="button"
                                       className={cls}
                                       style={{
-                                        outline: "2px solid rgba(255,0,0,0.9)",
-                                        background: "rgba(255,0,0,0.18)",
+                                        ...(A1_ENABLED
+                                          ? (() => {
+                                              const clsKey = a1ClassForAbsence(a);
+                                              const sevKey = normalizeLevel(sevBucket(a.severity));
+                                              const sevTok = A1_SEVERITY_TOKENS[sevKey];
+                                              const hzKey = a1NormalizeHorizon(a.horizon);
+                                              const hzTok = A1_HORIZON_EDGE[hzKey];
+
+                                              const interaction = isSelected
+                                                ? A1_INTERACTION.selected
+                                                : isHighlighted
+                                                  ? A1_INTERACTION.hover
+                                                  : null;
+
+                                              const base = A1_CLASS_COLOR[clsKey].base;
+                                              const glow = A1_CLASS_COLOR[clsKey].glow;
+
+                                              const bgAlpha = Math.min(
+                                                0.9,
+                                                sevTok.opacity + (interaction?.liftOpacityDelta ?? 0)
+                                              );
+
+                                              const depthPx = Math.max(
+                                                1,
+                                                Math.round(18 * sevTok.depthPct)
+                                              );
+                                              const feather = hzTok.featherPx;
+                                              const blur = hzTok.blurPx;
+
+                                              const structuralPattern =
+                                                clsKey === "structural"
+                                                  ? {
+                                                      backgroundImage:
+                                                        "repeating-linear-gradient(45deg, rgba(255,255,255,0.22) 0 2px, rgba(255,255,255,0) 2px 6px)",
+                                                      backgroundBlendMode: "screen" as const,
+                                                      opacity: Math.min(
+                                                        1,
+                                                        bgAlpha * A1_STRUCTURAL_PATTERN.dashOpacityMultiplier
+                                                      ),
+                                                    }
+                                                  : null;
+
+                                              return {
+                                                outline: interaction
+                                                  ? `${interaction.outlinePx}px solid ${interaction.outlineColor}`
+                                                  : "1px solid rgba(255,255,255,0.10)",
+                                                background: a1SetAlpha(base, bgAlpha),
+                                                boxShadow: [
+                                                  `inset 0 0 0 ${depthPx}px rgba(0,0,0,0.35)`,
+                                                  feather > 0
+                                                    ? `0 0 ${feather}px ${a1SetAlpha(glow, 0.28)}`
+                                                    : "",
+                                                  `0 0 10px ${a1SetAlpha(glow, 0.18)}`,
+                                                ]
+                                                  .filter(Boolean)
+                                                  .join(", "),
+                                                filter: blur > 0 ? `blur(${blur}px)` : "none",
+                                                ...(structuralPattern ?? {}),
+                                              };
+                                            })()
+                                          : {
+                                              outline: "2px solid rgba(255,0,0,0.9)",
+                                              background: "rgba(255,0,0,0.18)",
+                                            }),
                                         pointerEvents: "auto",
                                         zIndex: 60,
                                       }}

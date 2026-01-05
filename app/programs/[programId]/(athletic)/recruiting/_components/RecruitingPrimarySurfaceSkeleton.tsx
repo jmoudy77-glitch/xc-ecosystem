@@ -11,6 +11,12 @@ import type {
 } from "./types";
 import { DraggableAthleteChip } from "./DraggableAthleteChip";
 import { SlotRemoveDropZone } from "./SlotRemoveDropZone";
+import {
+  readOriginRegistryEntry,
+  clearOriginRegistryEntry,
+  unhideSurfacedCandidate,
+  addToFavoritesIfMissing,
+} from "@/app/lib/recruiting/discoveryStorage";
 
 type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
@@ -60,6 +66,7 @@ export function RecruitingPrimarySurfaceSkeleton({
           rows.map((row) => (
             <EventGroupRow
               key={row.eventGroupKey}
+              programId={programId}
               row={row}
               expanded={expanded}
               onToggleExpand={onToggleExpand}
@@ -85,6 +92,7 @@ function EmptyState() {
 }
 
 function EventGroupRow({
+  programId,
   row,
   expanded,
   onToggleExpand,
@@ -93,6 +101,7 @@ function EventGroupRow({
   onRemoveAthlete,
   renderDropZone,
 }: {
+  programId: string;
   row: RecruitingEventGroupRow;
   expanded: ExpandedKey;
   onToggleExpand: (eventGroupKey: string, slotId: string) => void;
@@ -135,6 +144,7 @@ function EventGroupRow({
         <div className="hidden lg:block">
           {expandedSlot ? (
             <ExpandedSlotPanel
+              programId={programId}
               row={row}
               slot={expandedSlot}
               onOpenAthlete={onOpenAthlete}
@@ -153,6 +163,7 @@ function EventGroupRow({
       {expandedSlot ? (
         <div className="lg:hidden">
           <ExpandedSlotPanel
+            programId={programId}
             row={row}
             slot={expandedSlot}
             onOpenAthlete={onOpenAthlete}
@@ -227,12 +238,14 @@ function SlotCard({
 }
 
 function ExpandedSlotPanel({
+  programId,
   row,
   slot,
   onOpenAthlete,
   onSetPrimary,
   onRemoveAthlete,
 }: {
+  programId: string;
   row: RecruitingEventGroupRow;
   slot: RecruitingSlot;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
@@ -289,7 +302,23 @@ function ExpandedSlotPanel({
         slot={slot}
         disabled={slot.athleteIds.some((id) => slot.athletesById[id]?.type === "returning")}
         disabledReason="Returning athletes cannot be removed via Recruiting"
-        onRemoveAthlete={(athleteId) => onRemoveAthlete(row.eventGroupKey, slot.slotId, athleteId)}
+        onRemoveAthlete={(athleteId) => {
+          // Perform origin-aware restoration (Discovery Portal lists) before M1 removes.
+          const entry = readOriginRegistryEntry(programId, athleteId);
+          if (entry) {
+            if (entry.originKey === "favorites") {
+              addToFavoritesIfMissing(programId, entry.candidate);
+            } else {
+              unhideSurfacedCandidate(programId, athleteId);
+            }
+            clearOriginRegistryEntry(programId, athleteId);
+          } else {
+            // Safe default: if we don't know origin, unhide surfaced.
+            unhideSurfacedCandidate(programId, athleteId);
+          }
+
+          onRemoveAthlete(row.eventGroupKey, slot.slotId, athleteId);
+        }}
       />
     </div>
   );

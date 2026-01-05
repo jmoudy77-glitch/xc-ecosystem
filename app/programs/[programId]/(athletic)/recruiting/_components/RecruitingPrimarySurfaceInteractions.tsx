@@ -6,6 +6,12 @@ import * as React from "react";
 import type { RecruitingSlot } from "./types";
 import { DRAG_TYPES, type DragAthletePayload } from "./dragTypes";
 import { parseRecruitingDnDPayload } from "@/app/lib/recruiting/parseRecruitingDnD";
+import {
+  hideSurfacedCandidate,
+  removeFromFavorites,
+  writeOriginRegistryEntry,
+  type RecruitDiscoveryOriginRegistryEntry,
+} from "@/app/lib/recruiting/discoveryStorage";
 
 type Props = {
   slot: RecruitingSlot;
@@ -37,9 +43,27 @@ export function SlotDropZone({ slot, onDropAthlete }: Props) {
 
     if ((discovery.eventGroup ?? null) !== (slot.eventGroupKey ?? null)) return;
 
-    // NOTE: M1 currently accepts only an athleteId string. We pass through the
-    // candidateId. Origin propagation remains UI-level and will be wired in the
-    // next promotion where the reducer accepts origin metadata.
+    const entry: RecruitDiscoveryOriginRegistryEntry = {
+      candidate: {
+        id: discovery.candidateId,
+        displayName: discovery.displayName,
+        eventGroup: discovery.eventGroup ?? null,
+        gradYear: discovery.gradYear ?? null,
+      },
+      originKey: discovery.originKey,
+      originMeta: discovery.originMeta ?? {},
+    };
+
+    // Record origin for later restoration on removal.
+    writeOriginRegistryEntry(discovery.programId, entry);
+
+    // While placed, suppress candidate in their origin list.
+    if (discovery.originKey === "favorites") {
+      removeFromFavorites(discovery.programId, discovery.candidateId);
+    } else {
+      hideSurfacedCandidate(discovery.programId, discovery.candidateId);
+    }
+
     onDropAthlete(discovery.candidateId);
   };
 

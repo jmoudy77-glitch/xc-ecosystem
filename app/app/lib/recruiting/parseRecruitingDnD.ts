@@ -1,3 +1,5 @@
+// app/app/lib/recruiting/parseRecruitingDnD.ts
+
 import { isRecruitDiscoveryDnDPayload, type RecruitDiscoveryDnDPayload } from "@/app/lib/recruiting/discoveryDnD";
 
 export function parseRecruitingDnDPayload(e: DragEvent | React.DragEvent): RecruitDiscoveryDnDPayload | null {

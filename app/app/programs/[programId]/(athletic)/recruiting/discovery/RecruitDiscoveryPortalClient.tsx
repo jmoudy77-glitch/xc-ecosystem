@@ -1,3 +1,5 @@
+// app/app/programs/[programId]/(athletic)/recruiting/discovery/RecruitDiscoveryPortalClient.tsx
+
 "use client";
 
 import Link from "next/link";
@@ -6,9 +8,12 @@ import {
   readRecruitDiscoverySurfacedCandidates,
   type RecruitDiscoveryCandidate,
 } from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
+import { type RecruitDiscoveryDnDPayload } from "@/app/lib/recruiting/discoveryDnD";
 import {
-  type RecruitDiscoveryDnDPayload,
-} from "@/app/lib/recruiting/discoveryDnD";
+  readHiddenSurfacedIds,
+  favoritesStorageKey,
+  safeJsonParse,
+} from "@/app/lib/recruiting/discoveryStorage";
 
 type OriginKey = "surfaced" | "favorites";
 
@@ -24,21 +29,6 @@ type Candidate = {
 type Props = {
   programId: string;
 };
-
-const FAVORITES_STORAGE_VERSION = 1;
-
-function favoritesStorageKey(programId: string) {
-  return `xcsys:recruiting:discovery:favorites:v${FAVORITES_STORAGE_VERSION}:${programId}`;
-}
-
-function safeJsonParse<T>(raw: string | null): T | null {
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
 
 function normalizeCandidate(raw: any, originKey: OriginKey): Candidate | null {
   const id = typeof raw?.id === "string" && raw.id.trim() ? raw.id.trim() : null;
@@ -78,8 +68,7 @@ function normalizeCandidate(raw: any, originKey: OriginKey): Candidate | null {
 
 function loadFavorites(programId: string): Candidate[] {
   if (typeof window === "undefined") return [];
-  const key = favoritesStorageKey(programId);
-  const parsed = safeJsonParse<any[]>(window.localStorage.getItem(key));
+  const parsed = safeJsonParse<any[]>(window.localStorage.getItem(favoritesStorageKey(programId)));
   if (!Array.isArray(parsed)) return [];
   return parsed
     .map((row) => normalizeCandidate(row, "favorites"))
@@ -88,17 +77,19 @@ function loadFavorites(programId: string): Candidate[] {
 
 function saveFavorites(programId: string, favorites: Candidate[]) {
   if (typeof window === "undefined") return;
-  const key = favoritesStorageKey(programId);
-  window.localStorage.setItem(key, JSON.stringify(favorites));
+  window.localStorage.setItem(favoritesStorageKey(programId), JSON.stringify(favorites));
 }
 
-function toDnDPayload(c: Candidate): RecruitDiscoveryDnDPayload {
+function toDnDPayload(programId: string, c: Candidate): RecruitDiscoveryDnDPayload {
   return {
     kind: "recruit_discovery_candidate",
+    programId,
+
     candidateId: c.id,
     displayName: c.displayName,
     eventGroup: c.eventGroup ?? null,
     gradYear: c.gradYear ?? null,
+
     originKey: c.originKey,
     originMeta: c.originMeta ?? {},
   };
@@ -110,7 +101,6 @@ function setDragData(e: React.DragEvent, payload: RecruitDiscoveryDnDPayload) {
   } catch {
     // no-op
   }
-  // Fallback for some environments.
   try {
     e.dataTransfer.setData("text/plain", JSON.stringify(payload));
   } catch {
@@ -122,9 +112,11 @@ function setDragData(e: React.DragEvent, payload: RecruitDiscoveryDnDPayload) {
 export default function RecruitDiscoveryPortalClient({ programId }: Props) {
   const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
+  const [hiddenSurfacedIds, setHiddenSurfacedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setFavorites(loadFavorites(programId));
+    setHiddenSurfacedIds(readHiddenSurfacedIds(programId));
   }, [programId]);
 
   useEffect(() => {
@@ -136,7 +128,8 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
 
       const normalized = (rows ?? [])
         .map((row) => normalizeCandidate(row, "surfaced"))
-        .filter(Boolean) as Candidate[];
+        .filter((c): c is Candidate => !!c)
+        .filter((c) => !hiddenSurfacedIds.has(c.id));
 
       if (!cancelled) setSurfaced(normalized);
     })();
@@ -144,7 +137,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [programId]);
+  }, [programId, hiddenSurfacedIds]);
 
   const isFav = (candidateId: string) => favorites.some((c) => c.id === candidateId);
 
@@ -207,9 +200,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
 
           <div className="p-3">
             {surfaced.length === 0 ? (
-              <div className="text-sm text-muted-foreground">
-                No surfaced candidates found.
-              </div>
+              <div className="text-sm text-muted-foreground">No surfaced candidates found.</div>
             ) : (
               <ul className="space-y-2">
                 {surfaced.map((c) => (
@@ -217,7 +208,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
                     key={c.id}
                     className="flex items-center justify-between rounded-md border px-3 py-2"
                     draggable
-                    onDragStart={(e) => setDragData(e, toDnDPayload(c))}
+                    onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
                     title="Drag to Recruiting Stabilization slot"
                   >
                     <div className="min-w-0">
@@ -246,9 +237,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
         <section className="rounded-lg border bg-card">
           <div className="border-b p-3">
             <div className="text-sm font-medium">Favorites</div>
-            <div className="text-xs text-muted-foreground">
-              Coach-curated shortlist (session cache v1).
-            </div>
+            <div className="text-xs text-muted-foreground">Coach-curated shortlist (session cache v1).</div>
           </div>
 
           <div className="p-3">
@@ -261,7 +250,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
                     key={c.id}
                     className="flex items-center justify-between rounded-md border px-3 py-2"
                     draggable
-                    onDragStart={(e) => setDragData(e, toDnDPayload(c))}
+                    onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
                     title="Drag to Recruiting Stabilization slot"
                   >
                     <div className="min-w-0">

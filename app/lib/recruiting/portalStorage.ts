@@ -23,6 +23,40 @@ export function favoritesStorageKey(programId: string) {
   return `xcsys:recruiting:discovery:favorites:v${FAVORITES_STORAGE_VERSION}:${programId}`;
 }
 
+export function favoritesOrderStorageKey(programId: string) {
+  return `xcsys:recruiting:discovery:favoritesOrder:v${FAVORITES_STORAGE_VERSION}:${programId}`;
+}
+
+export function readFavoritesOrder(programId: string): string[] {
+  if (typeof window === "undefined") return [];
+  const parsed = safeJsonParse<string[]>(
+    window.localStorage.getItem(favoritesOrderStorageKey(programId))
+  );
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((x) => typeof x === "string" && x.trim())
+    .map((x) => x.trim());
+}
+
+export function writeFavoritesOrder(programId: string, ids: string[]) {
+  if (typeof window === "undefined") return;
+  const uniq: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of ids) {
+    const id = raw?.trim();
+    if (!id) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    uniq.push(id);
+  }
+  window.localStorage.setItem(favoritesOrderStorageKey(programId), JSON.stringify(uniq));
+}
+
+export function clearFavoritesOrder(programId: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(favoritesOrderStorageKey(programId));
+}
+
 export function hiddenSurfacedStorageKey(programId: string) {
   return `xcsys:recruiting:discovery:hiddenSurfaced:v${HIDDEN_SURFACED_VERSION}:${programId}`;
 }

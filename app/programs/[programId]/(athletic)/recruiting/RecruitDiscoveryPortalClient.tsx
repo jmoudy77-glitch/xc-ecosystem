@@ -15,6 +15,9 @@ import {
   safeJsonParse,
   hideSurfacedCandidate,
   clearHiddenSurfaced,
+  readFavoritesOrder,
+  writeFavoritesOrder,
+  clearFavoritesOrder,
 } from "@/app/lib/recruiting/portalStorage";
 
 type OriginKey = "surfaced" | "favorites";
@@ -164,6 +167,7 @@ function setDragData(e: React.DragEvent, payload: RecruitDiscoveryDnDPayload) {
 export default function RecruitDiscoveryPortalClient({ programId }: Props) {
   const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
+  const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
   const [hiddenSurfacedIds, setHiddenSurfacedIds] = useState<Set<string>>(new Set());
 
   // Controls
@@ -175,6 +179,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
   useEffect(() => {
     setFavorites(loadFavorites(programId));
     setHiddenSurfacedIds(readHiddenSurfacedIds(programId));
+    setFavoritesOrder(readFavoritesOrder(programId));
   }, [programId]);
 
   useEffect(() => {
@@ -218,12 +223,22 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
       saveFavorites(programId, next);
       return next;
     });
+    setFavoritesOrder((prev) => {
+      const next = [c.id, ...prev.filter((id) => id !== c.id)];
+      writeFavoritesOrder(programId, next);
+      return next;
+    });
   };
 
   const removeFavorite = (candidateId: string) => {
     setFavorites((prev) => {
       const next = prev.filter((c) => c.id !== candidateId);
       saveFavorites(programId, next);
+      return next;
+    });
+    setFavoritesOrder((prev) => {
+      const next = prev.filter((id) => id !== candidateId);
+      writeFavoritesOrder(programId, next);
       return next;
     });
   };
@@ -317,14 +332,48 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
       rows = rows.filter((c) => c.gradYear === gy);
     }
 
+    const orderIndex = new Map<string, number>();
+    for (let i = 0; i < favoritesOrder.length; i++) orderIndex.set(favoritesOrder[i], i);
+
     rows.sort((a, b) => {
+      const ia = orderIndex.has(a.id) ? orderIndex.get(a.id)! : 1e9;
+      const ib = orderIndex.has(b.id) ? orderIndex.get(b.id)! : 1e9;
+      if (ia !== ib) return ia - ib;
+
       if (sortKey === "name") return a.displayName.localeCompare(b.displayName);
       if (sortKey === "gradYear") return (a.gradYear ?? 9999) - (b.gradYear ?? 9999);
       return candidateFitScore(b) - candidateFitScore(a);
     });
 
     return rows;
-  }, [favorites, q, eventGroupFilter, gradYearFilter, sortKey]);
+  }, [favorites, favoritesOrder, q, eventGroupFilter, gradYearFilter, sortKey]);
+
+  const pinFavoriteToTop = (candidateId: string) => {
+    setFavoritesOrder((prev) => {
+      const next = [candidateId, ...prev.filter((id) => id !== candidateId)];
+      writeFavoritesOrder(programId, next);
+      return next;
+    });
+  };
+
+  const moveFavorite = (candidateId: string, dir: "up" | "down") => {
+    setFavoritesOrder((prev) => {
+      const ids = prev.slice();
+      const idx = ids.indexOf(candidateId);
+      if (idx === -1) {
+        const next = [candidateId, ...ids];
+        writeFavoritesOrder(programId, next);
+        return next;
+      }
+      const swapWith = dir === "up" ? idx - 1 : idx + 1;
+      if (swapWith < 0 || swapWith >= ids.length) return ids;
+      const tmp = ids[swapWith];
+      ids[swapWith] = ids[idx];
+      ids[idx] = tmp;
+      writeFavoritesOrder(programId, ids);
+      return ids;
+    });
+  };
 
   return (
     <div className="w-full">
@@ -551,17 +600,60 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                      onClick={() => removeFavorite(c.id)}
-                      title="Remove from Favorites"
-                    >
-                      Remove
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                        onClick={() => pinFavoriteToTop(c.id)}
+                        title="Pin to top"
+                      >
+                        Pin
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                        onClick={() => moveFavorite(c.id, "up")}
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                        onClick={() => moveFavorite(c.id, "down")}
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                        onClick={() => removeFavorite(c.id)}
+                        title="Remove from Favorites"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
+            )}
+
+            {favorites.length > 0 && (
+              <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2">
+                <div className="text-xs text-muted-foreground">Order is local to this device.</div>
+                <button
+                  type="button"
+                  className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                  onClick={() => {
+                    clearFavoritesOrder(programId);
+                    setFavoritesOrder([]);
+                  }}
+                  title="Reset favorite ordering"
+                >
+                  Reset order
+                </button>
+              </div>
             )}
           </div>
         </section>

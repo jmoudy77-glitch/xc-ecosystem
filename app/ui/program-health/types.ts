@@ -1,3 +1,4 @@
+// app/ui/program-health/types.ts
 export type Sport = "xc" | "tf";
 export type Horizon = "H0" | "H1" | "H2" | "H3";
 

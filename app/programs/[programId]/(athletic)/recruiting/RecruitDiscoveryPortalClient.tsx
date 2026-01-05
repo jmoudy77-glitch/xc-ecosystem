@@ -13,6 +13,8 @@ import {
   readHiddenSurfacedIds,
   favoritesStorageKey,
   safeJsonParse,
+  hideSurfacedCandidate,
+  clearHiddenSurfaced,
 } from "@/app/lib/recruiting/portalStorage";
 
 type OriginKey = "surfaced" | "favorites";
@@ -194,6 +196,11 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
       cancelled = true;
     };
   }, [programId, hiddenSurfacedIds]);
+
+  const hideFromSurfaced = (candidateId: string) => {
+    hideSurfacedCandidate(programId, candidateId);
+    setHiddenSurfacedIds(readHiddenSurfacedIds(programId));
+  };
 
   const isFav = (candidateId: string) => favorites.some((c) => c.id === candidateId);
 
@@ -468,9 +475,38 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
                     >
                       {isFav(c.id) ? "Favorited" : "Favorite"}
                     </button>
+
+                    <button
+                      type="button"
+                      className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                      onClick={() => hideFromSurfaced(c.id)}
+                      title="Hide from Surfaced list (local)"
+                    >
+                      Hide
+                    </button>
                   </li>
                 ))}
               </ul>
+            )}
+
+            {hiddenSurfacedIds.size > 0 && (
+              <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2">
+                <div className="text-xs text-muted-foreground">
+                  Hidden from Surfaced (local):{" "}
+                  <span className="font-mono">{hiddenSurfacedIds.size}</span>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                  onClick={() => {
+                    clearHiddenSurfaced(programId);
+                    setHiddenSurfacedIds(new Set());
+                  }}
+                  title="Show hidden surfaced candidates again"
+                >
+                  Show hidden
+                </button>
+              </div>
             )}
           </div>
         </section>

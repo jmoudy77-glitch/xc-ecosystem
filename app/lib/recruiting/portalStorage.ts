@@ -104,6 +104,11 @@ export function unhideSurfacedCandidate(programId: string, candidateId: string) 
   writeHiddenSurfacedIds(programId, ids);
 }
 
+export function clearHiddenSurfaced(programId: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(hiddenSurfacedStorageKey(programId));
+}
+
 export function writeOriginRegistryEntry(
   programId: string,
   entry: RecruitDiscoveryOriginRegistryEntry

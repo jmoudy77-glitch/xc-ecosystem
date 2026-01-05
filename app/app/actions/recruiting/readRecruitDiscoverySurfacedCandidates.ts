@@ -1,7 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { readRecruitingM1View } from "@/app/actions/recruiting/readRecruitingM1View";
 
 export type RecruitDiscoveryOriginKey = "surfaced" | "favorites";
 
@@ -22,53 +21,56 @@ type ReadRecruitDiscoverySurfacedCandidatesInput = {
 export async function readRecruitDiscoverySurfacedCandidates(
   input: ReadRecruitDiscoverySurfacedCandidatesInput
 ): Promise<RecruitDiscoveryCandidate[]> {
-  const cookieStore = await cookies();
-  const { supabase } = await supabaseServer(cookieStore);
-
   const { programId, eventGroup } = input;
+  if (!programId) return [];
 
-  const query = supabase
-    .from("program_recruits")
-    .select(
-      `
-      recruit_id,
-      recruits (
-        id,
-        first_name,
-        last_name,
-        grad_year,
-        event_group
-      )
-    `
-    )
-    .eq("program_id", programId)
-    .neq("status", "archived");
+  const model = await readRecruitingM1View(programId);
+  const cohorts = (model as any)?.m3?.cohorts ?? [];
 
-  if (eventGroup) {
-    query.eq("recruits.event_group", eventGroup);
+  const out: RecruitDiscoveryCandidate[] = [];
+
+  for (const row of cohorts) {
+    const id =
+      (typeof row?.id === "string" && row.id) ||
+      (typeof row?.candidate_id === "string" && row.candidate_id) ||
+      (typeof row?.athlete_id === "string" && row.athlete_id) ||
+      (typeof row?.recruit_id === "string" && row.recruit_id) ||
+      null;
+
+    const displayName =
+      (typeof row?.displayName === "string" && row.displayName) ||
+      (typeof row?.display_name === "string" && row.display_name) ||
+      (typeof row?.full_name === "string" && row.full_name) ||
+      (typeof row?.name === "string" && row.name) ||
+      null;
+
+    if (!id || !displayName) continue;
+
+    const eventGroup =
+      (typeof row?.eventGroup === "string" && row.eventGroup) ||
+      (typeof row?.event_group === "string" && row.event_group) ||
+      null;
+
+    if (eventGroup && typeof eventGroup === "string" && input.eventGroup) {
+      if (eventGroup !== input.eventGroup) continue;
+    }
+
+    const gradYear =
+      (typeof row?.gradYear === "number" && Number.isFinite(row.gradYear) && row.gradYear) ||
+      (typeof row?.grad_year === "number" && Number.isFinite(row.grad_year) && row.grad_year) ||
+      null;
+
+    out.push({
+      id,
+      displayName,
+      eventGroup,
+      gradYear,
+      originKey: "surfaced",
+      originMeta: {
+        source: "recruiting_m1_view",
+      },
+    });
   }
 
-  const { data, error } = await query;
-
-  if (error || !data) {
-    return [];
-  }
-
-  return data
-    .map((row: any) => {
-      const r = row?.recruits;
-      if (!r?.id || !r?.first_name || !r?.last_name) return null;
-
-      return {
-        id: r.id,
-        displayName: `${r.first_name} ${r.last_name}`,
-        eventGroup: r.event_group ?? null,
-        gradYear: r.grad_year ?? null,
-        originKey: "surfaced",
-        originMeta: {
-          source: "program_recruits",
-        },
-      } satisfies RecruitDiscoveryCandidate;
-    })
-    .filter(Boolean) as RecruitDiscoveryCandidate[];
+  return out;
 }

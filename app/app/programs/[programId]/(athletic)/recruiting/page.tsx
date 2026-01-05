@@ -124,6 +124,18 @@ export default async function ProgramRecruitingPage({ params }: PageProps) {
             <p className="mt-1 text-[11px] text-muted">
               Stabilize your roster for this season by addressing recruitable deficits.
             </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Link
+                href={`/app/programs/${programId}/recruiting/discovery`}
+                className="rounded-md border border-subtle bg-surface/60 px-3 py-2 text-[11px] font-semibold text-slate-100 hover:bg-surface/80"
+              >
+                Open Discovery Portal
+              </Link>
+              <div className="text-[11px] text-muted">
+                Stage recruits into Surfaced/Favorites, then drag into stabilization slots.
+              </div>
+            </div>
           </div>
 
           <div className="hidden text-right text-[11px] text-muted sm:block">

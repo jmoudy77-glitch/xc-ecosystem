@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import type { ProgramHealthViewModel } from "./readProgramHealthView";
+import type { ProgramHealthViewModel } from "@/app/ui/program-health/types";
 
 export type A2PrimaryMappingRow = {
   program_id: string;
@@ -35,7 +35,6 @@ export async function readProgramHealthA2Sandbox(
     }
   );
 
-  // Base PH read (canonical snapshots, unchanged)
   const { data: baseModel, error: baseErr } = await supabase
     .from("program_health_snapshots")
     .select("*")
@@ -46,7 +45,6 @@ export async function readProgramHealthA2Sandbox(
 
   if (baseErr) throw baseErr;
 
-  // PRIMARY-only mapping for A2 sandbox
   const { data: primaryMapping, error: pmErr } = await supabase.rpc(
     "rpc_ph_a2_primary_mapping_v1",
     {
@@ -58,10 +56,10 @@ export async function readProgramHealthA2Sandbox(
   if (pmErr) throw pmErr;
 
   return {
-    ...baseModel,
+    ...(baseModel as any),
     sandbox: {
       horizon: "A2",
-      primary_mapping: primaryMapping ?? [],
+      primary_mapping: (primaryMapping ?? []) as any,
     },
   } as ProgramHealthA2SandboxView;
 }

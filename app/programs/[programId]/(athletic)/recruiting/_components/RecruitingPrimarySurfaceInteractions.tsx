@@ -5,6 +5,7 @@
 import * as React from "react";
 import type { RecruitingSlot } from "./types";
 import { DRAG_TYPES, type DragAthletePayload } from "./dragTypes";
+import { parseRecruitingDnDPayload } from "@/app/lib/recruiting/parseRecruitingDnD";
 
 type Props = {
   slot: RecruitingSlot;
@@ -19,13 +20,27 @@ export function SlotDropZone({ slot, onDropAthlete }: Props) {
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const raw = e.dataTransfer.getData(DRAG_TYPES.ATHLETE);
-    if (!raw) return;
 
-    const payload = JSON.parse(raw) as DragAthletePayload;
-    if (payload.eventGroupKey !== slot.eventGroupKey) return;
+    // 1) Existing M1 athlete drag payload (unchanged behavior)
+    const rawAthlete = e.dataTransfer.getData(DRAG_TYPES.ATHLETE);
+    if (rawAthlete) {
+      const payload = JSON.parse(rawAthlete) as DragAthletePayload;
+      if (payload.eventGroupKey !== slot.eventGroupKey) return;
 
-    onDropAthlete(payload.athleteId);
+      onDropAthlete(payload.athleteId);
+      return;
+    }
+
+    // 2) Discovery Portal candidate payload (new)
+    const discovery = parseRecruitingDnDPayload(e);
+    if (!discovery) return;
+
+    if ((discovery.eventGroup ?? null) !== (slot.eventGroupKey ?? null)) return;
+
+    // NOTE: M1 currently accepts only an athleteId string. We pass through the
+    // candidateId. Origin propagation remains UI-level and will be wired in the
+    // next promotion where the reducer accepts origin metadata.
+    onDropAthlete(discovery.candidateId);
   };
 
   return (

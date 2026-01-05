@@ -7,11 +7,7 @@ import { RecruitingPrimarySurfaceSkeleton } from "./RecruitingPrimarySurfaceSkel
 import { SlotDropZone } from "./RecruitingPrimarySurfaceInteractions";
 import { AthleteFactsModal } from "./AthleteFactsModal";
 import { useRecruitingSlots } from "./useRecruitingSlots";
-import type {
-  RecruitingEventGroupRow,
-  RecruitingSlot,
-  RecruitingAthleteSummary,
-} from "./types";
+import type { RecruitingEventGroupRow, RecruitingSlot, RecruitingAthleteSummary } from "./types";
 
 type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
@@ -50,27 +46,38 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
     setModalAthlete(null);
   }, []);
 
+  const persistPrimary = React.useCallback(
+    async (eventGroupKey: string, slotId: string, athleteId: string) => {
+      const slot = rows.find((r) => r.eventGroupKey === eventGroupKey)?.slots.find((s) => s.slotId === slotId);
+      const athlete = slot?.athletesById[athleteId];
+      if (!athlete) return;
+
+      try {
+        await fetch("/api/recruiting/primary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            programId,
+            sport: "xc",
+            eventGroupKey,
+            slotId,
+            primaryAthleteId: athleteId,
+            athleteType: athlete.type,
+          }),
+        });
+      } catch {
+        // Best-effort persistence; UI remains authoritative.
+      }
+    },
+    [rows, programId]
+  );
+
   const onSetPrimary = React.useCallback(
     async (eventGroupKey: string, slotId: string, athleteId: string) => {
       dispatch({ type: "SET_PRIMARY", eventGroupKey, slotId, athleteId });
-      try {
-        const slot = rows.find(r => r.eventGroupKey === eventGroupKey)?.slots.find(s => s.slotId === slotId);
-        const athlete = slot?.athletesById[athleteId];
-        if (!athlete) return;
-        const mod = await import("@/app/actions/recruiting/persistRecruitingPrimary");
-        await mod.persistRecruitingPrimary({
-          programId,
-          eventGroupKey,
-          slotId,
-          primaryAthleteId: athleteId,
-          athleteType: athlete.type,
-        });
-      } catch {}
+      await persistPrimary(eventGroupKey, slotId, athleteId);
     },
-    [dispatch, rows, programId]
-  );
-    },
-    [dispatch]
+    [dispatch, persistPrimary]
   );
 
   const onRemoveAthlete = React.useCallback(

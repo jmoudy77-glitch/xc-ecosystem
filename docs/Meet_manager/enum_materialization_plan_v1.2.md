@@ -164,20 +164,31 @@ This plan is binding for the following table columns (from `supabase_schema_rls_
 - `meet_rosters.roster_state` → `mm_roster_submission_state`
 - `meet_entries.entry_state` → `mm_entries_submission_state` (or entry-specific enum if defined in state machines)
 - `meet_events.event_type` → `mm_event_type`
-- `meet_events.event_state` → `mm_tf_event_state` OR `mm_xc_race_state` OR `mm_field_scoring_state` (see schema implementation note below)
 - `meet_results.publication_state` → `mm_results_publication_state`
 - `ops_tokens.token_type` → `mm_ops_token_type`
 
-### Schema Implementation Note (Event State Columns)
-To avoid polymorphic enums in a single column, v1.2 physical schema must choose one of:
-- A) separate state columns by event_type (preferred)
-- B) a unified `mm_event_state` enum that is the union of all event state values (allowed only if it matches `state_machines_v1.2.md` and remains governance-locked)
+---
 
-This document locks the decision policy; the physical migration must implement A or B explicitly as part of Step 2.
+## 7) Event State Column Lock (v1.2)
+
+**LOCKED DECISION:** Option A — separate state columns by event_type.
+
+### 7.1 Physical Schema Requirements
+
+- `meet_events` must include:
+  - `xc_state mm_xc_race_state NULL`
+  - `tf_state mm_tf_event_state NULL`
+  - `field_state mm_field_scoring_state NULL`
+
+- Exactly one of these columns may be non-null per row, enforced by a CHECK constraint tied to `event_type`.
+
+### 7.2 Rationale (Binding)
+- Avoids polymorphic union enums and preserves strict state-machine semantics per discipline.
+- Prevents invalid cross-domain state assignments.
 
 ---
 
-## 7) Versioning
+## 8) Versioning
 
 This enum materialization plan is **v1.2** and must remain consistent with:
 - `canonical_spec_v1.2.md`

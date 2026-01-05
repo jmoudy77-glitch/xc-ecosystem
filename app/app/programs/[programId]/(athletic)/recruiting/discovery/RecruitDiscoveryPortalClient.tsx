@@ -6,6 +6,9 @@ import {
   readRecruitDiscoverySurfacedCandidates,
   type RecruitDiscoveryCandidate,
 } from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
+import {
+  type RecruitDiscoveryDnDPayload,
+} from "@/app/lib/recruiting/discoveryDnD";
 
 type OriginKey = "surfaced" | "favorites";
 
@@ -89,18 +92,42 @@ function saveFavorites(programId: string, favorites: Candidate[]) {
   window.localStorage.setItem(key, JSON.stringify(favorites));
 }
 
+function toDnDPayload(c: Candidate): RecruitDiscoveryDnDPayload {
+  return {
+    kind: "recruit_discovery_candidate",
+    candidateId: c.id,
+    displayName: c.displayName,
+    eventGroup: c.eventGroup ?? null,
+    gradYear: c.gradYear ?? null,
+    originKey: c.originKey,
+    originMeta: c.originMeta ?? {},
+  };
+}
+
+function setDragData(e: React.DragEvent, payload: RecruitDiscoveryDnDPayload) {
+  try {
+    e.dataTransfer.setData("application/x-xcsys-recruiting", JSON.stringify(payload));
+  } catch {
+    // no-op
+  }
+  // Fallback for some environments.
+  try {
+    e.dataTransfer.setData("text/plain", JSON.stringify(payload));
+  } catch {
+    // no-op
+  }
+  e.dataTransfer.effectAllowed = "copy";
+}
+
 export default function RecruitDiscoveryPortalClient({ programId }: Props) {
   const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
 
   useEffect(() => {
-    // Hydrate favorites from session cache (localStorage).
     setFavorites(loadFavorites(programId));
   }, [programId]);
 
   useEffect(() => {
-    // Wire Surfaced via canonical server action seam (currently returns []).
-    // No assumptions about sourcing providers are made here.
     let cancelled = false;
 
     (async () => {
@@ -181,7 +208,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
           <div className="p-3">
             {surfaced.length === 0 ? (
               <div className="text-sm text-muted-foreground">
-                Surfaced is wired via a canonical server action seam. Next promotion connects sourcing + filters.
+                No surfaced candidates found.
               </div>
             ) : (
               <ul className="space-y-2">
@@ -189,6 +216,9 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
                   <li
                     key={c.id}
                     className="flex items-center justify-between rounded-md border px-3 py-2"
+                    draggable
+                    onDragStart={(e) => setDragData(e, toDnDPayload(c))}
+                    title="Drag to Recruiting Stabilization slot"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{c.displayName}</div>
@@ -230,6 +260,9 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
                   <li
                     key={c.id}
                     className="flex items-center justify-between rounded-md border px-3 py-2"
+                    draggable
+                    onDragStart={(e) => setDragData(e, toDnDPayload(c))}
+                    title="Drag to Recruiting Stabilization slot"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{c.displayName}</div>

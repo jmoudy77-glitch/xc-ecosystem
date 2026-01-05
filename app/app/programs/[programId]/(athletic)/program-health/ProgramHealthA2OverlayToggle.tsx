@@ -7,7 +7,13 @@ type Props = {
   programId: string;
 };
 
+// A2 overlays are strictly additive and read-only.
+// Enable via: NEXT_PUBLIC_PH_A2_OVERLAYS=1
+const A2_ENABLED = process.env.NEXT_PUBLIC_PH_A2_OVERLAYS === "1";
+
 export function ProgramHealthA2OverlayToggle({ programId }: Props) {
+  if (!A2_ENABLED) return null;
+
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();

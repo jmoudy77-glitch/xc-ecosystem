@@ -66,7 +66,14 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
     authUserErr: authUserErr?.message ?? null,
   });
 
-  // 1) Capability structure (canonical surface)
+  
+  const { data: authUidViaPostgrest, error: authUidErr } = await supabase.rpc("rpc_auth_uid");
+  console.log("[PH DIAG auth.uid via PostgREST]", {
+    programId,
+    authUidViaPostgrest: authUidViaPostgrest ?? null,
+    authUidErr: authUidErr?.message ?? null,
+  });
+// 1) Capability structure (canonical surface)
   const { data: capabilityNodes, error: nodesErr } = await supabase
     .from("capability_nodes")
     .select(

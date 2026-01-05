@@ -144,21 +144,42 @@ function a2ConfidenceKey(a: any): keyof typeof A2_CONFIDENCE {
     .trim()
     .toLowerCase();
   if (v === "low" || v === "medium" || v === "high") return v;
-  return "unknown";
+  const hasProv = Boolean(
+    a?.provenance_id ??
+      a?.audit_link_id ??
+      a?.freeze_marker_id ??
+      a?.determination_id ??
+      a?.canonical_event_id ??
+      a?.details?.ledger_id ??
+      a?.details?.event_id ??
+      a?.details?.canonical_event_id
+  );
+  return hasProv ? "medium" : "low";
 }
 
 function a2HasProvenance(a: any): boolean {
   return Boolean(
     a?.canonical_event_id ??
+      a?.provenance_id ??
+      a?.audit_link_id ??
+      a?.freeze_marker_id ??
+      a?.determination_id ??
       a?.ledger_id ??
       a?.event_id ??
+      a?.details?.canonical_event_id ??
       a?.details?.event_id ??
       a?.details?.ledger_id
   );
 }
 
 function a2GroupLabel(a: any): string | null {
-  const v = a?.details?.group_key ?? a?.details?.cohort ?? a?.group_key ?? a?.cohort ?? null;
+  const v =
+    a?.details?.group_key ??
+    a?.details?.cohort ??
+    a?.violation_type ??
+    a?.group_key ??
+    a?.cohort ??
+    null;
   if (v == null) return null;
   const s = v.toString().trim();
   return s.length ? s : null;

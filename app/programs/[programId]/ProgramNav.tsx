@@ -20,6 +20,7 @@ type ProgramNavItemId =
   | "roster_planning"
   | "performance"
   | "program_health"
+  | "resources"
   | "knowledge"
   | "files"
   | "media"
@@ -47,6 +48,7 @@ type ProgramNavItem = {
   badge?: string;
   isActive?: (pathname: string, ctx: ProgramNavContext) => boolean;
   order?: number;
+  children?: ProgramNavItem[];
 };
 
 type ProgramNavGroup = {
@@ -534,10 +536,18 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
         href: (ctx) => `/programs/${ctx.programId}/training`,
         order: 20,
       },
-      { id: "knowledge", label: "Knowledge", href: "/knowledge" },
-      { id: "files", label: "Files", href: "/files" },
-      { id: "media", label: "Media", href: "/media" },
-      { id: "gear", label: "Gear", href: "/gear" },
+      {
+        id: "resources",
+        label: "Resources",
+        href: "#",
+        order: 110,
+        children: [
+          { id: "knowledge", label: "Knowledge", href: "/knowledge", order: 10 },
+          { id: "files", label: "Files", href: "/files", order: 20 },
+          { id: "media", label: "Media", href: "/media", order: 30 },
+          { id: "gear", label: "Gear", href: "/gear", order: 40 },
+        ],
+      },
     ],
   },
   {
@@ -712,6 +722,58 @@ export function ProgramNav() {
                             {item.badge ? ` (${item.badge})` : ""}
                           </span>
                           <span className="text-[9px] opacity-60">•</span>
+                        </div>
+                      );
+                    }
+
+                    if (item.children && item.children.length > 0) {
+                      const childrenSorted = [...item.children].sort(
+                        (a, b) => (a.order ?? 0) - (b.order ?? 0)
+                      );
+                      const childrenActive = childrenSorted.some((child) =>
+                        isNavItemActive(child, pathname, ctx)
+                      );
+
+                      return (
+                        <div key={item.id} className="space-y-1 bg-transparent">
+                          <div
+                            className={[
+                              "glass-pill flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 text-[11px] transition-colors",
+                              childrenActive
+                                ? "glass-pill--brand glass-pill--active"
+                                : "glass-pill--brand-soft text-muted",
+                            ].join(" ")}
+                          >
+                            <span>{item.label}</span>
+                            <span className="text-[9px] opacity-60">▾</span>
+                          </div>
+
+                          <div className="space-y-1 pl-3 bg-transparent">
+                            {childrenSorted.map((child) => {
+                              const href = resolveNavHref(child, ctx);
+                              const isActive = isNavItemActive(
+                                child,
+                                pathname,
+                                ctx
+                              );
+
+                              return (
+                                <Link
+                                  key={child.id}
+                                  href={href}
+                                  className={[
+                                    "glass-pill flex items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors",
+                                    isActive
+                                      ? "glass-pill--brand glass-pill--active"
+                                      : "glass-pill--brand-soft text-muted",
+                                  ].join(" ")}
+                                >
+                                  <span>{child.label}</span>
+                                  <span className="text-[9px] opacity-60">→</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     }

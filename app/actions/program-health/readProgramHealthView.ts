@@ -1,3 +1,4 @@
+// app/actions/program-health/readProgramHealthView.ts
 "use server";
 
 import { cookies } from "next/headers";
@@ -71,10 +72,10 @@ export async function readProgramHealthView(programId: string): Promise<ProgramH
   const { data: absences, error: absErr } = await supabase
     .from("program_health_absences")
     .select("*")
-    .eq("program_id", programId)
-    .order("updated_at", { ascending: false });
-
-  if (absErr) throw absErr;
+    // Some legacy/materialized rows may be keyed by scope_id instead of program_id.
+    // Bind to either to avoid rendering "0 absences" when snapshot truth exists.
+    .or(`program_id.eq.${programId},scope_id.eq.${programId}`)
+    .order("updated_at", { ascending: false });if (absErr) throw absErr;
 
   // R4_1_1: Runtime truth binding — normalize absence shape for client mapping.
   // DB canonical column: capability_node_id

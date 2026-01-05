@@ -9,6 +9,7 @@ import { TruthView } from "./TruthView";
 import { readAbsenceTruth } from "@/app/actions/program-health/readAbsenceTruth";
 import { readCanonicalEventGraph } from "@/app/actions/program-health/readCanonicalEventGraph";
 import { readLinkedCanonicalEventIds } from "@/app/actions/program-health/readLinkedCanonicalEventIds";
+import { ProgramHealthA2OverlayToggle } from "@/app/app/programs/[programId]/(athletic)/program-health/ProgramHealthA2OverlayToggle";
 import "./styles.css";
 
 import { SelectionPill } from "./SelectionPill";
@@ -344,6 +345,7 @@ export function ProgramHealthPage({
           <div className="ph-topbar">
             <div className="ph-title">Program Health</div>
             <div className="ph-controls">
+              <ProgramHealthA2OverlayToggle programId={programId} />
               <button
                 className="ph-btn"
                 disabled={!selectedAbsenceId || truthLoading}

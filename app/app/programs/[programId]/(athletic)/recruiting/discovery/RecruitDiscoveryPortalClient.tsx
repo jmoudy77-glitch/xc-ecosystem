@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  readRecruitDiscoverySurfacedCandidates,
+  type RecruitDiscoveryCandidate,
+} from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
 
 type OriginKey = "surfaced" | "favorites";
 
@@ -18,87 +22,133 @@ type Props = {
   programId: string;
 };
 
-function coerceString(v: unknown): string | null {
-  if (typeof v === "string" && v.trim().length > 0) return v;
-  return null;
+const FAVORITES_STORAGE_VERSION = 1;
+
+function favoritesStorageKey(programId: string) {
+  return `xcsys:recruiting:discovery:favorites:v${FAVORITES_STORAGE_VERSION}:${programId}`;
 }
 
-function coerceNumber(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  return null;
+function safeJsonParse<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
-function asCandidateList(input: unknown, originKey: OriginKey): Candidate[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((row: any) => {
-      const id =
-        coerceString(row?.id) ??
-        coerceString(row?.athlete_id) ??
-        coerceString(row?.athleteId) ??
-        coerceString(row?.recruit_id) ??
-        coerceString(row?.recruitId);
+function normalizeCandidate(raw: any, originKey: OriginKey): Candidate | null {
+  const id = typeof raw?.id === "string" && raw.id.trim() ? raw.id.trim() : null;
+  const displayName =
+    typeof raw?.displayName === "string" && raw.displayName.trim()
+      ? raw.displayName.trim()
+      : null;
 
-      const displayName =
-        coerceString(row?.displayName) ??
-        coerceString(row?.display_name) ??
-        coerceString(row?.name) ??
-        [coerceString(row?.first_name), coerceString(row?.last_name)]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
+  if (!id || !displayName) return null;
 
-      if (!id || !displayName) return null;
+  const eventGroup =
+    typeof raw?.eventGroup === "string" && raw.eventGroup.trim()
+      ? raw.eventGroup.trim()
+      : typeof raw?.event_group === "string" && raw.event_group.trim()
+        ? raw.event_group.trim()
+        : null;
 
-      const eventGroup =
-        coerceString(row?.event_group) ??
-        coerceString(row?.eventGroup) ??
-        null;
+  const gradYear =
+    typeof raw?.gradYear === "number" && Number.isFinite(raw.gradYear)
+      ? raw.gradYear
+      : typeof raw?.grad_year === "number" && Number.isFinite(raw.grad_year)
+        ? raw.grad_year
+        : null;
 
-      const gradYear = coerceNumber(row?.grad_year) ?? coerceNumber(row?.gradYear);
+  const originMeta =
+    raw?.originMeta && typeof raw.originMeta === "object" ? (raw.originMeta as Record<string, unknown>) : {};
 
-      return {
-        id,
-        displayName,
-        eventGroup,
-        gradYear,
-        originKey,
-        originMeta: {},
-      } satisfies Candidate;
-    })
+  return {
+    id,
+    displayName,
+    eventGroup,
+    gradYear,
+    originKey,
+    originMeta,
+  };
+}
+
+function loadFavorites(programId: string): Candidate[] {
+  if (typeof window === "undefined") return [];
+  const key = favoritesStorageKey(programId);
+  const parsed = safeJsonParse<any[]>(window.localStorage.getItem(key));
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((row) => normalizeCandidate(row, "favorites"))
     .filter(Boolean) as Candidate[];
 }
 
-export default function RecruitDiscoveryPortalClient({ programId }: Props) {
-  // NOTE: This scaffold intentionally does not assume any specific upstream data
-  // shape yet. Surfaced candidates will be wired to the canonical sourcing logic
-  // in the next promotion once the read surface is finalized.
-  const surfaced = useMemo<Candidate[]>(() => {
-    // Placeholder: empty until sourced list is wired.
-    return [];
-  }, []);
+function saveFavorites(programId: string, favorites: Candidate[]) {
+  if (typeof window === "undefined") return;
+  const key = favoritesStorageKey(programId);
+  window.localStorage.setItem(key, JSON.stringify(favorites));
+}
 
+export default function RecruitDiscoveryPortalClient({ programId }: Props) {
+  const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
+
+  useEffect(() => {
+    // Hydrate favorites from session cache (localStorage).
+    setFavorites(loadFavorites(programId));
+  }, [programId]);
+
+  useEffect(() => {
+    // Wire Surfaced via canonical server action seam (currently returns []).
+    // No assumptions about sourcing providers are made here.
+    let cancelled = false;
+
+    (async () => {
+      const rows: RecruitDiscoveryCandidate[] =
+        await readRecruitDiscoverySurfacedCandidates({ programId });
+
+      const normalized = (rows ?? [])
+        .map((row) => normalizeCandidate(row, "surfaced"))
+        .filter(Boolean) as Candidate[];
+
+      if (!cancelled) setSurfaced(normalized);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [programId]);
+
+  const isFav = (candidateId: string) => favorites.some((c) => c.id === candidateId);
 
   const addFavorite = (c: Candidate) => {
     setFavorites((prev) => {
       if (prev.some((p) => p.id === c.id)) return prev;
-      return [
+      const next = [
         ...prev,
         {
           ...c,
-          originKey: "favorites",
+          originKey: "favorites" as OriginKey,
           originMeta: { ...(c.originMeta ?? {}), favoritedAt: new Date().toISOString() },
         },
       ];
+      saveFavorites(programId, next);
+      return next;
     });
   };
 
   const removeFavorite = (candidateId: string) => {
-    setFavorites((prev) => prev.filter((c) => c.id !== candidateId));
+    setFavorites((prev) => {
+      const next = prev.filter((c) => c.id !== candidateId);
+      saveFavorites(programId, next);
+      return next;
+    });
   };
 
-  const isFav = (candidateId: string) => favorites.some((c) => c.id === candidateId);
+  const surfacedHeader = useMemo(() => {
+    if (surfaced.length === 0) return "No surfaced candidates yet.";
+    return `${surfaced.length} surfaced candidate${surfaced.length === 1 ? "" : "s"}.`;
+  }, [surfaced.length]);
 
   return (
     <div className="w-full">
@@ -125,15 +175,13 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
         <section className="rounded-lg border bg-card">
           <div className="border-b p-3">
             <div className="text-sm font-medium">Surfaced</div>
-            <div className="text-xs text-muted-foreground">
-              System-sourced candidates (wiring next promotion).
-            </div>
+            <div className="text-xs text-muted-foreground">{surfacedHeader}</div>
           </div>
 
           <div className="p-3">
             {surfaced.length === 0 ? (
               <div className="text-sm text-muted-foreground">
-                No surfaced candidates yet. Next promotion wires sourcing + filters.
+                Surfaced is wired via a canonical server action seam. Next promotion connects sourcing + filters.
               </div>
             ) : (
               <ul className="space-y-2">
@@ -169,7 +217,7 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
           <div className="border-b p-3">
             <div className="text-sm font-medium">Favorites</div>
             <div className="text-xs text-muted-foreground">
-              Coach-curated shortlist (session-state v1).
+              Coach-curated shortlist (session cache v1).
             </div>
           </div>
 

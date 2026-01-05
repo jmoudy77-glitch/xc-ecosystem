@@ -176,6 +176,22 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
   const [gradYearFilter, setGradYearFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("fit");
 
+  const activeFilterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (q.trim()) parts.push(`Search: "${q.trim()}"`);
+    if (eventGroupFilter !== "all") parts.push(`Event: ${eventGroupFilter}`);
+    if (gradYearFilter !== "all") parts.push(`Grad: ${gradYearFilter}`);
+    if (parts.length === 0) return "No filters applied.";
+    return parts.join(" · ");
+  }, [q, eventGroupFilter, gradYearFilter]);
+
+  const resetFilters = () => {
+    setQ("");
+    setEventGroupFilter("all");
+    setGradYearFilter("all");
+    setSortKey("fit");
+  };
+
   useEffect(() => {
     setFavorites(loadFavorites(programId));
     setHiddenSurfacedIds(readHiddenSurfacedIds(programId));
@@ -457,17 +473,13 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
           <button
             type="button"
             className="h-9 rounded-md border px-3 text-sm hover:bg-muted"
-            onClick={() => {
-              setQ("");
-              setEventGroupFilter("all");
-              setGradYearFilter("all");
-              setSortKey("fit");
-            }}
+            onClick={resetFilters}
             title="Reset filters"
           >
             Reset
           </button>
         </div>
+        <div className="mt-2 text-xs text-muted-foreground">{activeFilterSummary}</div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -485,57 +497,80 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
             {surfaced.length === 0 ? (
               <div className="text-sm text-muted-foreground">No surfaced candidates found.</div>
             ) : (
-              <ul className="space-y-2">
-                {filteredSurfaced.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex items-center justify-between rounded-md border px-3 py-2"
-                    draggable
-                    onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
-                    title="Drag to Recruiting Stabilization slot"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{c.displayName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {candidateCues(c)
-                          .slice(0, 3)
-                          .map((cue) => (
-                            <span
-                              key={cue.label}
-                              className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                              title={`${cue.label}: ${cue.value}`}
-                            >
-                              <span className="opacity-70">{cue.label}</span>
-                              <span className="font-mono">{cue.value}</span>
-                            </span>
-                          ))}
-                      </div>
+              <>
+                {filteredSurfaced.length === 0 ? (
+                  <div className="rounded-md border bg-muted/20 px-3 py-3">
+                    <div className="text-sm font-medium">No matches in Surfaced</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Filters removed all surfaced candidates. Reset filters to widen results.
                     </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                        onClick={resetFilters}
+                      >
+                        Reset filters
+                      </button>
+                      <div className="text-xs text-muted-foreground">{activeFilterSummary}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <ul className="space-y-2">
+                    {filteredSurfaced.map((c) => (
+                      <li
+                        key={c.id}
+                        className="flex items-center justify-between rounded-md border px-3 py-2"
+                        draggable
+                        onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
+                        title="Drag to Recruiting Stabilization slot"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{c.displayName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {candidateCues(c)
+                              .slice(0, 3)
+                              .map((cue) => (
+                                <span
+                                  key={cue.label}
+                                  className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                  title={`${cue.label}: ${cue.value}`}
+                                >
+                                  <span className="opacity-70">{cue.label}</span>
+                                  <span className="font-mono">{cue.value}</span>
+                                </span>
+                              ))}
+                          </div>
+                        </div>
 
-                    <button
-                      type="button"
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                      onClick={() => addFavorite(c)}
-                      disabled={isFav(c.id)}
-                      title={isFav(c.id) ? "Already in Favorites" : "Add to Favorites"}
-                    >
-                      {isFav(c.id) ? "Favorited" : "Favorite"}
-                    </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                            onClick={() => addFavorite(c)}
+                            disabled={isFav(c.id)}
+                            title={isFav(c.id) ? "Already in Favorites" : "Add to Favorites"}
+                          >
+                            {isFav(c.id) ? "Favorited" : "Favorite"}
+                          </button>
 
-                    <button
-                      type="button"
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                      onClick={() => hideFromSurfaced(c.id)}
-                      title="Hide from Surfaced list (local)"
-                    >
-                      Hide
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                            onClick={() => hideFromSurfaced(c.id)}
+                            title="Hide from Surfaced list (local)"
+                          >
+                            Hide
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
 
             {hiddenSurfacedIds.size > 0 && (
@@ -570,73 +605,94 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
             {favorites.length === 0 ? (
               <div className="text-sm text-muted-foreground">No favorites yet.</div>
             ) : (
-              <ul className="space-y-2">
-                {filteredFavorites.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex items-center justify-between rounded-md border px-3 py-2"
-                    draggable
-                    onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
-                    title="Drag to Recruiting Stabilization slot"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{c.displayName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {candidateCues(c)
-                          .slice(0, 3)
-                          .map((cue) => (
-                            <span
-                              key={cue.label}
-                              className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                              title={`${cue.label}: ${cue.value}`}
-                            >
-                              <span className="opacity-70">{cue.label}</span>
-                              <span className="font-mono">{cue.value}</span>
-                            </span>
-                          ))}
-                      </div>
+              <>
+                {filteredFavorites.length === 0 ? (
+                  <div className="rounded-md border bg-muted/20 px-3 py-3">
+                    <div className="text-sm font-medium">No matches in Favorites</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Filters removed all favorites. Reset filters to widen results.
                     </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                        onClick={resetFilters}
+                      >
+                        Reset filters
+                      </button>
+                      <div className="text-xs text-muted-foreground">{activeFilterSummary}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <ul className="space-y-2">
+                    {filteredFavorites.map((c) => (
+                      <li
+                        key={c.id}
+                        className="flex items-center justify-between rounded-md border px-3 py-2"
+                        draggable
+                        onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
+                        title="Drag to Recruiting Stabilization slot"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{c.displayName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {candidateCues(c)
+                              .slice(0, 3)
+                              .map((cue) => (
+                                <span
+                                  key={cue.label}
+                                  className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                  title={`${cue.label}: ${cue.value}`}
+                                >
+                                  <span className="opacity-70">{cue.label}</span>
+                                  <span className="font-mono">{cue.value}</span>
+                                </span>
+                              ))}
+                          </div>
+                        </div>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                        onClick={() => pinFavoriteToTop(c.id)}
-                        title="Pin to top"
-                      >
-                        Pin
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                        onClick={() => moveFavorite(c.id, "up")}
-                        title="Move up"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                        onClick={() => moveFavorite(c.id, "down")}
-                        title="Move down"
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                        onClick={() => removeFavorite(c.id)}
-                        title="Remove from Favorites"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                            onClick={() => pinFavoriteToTop(c.id)}
+                            title="Pin to top"
+                          >
+                            Pin
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                            onClick={() => moveFavorite(c.id, "up")}
+                            title="Move up"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                            onClick={() => moveFavorite(c.id, "down")}
+                            title="Move down"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                            onClick={() => removeFavorite(c.id)}
+                            title="Remove from Favorites"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
 
             {favorites.length > 0 && (

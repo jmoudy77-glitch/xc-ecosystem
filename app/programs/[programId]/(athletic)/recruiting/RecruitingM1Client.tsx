@@ -5,6 +5,8 @@
 import * as React from "react";
 import { RecruitingPrimarySurfaceWired } from "./_components/RecruitingPrimarySurfaceWired";
 import type { RecruitingEventGroupRow } from "./_components/types";
+import { RecruitingSurfacedPanel } from "./RecruitingSurfacedPanel";
+import { RecruitingFavoritesPanel } from "./RecruitingFavoritesPanel";
 
 type Props = {
   programId: string;
@@ -32,7 +34,21 @@ export default function RecruitingM1Client({ programId }: Props) {
     []
   );
 
-  return <RecruitingPrimarySurfaceWired programId={programId} initialRows={initialRows} />;
+  return (
+    <div className="grid h-full min-h-0 grid-cols-12 gap-4">
+      <div className="col-span-12 min-h-0 lg:col-span-3">
+        <RecruitingSurfacedPanel />
+      </div>
+
+      <div className="col-span-12 min-h-0 lg:col-span-6">
+        <RecruitingPrimarySurfaceWired programId={programId} initialRows={initialRows} />
+      </div>
+
+      <div className="col-span-12 min-h-0 lg:col-span-3">
+        <RecruitingFavoritesPanel />
+      </div>
+    </div>
+  );
 }
 
 function makeEmptySlot(eventGroupKey: string, slotId: string) {

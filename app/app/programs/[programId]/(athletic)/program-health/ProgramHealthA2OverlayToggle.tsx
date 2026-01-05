@@ -7,6 +7,10 @@ type Props = {
   programId: string;
 };
 
+// A1/A2 overlay toggle contract:
+// - OFF => A1 overlays (default)
+// - ON  => A2 overlays via query param phOverlay=a2
+
 // A2 overlays are strictly additive and read-only.
 // Enable via: NEXT_PUBLIC_PH_A2_OVERLAYS=1
 const A2_ENABLED = process.env.NEXT_PUBLIC_PH_A2_OVERLAYS === "1";
@@ -18,7 +22,7 @@ export function ProgramHealthA2OverlayToggle({ programId }: Props) {
   const pathname = usePathname();
   const sp = useSearchParams();
 
-  const a2 = sp.get("a2") === "1";
+  const isA2 = sp.get("phOverlay") === "a2";
   const horizon = sp.get("horizon");
 
   const [loading, setLoading] = React.useState(false);
@@ -26,16 +30,17 @@ export function ProgramHealthA2OverlayToggle({ programId }: Props) {
 
   const toggle = () => {
     const next = new URLSearchParams(sp.toString());
-    if (a2) next.delete("a2");
-    else next.set("a2", "1");
-    router.replace(`${pathname}?${next.toString()}`);
+    if (isA2) next.delete("phOverlay");
+    else next.set("phOverlay", "a2");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   };
 
   React.useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      if (!a2) {
+      if (!isA2) {
         setHasA2Data(null);
         return;
       }
@@ -62,7 +67,7 @@ export function ProgramHealthA2OverlayToggle({ programId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [a2, programId, horizon]);
+  }, [isA2, programId, horizon]);
 
   return (
     <div className="flex items-center gap-2">
@@ -70,12 +75,12 @@ export function ProgramHealthA2OverlayToggle({ programId }: Props) {
         type="button"
         onClick={toggle}
         className="rounded-md border border-slate-800 px-2 py-1 text-[11px] text-slate-200 hover:bg-slate-900/40"
-        aria-pressed={a2}
+        aria-pressed={isA2}
       >
-        {a2 ? "A2 Sandbox: ON" : "A2 Sandbox: OFF"}
+        {isA2 ? "A2" : "A1"}
       </button>
 
-      {a2 ? (
+      {isA2 ? (
         <div className="rounded-md border border-slate-800 bg-slate-950/40 px-2 py-1 text-[11px] text-slate-200">
           {loading
             ? "Loading A2…"

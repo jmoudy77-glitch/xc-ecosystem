@@ -3,6 +3,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import type { AbsenceTruthModel, ProgramHealthViewModel } from "./types";
 import { CapabilityDriftMap } from "./CapabilityDriftMap";
 import { TruthView } from "./TruthView";
@@ -84,6 +85,9 @@ export function ProgramHealthPage({
   const [truthInitialRootEventId, setTruthInitialRootEventId] = React.useState<string | undefined>(
     undefined
   );
+
+  const searchParams = useSearchParams();
+  const showA2 = searchParams.get("phOverlay") === "a2";
 
   const selectedAbsence = React.useMemo(() => {
     if (!selectedAbsenceId) return null;
@@ -335,6 +339,7 @@ export function ProgramHealthPage({
           highlightAbsenceIds={lineageHighlightOn ? highlightAbsenceIds : []}
           lineageNodeIds={lineageNodeIds}
           showUnmapped={false}
+          showA2={showA2}
           onAbsenceHover={(_absenceId, summary) => setHoveredAbsence(summary)}
           onAbsenceSelect={setSelectedAbsenceId}
         />

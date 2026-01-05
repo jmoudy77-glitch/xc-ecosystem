@@ -18,6 +18,7 @@
 
 | Date (local) | Promotion | Artifact(s) | Commit |
 |---|---|---|---|
+| 2026-01-05 | Add canonical Meet Manager specification v1.2 (LOCKED) | `docs/Meet_manager/canonical_spec_v1.2.md` | — |
 | 2026-01-05 | Add canonical state machines + status enums v1.2 | `docs/Meet_manager/state_machines_v1.2.md` | — |
 | 2026-01-05 | Add routing contracts v1.2 | `docs/Meet_manager/routing_contracts_v1.2.md` | — |
 | 2026-01-05 | Add ops token lifecycle v1.2 | `docs/Meet_manager/ops_token_lifecycle_v1.2.md` | — |
@@ -34,4 +35,3 @@
 | 2026-01-05 | Stub public API routes (live results, field scoring, display feeds) | `app/api/public/meets/[meetId]/live/route.ts` + related route stubs | — |
 | 2026-01-05 | Add minimal read server actions (meet home/roster/entries/events) | `app/actions/meet_manager/getMeetHome.ts` + related actions | — |
 | 2026-01-05 | Wire meet manager routes + initial meet home page | `app/programs/[programId]/meets/page.tsx`, `app/programs/[programId]/meets/[meetId]/page.tsx` | — |
-

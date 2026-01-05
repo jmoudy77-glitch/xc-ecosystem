@@ -5,9 +5,11 @@ import { readProgramHealthA2Sandbox } from "@/app/actions/program-health/readPro
 export default async function ProgramHealthA2SandboxPage({
   params,
 }: {
-  params: { programId: string };
+  params: Promise<{ programId: string }>;
 }) {
-  const model = await readProgramHealthA2Sandbox(params.programId);
+  const { programId } = await params;
+
+  const model = await readProgramHealthA2Sandbox(programId);
 
   return (
     <pre style={{ padding: 16, fontSize: 12 }}>

@@ -83,7 +83,7 @@ Recruiting M1 UI is implemented and live.
 - `app/programs/[programId]/(athletic)/recruiting/page.tsx`
 
 ### 4.2 Components/actions
-- Server action: `app/app/actions/recruiting/readRecruitingM1View.ts`
+- Server action: `app/actions/recruiting/readRecruitingM1View.ts`
 - Client UI: `app/programs/[programId]/(athletic)/recruiting/RecruitingM1Client.tsx`
 
 ### 4.3 Behavior guarantees

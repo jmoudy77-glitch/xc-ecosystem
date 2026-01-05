@@ -1,4 +1,4 @@
-// app/app/lib/recruiting/discoveryDnD.ts
+// app/lib/recruiting/portalDnD.ts
 
 export type RecruitDiscoveryOriginKey = "surfaced" | "favorites";
 

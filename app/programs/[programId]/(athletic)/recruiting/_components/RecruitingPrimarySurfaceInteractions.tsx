@@ -11,7 +11,7 @@ import {
   removeFromFavorites,
   writeOriginRegistryEntry,
   type RecruitDiscoveryOriginRegistryEntry,
-} from "@/app/lib/recruiting/discoveryStorage";
+} from "@/app/lib/recruiting/portalStorage";
 
 type Props = {
   slot: RecruitingSlot;

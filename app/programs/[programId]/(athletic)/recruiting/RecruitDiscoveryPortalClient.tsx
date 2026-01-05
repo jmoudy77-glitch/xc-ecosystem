@@ -1,4 +1,4 @@
-// app/programs/[programId]/(athletic)/recruiting/discovery/RecruitDiscoveryPortalClient.tsx
+// app/programs/[programId]/(athletic)/recruiting/RecruitDiscoveryPortalClient.tsx
 
 "use client";
 
@@ -8,12 +8,12 @@ import {
   readRecruitDiscoverySurfacedCandidates,
   type RecruitDiscoveryCandidate,
 } from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
-import { type RecruitDiscoveryDnDPayload } from "@/app/lib/recruiting/discoveryDnD";
+import { type RecruitDiscoveryDnDPayload } from "@/app/lib/recruiting/portalDnD";
 import {
   readHiddenSurfacedIds,
   favoritesStorageKey,
   safeJsonParse,
-} from "@/app/lib/recruiting/discoveryStorage";
+} from "@/app/lib/recruiting/portalStorage";
 
 type OriginKey = "surfaced" | "favorites";
 

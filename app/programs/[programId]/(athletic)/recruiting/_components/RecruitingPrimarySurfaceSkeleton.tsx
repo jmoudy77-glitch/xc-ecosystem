@@ -16,7 +16,7 @@ import {
   clearOriginRegistryEntry,
   unhideSurfacedCandidate,
   addToFavoritesIfMissing,
-} from "@/app/lib/recruiting/discoveryStorage";
+} from "@/app/lib/recruiting/portalStorage";
 
 type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 

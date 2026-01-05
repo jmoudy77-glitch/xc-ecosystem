@@ -1,4 +1,4 @@
-// app/app/lib/recruiting/discoveryStorage.ts
+// app/lib/recruiting/portalStorage.ts
 
 export type RecruitDiscoveryOriginKey = "surfaced" | "favorites";
 

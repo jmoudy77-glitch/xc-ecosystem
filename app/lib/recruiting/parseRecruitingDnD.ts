@@ -1,4 +1,25 @@
 // app/lib/recruiting/parseRecruitingDnD.ts
-// Shim re-export to preserve @/app/lib/* import convention.
 
-export * from "@/app/app/lib/recruiting/parseRecruitingDnD";
+import { isRecruitDiscoveryDnDPayload, type RecruitDiscoveryDnDPayload } from "@/app/lib/recruiting/portalDnD";
+
+export function parseRecruitingDnDPayload(
+  e: DragEvent | React.DragEvent
+): RecruitDiscoveryDnDPayload | null {
+  const dt = (e as any)?.dataTransfer;
+  if (!dt) return null;
+
+  const raw =
+    dt.getData?.("application/x-xcsys-recruiting") ||
+    dt.getData?.("text/plain") ||
+    "";
+
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (isRecruitDiscoveryDnDPayload(parsed)) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}

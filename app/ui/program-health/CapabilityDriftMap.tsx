@@ -38,6 +38,7 @@ type Props = {
   highlightAbsenceIds?: string[];
   lineageNodeIds?: string[];
   showUnmapped?: boolean;
+  showA2?: boolean;
   onAbsenceHover?: (
     absenceId: string | null,
     summary: { capabilityLabel: string; level: "critical" | "high" | "medium" | "low" } | null
@@ -97,6 +98,22 @@ const DISC_RADIUS_PX = 440;
 // A1 overlays (feature-flagged)
 // Enable via: NEXT_PUBLIC_PH_A1_OVERLAYS=1
 const A1_ENABLED = process.env.NEXT_PUBLIC_PH_A1_OVERLAYS === "1";
+
+// A2 overlays (feature-flagged; A2 replaces A1 when toggled ON)
+// Enable via: NEXT_PUBLIC_PH_A2_OVERLAYS=1
+const A2_ENABLED = process.env.NEXT_PUBLIC_PH_A2_OVERLAYS === "1";
+
+const A2_STROKE = {
+  widthPx: 1,
+  color: "rgba(255,255,255,0.35)",
+  hoverBoostColor: "rgba(255,255,255,0.55)",
+  selectedBoostColor: "rgba(255,255,255,0.75)",
+} as const;
+
+const A2_LAYERING = {
+  zIndex: 80,
+  pointerEvents: "none" as const,
+} as const;
 
 type A1AbsenceClass = "capability" | "structural" | "readiness";
 
@@ -497,9 +514,12 @@ export function CapabilityDriftMap({
   highlightAbsenceIds,
   lineageNodeIds,
   showUnmapped = true,
+  showA2,
   onAbsenceHover,
   onAbsenceSelect,
 }: Props) {
+  const overlayMode: "a1" | "a2" = A2_ENABLED && Boolean(showA2) ? "a2" : "a1";
+
   // Hoist hoverHorizon above all potential reads to avoid TDZ hazards
   const [hoverHorizon, setHoverHorizon] = React.useState<Horizon | null>(null);
 
@@ -1064,7 +1084,7 @@ export function CapabilityDriftMap({
                                       type="button"
                                       className={cls}
                                       style={{
-                                        ...(A1_ENABLED
+                                        ...(A1_ENABLED && overlayMode === "a1"
                                           ? (() => {
                                               const clsKey = a1ClassForAbsence(a);
                                               const sevKey = normalizeLevel(sevBucket(a.severity));
@@ -1124,12 +1144,32 @@ export function CapabilityDriftMap({
                                                 ...(structuralPattern ?? {}),
                                               };
                                             })()
-                                          : {
-                                              outline: "2px solid rgba(255,0,0,0.9)",
-                                              background: "rgba(255,0,0,0.18)",
-                                            }),
-                                        pointerEvents: "auto",
-                                        zIndex: 60,
+                                          : A2_ENABLED && overlayMode === "a2"
+                                            ? (() => {
+                                                const stroke = isSelected
+                                                  ? A2_STROKE.selectedBoostColor
+                                                  : isHighlighted
+                                                    ? A2_STROKE.hoverBoostColor
+                                                    : A2_STROKE.color;
+                                                return {
+                                                  outline: `${A2_STROKE.widthPx}px solid ${stroke}`,
+                                                  background: "rgba(255,255,255,0.04)",
+                                                  boxShadow: "none",
+                                                  filter: "none",
+                                                };
+                                              })()
+                                            : {
+                                                outline: "2px solid rgba(255,0,0,0.9)",
+                                                background: "rgba(255,0,0,0.18)",
+                                              }),
+                                        pointerEvents:
+                                          A2_ENABLED && overlayMode === "a2"
+                                            ? A2_LAYERING.pointerEvents
+                                            : "auto",
+                                        zIndex:
+                                          A2_ENABLED && overlayMode === "a2"
+                                            ? A2_LAYERING.zIndex
+                                            : 60,
                                       }}
                                       onClick={handleSelect}
                                       onMouseEnter={() => {

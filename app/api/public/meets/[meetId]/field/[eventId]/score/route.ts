@@ -9,8 +9,9 @@ function getBearerToken(req: Request): string | null {
 
 export async function POST(
   req: Request,
-  { params }: { params: { meetId: string; eventId: string } }
+  { params }: { params: Promise<{ meetId: string; eventId: string }> }
 ) {
+  const { meetId, eventId } = await params;
   const token =
     new URL(req.url).searchParams.get("token") ??
     getBearerToken(req) ??
@@ -22,8 +23,8 @@ export async function POST(
       error: "NOT_IMPLEMENTED",
       message:
         "Field scoring submission not implemented yet. Token validation and ingest will be added in ops token lifecycle + results pipeline implementation.",
-      meetId: params.meetId,
-      eventId: params.eventId,
+      meetId,
+      eventId,
       token_present: Boolean(token),
     },
     { status: 501 }

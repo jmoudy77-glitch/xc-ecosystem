@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 
-export default function MeetsIndexPage({
+export default async function MeetsIndexPage({
   params,
 }: {
-  params: { programId: string };
+  params: Promise<{ programId: string }>;
 }) {
-  redirect(`/programs/${params.programId}/meets`);
+  const { programId } = await params;
+  redirect(`/programs/${programId}/meets`);
 }

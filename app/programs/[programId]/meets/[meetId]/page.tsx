@@ -3,9 +3,10 @@ import { getMeetHome } from "@/app/actions/meet_manager/getMeetHome";
 export default async function MeetHomePage({
   params,
 }: {
-  params: { programId: string; meetId: string };
+  params: Promise<{ programId: string; meetId: string }>;
 }) {
-  const meet = await getMeetHome(params.meetId);
+  const { meetId } = await params;
+  const meet = await getMeetHome(meetId);
 
   return (
     <div style={{ padding: 24 }}>

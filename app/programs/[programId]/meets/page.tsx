@@ -1,7 +1,5 @@
 /* File: app/programs/[programId]/meets/page.tsx */
-
-import Link from "next/link";
-import { getMeetHome } from "@/app/actions/meet_manager/getMeetHome";
+import { WorkflowHeader } from "@/app/components/meet_manager/WorkflowHeader";
 
 type PageProps = {
   params: Promise<{ programId: string }>;
@@ -10,108 +8,96 @@ type PageProps = {
 export default async function ProgramMeetsPage({ params }: PageProps) {
   const { programId } = await params;
 
-  // Read-only stub: grounded on locked schema + minimal read server action.
-  // Do not assume return shape; render a stable triage surface with safe fallbacks.
-  let data: any = null;
-  let error: string | null = null;
-
-  try {
-    data = await getMeetHome(programId);
-  } catch (e: any) {
-    error = e?.message ?? "Failed to load meets.";
-  }
-
-  const meets: any[] = Array.isArray(data?.meets) ? data.meets : [];
-
   return (
     <div className="px-6 py-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">Meet Manager</h1>
-          <p className="text-sm text-muted-foreground">
-            Create or join meets, monitor alerts, and review archived meets.
-          </p>
-        </div>
+      <WorkflowHeader programId={programId} current="initiate" />
 
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/programs/${programId}/meets?mode=create`}
-            className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
-          >
-            Create meet
-          </Link>
-          <Link
-            href={`/programs/${programId}/meets?mode=join`}
-            className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
-          >
-            Join meet
-          </Link>
-        </div>
-      </div>
-
-      {error ? (
-        <div className="rounded-md border bg-muted/30 p-4 text-sm">
-          <div className="font-medium">Unable to load meet data</div>
-          <div className="mt-1 text-muted-foreground">{error}</div>
-        </div>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="rounded-md border p-4">
-          <div className="mb-2 text-sm font-medium">Active meets</div>
-          {meets.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              No meets yet. Use Create or Join to get started.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {meets.slice(0, 10).map((m: any) => {
-                const meetId = m?.id ?? m?.meet_id;
-                const title = m?.name ?? m?.title ?? "Meet";
-                const state = m?.lifecycle_state ?? m?.state ?? "unknown";
-
-                if (!meetId) return null;
-
-                return (
-                  <li key={String(meetId)} className="rounded-md border p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{title}</div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          State: {String(state)}
-                        </div>
-                      </div>
-                      <Link
-                        href={`/programs/${programId}/meets/${meetId}`}
-                        className="text-sm underline underline-offset-4"
-                      >
-                        Open
-                      </Link>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        <div className="rounded-md border p-4">
-          <div className="mb-2 text-sm font-medium">Alerts / To-dos</div>
-          <div className="text-sm text-muted-foreground">
-            Stub: alert panels will populate from ops + results lifecycle after validation.
+      <div className="grid grid-cols-12 gap-4">
+        {/* LEFT RAIL — Investigate only */}
+        <aside className="col-span-12 md:col-span-4">
+          <div className="space-y-3">
+            <InvestigatePanel title="Join Requests" count={0} />
+            <InvestigatePanel title="Roster Issues" count={0} />
+            <InvestigatePanel title="Ops Tokens" count={0} />
+            <InvestigatePanel title="Results Flags" count={0} />
           </div>
+        </aside>
 
-          <div className="mt-4 border-t pt-4">
-            <div className="mb-2 text-sm font-medium">Review</div>
-            <div className="text-sm text-muted-foreground">
-              Stub: archived meets and results review will appear here once results ingestion is wired.
+        {/* RIGHT PANEL — Create | Join */}
+        <main className="col-span-12 md:col-span-8">
+          <div className="rounded-md border">
+            <div className="flex border-b">
+              <Tab label="Create" active />
+              <Tab label="Join" />
+            </div>
+
+            <div className="p-4">
+              {/* CREATE STUB */}
+              <div>
+                <h2 className="text-sm font-medium">Create a new meet</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Meet creation form will appear here. Date selection will surface
+                  conflicts within 100 miles.
+                </p>
+              </div>
+
+              <div className="my-6 h-px bg-border" />
+
+              {/* JOIN STUB */}
+              <div>
+                <h2 className="text-sm font-medium">Join an existing meet</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Map-based discovery with date and radius filters will appear here.
+                </p>
+              </div>
             </div>
           </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function Tab({ label, active = false }: { label: string; active?: boolean }) {
+  return (
+    <div
+      className={[
+        "px-4 py-2 text-sm",
+        active
+          ? "border-b-2 border-foreground font-medium"
+          : "text-muted-foreground",
+      ].join(" ")}
+    >
+      {label}
+    </div>
+  );
+}
+
+function InvestigatePanel({
+  title,
+  count,
+}: {
+  title: string;
+  count: number;
+}) {
+  const hasItems = count > 0;
+  return (
+    <div className="rounded-md border p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">{title}</div>
+        <div
+          className={[
+            "rounded-full px-2 py-0.5 text-xs",
+            hasItems ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground",
+          ].join(" ")}
+        >
+          {count}
         </div>
       </div>
-
-      <div className="mt-6 text-xs text-muted-foreground">
-        Read-only stub. No meet mutation actions are implemented on this surface.
+      <div className="mt-2 text-xs text-muted-foreground">
+        {hasItems
+          ? "Action required."
+          : "No outstanding items."}
       </div>
     </div>
   );

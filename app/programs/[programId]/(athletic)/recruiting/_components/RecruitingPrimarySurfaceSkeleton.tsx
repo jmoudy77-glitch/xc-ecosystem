@@ -200,7 +200,7 @@ function SlotCard({
         className={[
           "w-full text-left",
           "rounded-xl border bg-surface p-4 transition",
-          isExpanded ? "border-slate-200/30" : "border-subtle hover:border-slate-200/20",
+          isExpanded ? "border-slate-200/30" : "border-subtle",
         ].join(" ")}
         aria-expanded={isExpanded}
       >

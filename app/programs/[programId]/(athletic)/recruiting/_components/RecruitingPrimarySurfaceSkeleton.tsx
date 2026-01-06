@@ -173,7 +173,7 @@ function SlotCard({
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
   // LOCK: SlotCard width flexes to avatar + p-3 padding (12px each side).
-  const cardWidthPx = RECRUITING_UI.avatar.sizePx + 24;
+  const cardWidthPx = RECRUITING_UI.avatar.sizePx + 34;
 
   const getEventsLabel = (a: any): string | null => {
     if (!a) return null;

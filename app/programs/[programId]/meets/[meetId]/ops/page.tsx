@@ -1,9 +1,13 @@
 /* File: app/programs/[programId]/meets/[meetId]/ops/page.tsx */
 import { WorkflowHeader } from "@/app/components/meet_manager/WorkflowHeader";
+import { isMeetHost } from "@/app/actions/meet_manager/isMeetHost";
+import { getHostedCompeteOps } from "@/app/actions/meet_manager/getHostedCompeteOps";
+import { HostedCompeteOpsClient } from "@/app/components/meet_manager/HostedCompeteOpsClient";
 import { getAttendingCompeteReadOnly } from "@/app/actions/meet_manager/getAttendingCompeteReadOnly";
 
 type PageProps = {
   params: Promise<{ programId: string; meetId: string }>;
+  searchParams?: Promise<{ eventId?: string }>;
 };
 
 function eventLabel(e: { eventType: string; scheduledAt: string | null; state: string | null }) {
@@ -12,9 +16,32 @@ function eventLabel(e: { eventType: string; scheduledAt: string | null; state: s
   return `${e.eventType}${dt}${st}`;
 }
 
-export default async function MeetOpsWorkspacePage({ params }: PageProps) {
+export default async function MeetOpsWorkspacePage({ params, searchParams }: PageProps) {
   const { programId, meetId } = await params;
+  const sp = (await searchParams) ?? {};
+  const selectedEventId = sp.eventId ? String(sp.eventId) : null;
 
+  const host = await isMeetHost(meetId);
+
+  if (host) {
+    const hostData = await getHostedCompeteOps(meetId, selectedEventId);
+
+    return (
+      <div className="px-6 py-6">
+        <WorkflowHeader programId={programId} current="compete" />
+        <div className="mt-4">
+          <HostedCompeteOpsClient
+            meetId={meetId}
+            events={hostData.events}
+            selectedEventId={selectedEventId}
+            entries={hostData.entries}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ATTENDEE (existing read-only surface)
   const data = await getAttendingCompeteReadOnly(programId, meetId);
 
   const eventsById = new Map(data.events.map((e) => [e.eventId, e]));
@@ -131,7 +158,10 @@ export default async function MeetOpsWorkspacePage({ params }: PageProps) {
                                 : null;
 
                             return (
-                              <div key={`${a.athleteId}:${r.eventId}:${idx}`} className="flex items-center justify-between rounded-md border px-3 py-2">
+                              <div
+                                key={`${a.athleteId}:${r.eventId}:${idx}`}
+                                className="flex items-center justify-between rounded-md border px-3 py-2"
+                              >
                                 <div className="text-sm">
                                   {label}
                                   {summary ? <span className="text-muted-foreground"> • {String(summary)}</span> : null}

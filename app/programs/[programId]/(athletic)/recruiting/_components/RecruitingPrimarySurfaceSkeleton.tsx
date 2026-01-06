@@ -116,7 +116,7 @@ function EventGroupRow({
       : null;
 
   return (
-    <section className="space-y-2">
+    <section className="w-full rounded-xl border border-subtle bg-surface/30 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-100">{row.label}</span>
@@ -128,20 +128,21 @@ function EventGroupRow({
         <div className="text-[10px] text-muted">Expansion is horizontal; other rows do not reflow.</div>
       </div>
 
-      <div className="grid gap-3">
+      <div className="mt-3 flex flex-wrap items-start gap-3">
         {row.slots.map((slot) => (
-          <SlotCard
-            key={slot.slotId}
-            programId={programId}
-            eventGroupKey={row.eventGroupKey}
-            slot={slot}
-            isExpanded={!!expandedSlot && expandedSlot.slotId === slot.slotId}
-            onToggleExpand={() => onToggleExpand(row.eventGroupKey, slot.slotId)}
-            onOpenAthlete={onOpenAthlete}
-            onSetPrimary={onSetPrimary}
-            onRemoveAthlete={onRemoveAthlete}
-            renderDropZone={renderDropZone}
-          />
+          <div key={slot.slotId} className="shrink-0">
+            <SlotCard
+              programId={programId}
+              eventGroupKey={row.eventGroupKey}
+              slot={slot}
+              isExpanded={!!expandedSlot && expandedSlot.slotId === slot.slotId}
+              onToggleExpand={() => onToggleExpand(row.eventGroupKey, slot.slotId)}
+              onOpenAthlete={onOpenAthlete}
+              onSetPrimary={onSetPrimary}
+              onRemoveAthlete={onRemoveAthlete}
+              renderDropZone={renderDropZone}
+            />
+          </div>
         ))}
       </div>
     </section>
@@ -187,7 +188,7 @@ function SlotCard({
 
       <div
         className={[
-          "w-full text-left",
+          "w-[280px] max-w-full text-left",
           "rounded-xl border bg-surface p-4",
           isExpanded ? "border-slate-200/30" : "border-subtle",
         ].join(" ")}

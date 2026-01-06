@@ -127,7 +127,7 @@ function EventGroupRow({
 
       </div>
 
-      <div className="mt-3 flex flex-wrap items-start justify-start gap-3">
+      <div className="mt-3 flex w-full flex-wrap items-start justify-start gap-3">
         {row.slots.map((slot) => (
           <div key={slot.slotId} className="shrink-0">
             <SlotCard
@@ -210,7 +210,7 @@ function SlotCard({
       >
         {/* Slot header intentionally removed per locked contract */}
 
-        <div className="mt-2 flex items-center justify-center">
+        <div className="mt-2 flex items-center justify-start">
           <div className="flex flex-col items-center justify-center">
             <PresenceMeter primary={primary} />
             <button
@@ -353,7 +353,7 @@ function PrimaryAvatar({
     primary?.type === "returning"
       ? "ring-blue-500/80"
       : primary?.type === "recruit"
-        ? "ring-yellow-400/80"
+        ? "ring-green-500/80"
         : "ring-slate-600/60";
 
   return (

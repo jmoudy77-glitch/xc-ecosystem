@@ -172,6 +172,22 @@ function SlotCard({
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
 
+  const getEventsLabel = (a: any): string | null => {
+    if (!a) return null;
+    // Prefer explicit labels when present
+    if (typeof a.eventsLabel === "string" && a.eventsLabel.trim()) return a.eventsLabel.trim();
+    if (typeof a.eventNamesLabel === "string" && a.eventNamesLabel.trim()) return a.eventNamesLabel.trim();
+    // Common arrays: events, eventNames
+    const ev = Array.isArray(a.events) ? a.events : Array.isArray(a.eventNames) ? a.eventNames : null;
+    if (ev && ev.length) {
+      const s = ev.filter(Boolean).map((x: any) => String(x)).join(", ");
+      return s.trim() ? s : null;
+    }
+    // Fallback: athlete may have a single event string
+    if (typeof a.event === "string" && a.event.trim()) return a.event.trim();
+    return null;
+  };
+
   const onPrimaryAvatarClick = () => {
     if (!primary) return;
     if (total <= 1) {
@@ -194,7 +210,7 @@ function SlotCard({
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="text-[11px] font-semibold text-slate-100">
+            <div className="text-[10px] font-medium text-slate-200/80">
               Slot <span className="font-mono text-slate-300">{slot.slotId}</span>
             </div>
             <span className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
@@ -202,7 +218,9 @@ function SlotCard({
             </span>
           </div>
 
-          <div className="text-[10px] text-muted">{slot.primaryAthleteId ? "PRIMARY set" : "PRIMARY empty"}</div>
+          {slot.primaryAthleteId ? (
+            <div className="text-[10px] text-slate-200/60">PRIMARY</div>
+          ) : null}
         </div>
 
         <div className="mt-4 flex items-center justify-center">
@@ -221,9 +239,11 @@ function SlotCard({
               <div className="max-w-[9rem] truncate text-sm font-medium text-slate-100">
                 {primary?.displayName ?? "Open slot"}
               </div>
-              <div className="mt-0.5 max-w-[9rem] truncate text-xs text-muted">
-                {eventGroupKey}
-              </div>
+              {primary ? (
+                <div className="mt-0.5 max-w-[9rem] truncate text-xs text-muted">
+                  {getEventsLabel(primary) ?? "—"}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

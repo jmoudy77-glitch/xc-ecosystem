@@ -11,14 +11,45 @@ type Props = {
   attendingForHosted: BuildMeetOption[];
 };
 
-function labelFor(o: BuildMeetOption, suffix?: string) {
-  const date = o.startDate ? ` • ${o.startDate}` : "";
-  const type = o.meetType ? `${o.meetType}` : "MEET";
-  const state = o.lifecycleState ? ` • ${o.lifecycleState}` : "";
-  return `${type}${date}${state}${suffix ? ` — ${suffix}` : ""}`;
+function locationSummary(loc: any): string {
+  if (!loc) return "";
+
+  // Best-effort without assuming a strict shape.
+  // Common keys (optional): name, venue, city, state, region
+  if (typeof loc === "string") return loc.trim();
+
+  if (typeof loc === "object") {
+    const name = typeof loc.name === "string" ? loc.name.trim() : "";
+    const venue = typeof loc.venue === "string" ? loc.venue.trim() : "";
+    const city = typeof loc.city === "string" ? loc.city.trim() : "";
+    const state = typeof loc.state === "string" ? loc.state.trim() : "";
+    const region = typeof loc.region === "string" ? loc.region.trim() : "";
+
+    const primary = name || venue;
+    const geo = [city, state || region].filter(Boolean).join(", ");
+
+    const out = [primary, geo].filter(Boolean).join(" — ");
+    return out;
+  }
+
+  return "";
 }
 
-export function BuildMeetSelectorClient({ hosted, attending, attendingForHosted }: Props) {
+function labelFor(o: BuildMeetOption, suffix?: string) {
+  const type = o.meetType ? `${o.meetType}` : "MEET";
+  const date = o.startDate ? ` • ${o.startDate}` : "";
+  const state = o.lifecycleState ? ` • ${o.lifecycleState}` : "";
+  const loc = locationSummary(o.location);
+  const locPart = loc ? ` • ${loc}` : "";
+  const suffixPart = suffix ? ` — ${suffix}` : "";
+  return `${type}${date}${state}${locPart}${suffixPart}`;
+}
+
+export function BuildMeetSelectorClient({
+  hosted,
+  attending,
+  attendingForHosted,
+}: Props) {
   const router = useRouter();
   const sp = useSearchParams();
 

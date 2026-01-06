@@ -8,8 +8,9 @@ export type BuildMeetOption = {
   meetId: string;
   meetType: "XC" | "TF" | string;
   lifecycleState: string;
-  startDate: string;
+  startDate: string; // ISO date string
   role: "HOST" | "ATTENDEE" | string;
+  location: any | null; // meets.location (jsonb)
 };
 
 function supabaseServer(cookieStore: any) {
@@ -17,7 +18,9 @@ function supabaseServer(cookieStore: any) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    throw new Error("Missing Supabase env vars (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).");
+    throw new Error(
+      "Missing Supabase env vars (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)."
+    );
   }
 
   return createServerClient(url, anonKey, {
@@ -31,7 +34,19 @@ function supabaseServer(cookieStore: any) {
   });
 }
 
-export async function getBuildMeetOptions(programId: string): Promise<{
+function sortSoonest(a: BuildMeetOption, b: BuildMeetOption) {
+  const ad = a.startDate ? Date.parse(a.startDate) : Number.POSITIVE_INFINITY;
+  const bd = b.startDate ? Date.parse(b.startDate) : Number.POSITIVE_INFINITY;
+  if (ad !== bd) return ad - bd;
+
+  // Stable tie-breaker
+  if (a.meetType !== b.meetType) return String(a.meetType).localeCompare(String(b.meetType));
+  return String(a.meetId).localeCompare(String(b.meetId));
+}
+
+export async function getBuildMeetOptions(
+  programId: string
+): Promise<{
   hosted: BuildMeetOption[];
   attending: BuildMeetOption[];
   attendingForHosted: BuildMeetOption[];
@@ -39,9 +54,9 @@ export async function getBuildMeetOptions(programId: string): Promise<{
   const cookieStore = (await cookies()) as any;
   const supabase = supabaseServer(cookieStore);
 
-  // Grounded in v1.2 schema:
+  // Core spine only:
   // - meet_participants: meet_id, program_id, role
-  // - meets: id, meet_type, lifecycle_state, start_date
+  // - meets: id, meet_type, lifecycle_state, start_date, location
   const { data, error } = await supabase
     .from("meet_participants")
     .select(
@@ -52,7 +67,8 @@ export async function getBuildMeetOptions(programId: string): Promise<{
           id,
           meet_type,
           lifecycle_state,
-          start_date
+          start_date,
+          location
         )
       `
     )
@@ -73,20 +89,23 @@ export async function getBuildMeetOptions(programId: string): Promise<{
       lifecycleState: String(m?.lifecycle_state ?? ""),
       startDate: String(m?.start_date ?? ""),
       role: String(row?.role ?? ""),
+      location: m?.location ?? null,
     };
   };
 
   const all = rows.map(normalize).filter(Boolean) as BuildMeetOption[];
 
-  const hosted = all.filter((x) => x.role === "HOST");
-  const attending = all.filter((x) => x.role === "ATTENDEE");
+  const hosted = all.filter((x) => x.role === "HOST").sort(sortSoonest);
+  const attending = all.filter((x) => x.role === "ATTENDEE").sort(sortSoonest);
 
   // Contract: hosted meet has corresponding attended context for the same coach hat-switch.
-  // Represent as the same meet_id surfaced under Attending dropdown as "attending-for-hosted".
-  const attendingForHosted: BuildMeetOption[] = hosted.map((h) => ({
-    ...h,
-    role: "ATTENDEE",
-  }));
+  // Surface this as an attending option with identical meet_id.
+  const attendingForHosted: BuildMeetOption[] = hosted
+    .map((h) => ({
+      ...h,
+      role: "ATTENDEE",
+    }))
+    .sort(sortSoonest);
 
   return { hosted, attending, attendingForHosted };
 }

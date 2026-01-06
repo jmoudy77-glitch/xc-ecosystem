@@ -8,7 +8,9 @@ function supabaseServer(cookieStore: any) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !anonKey) throw new Error("Missing Supabase env vars.");
+  if (!url || !anonKey) {
+    throw new Error("Missing Supabase env vars.");
+  }
 
   return createServerClient(url, anonKey, {
     cookies: {
@@ -33,5 +35,8 @@ export async function getMeetRosterAthleteIds(programId: string, meetId: string)
 
   if (error) throw error;
 
-  return (data ?? []).map((r: any) => String(r.athlete_id));
+  const ids = (data ?? []).map((r: any) => r.athlete_id).filter(Boolean);
+
+  // Hard de-dupe for stability (DB may already contain duplicates).
+  return Array.from(new Set(ids));
 }

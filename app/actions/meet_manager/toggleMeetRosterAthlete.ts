@@ -2,13 +2,16 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createServerClient } from "@supabase/ssr";
 
 function supabaseServer(cookieStore: any) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !anonKey) throw new Error("Missing Supabase env vars.");
+  if (!url || !anonKey) {
+    throw new Error("Missing Supabase env vars.");
+  }
 
   return createServerClient(url, anonKey, {
     cookies: {
@@ -26,37 +29,48 @@ export async function toggleMeetRosterAthlete(
   meetId: string,
   athleteId: string,
   include: boolean
-) {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const cookieStore = (await cookies()) as any;
   const supabase = supabaseServer(cookieStore);
 
-  if (include) {
-    // meet_rosters is a header table (meet_id, program_id unique). Ensure it exists.
-    // Do not set roster_state here (avoid guessing enum values); rely on table default.
-    const { error: upsertErr } = await supabase.from("meet_rosters").upsert(
-      {
-        meet_id: meetId,
-        program_id: programId,
-      },
-      { onConflict: "meet_id,program_id" }
-    );
-    if (upsertErr) throw upsertErr;
+  if (!programId || !meetId || !athleteId) {
+    return { ok: false, error: "Missing required identifiers." };
+  }
 
-    const { error } = await supabase.from("meet_roster_athletes").insert({
-      meet_id: meetId,
-      program_id: programId,
-      athlete_id: athleteId,
-      attendance_state: "attending",
-    });
-    if (error) throw error;
+  if (include) {
+    // Idempotent add: prevent duplicates even without a DB-level uniqueness constraint.
+    const { data: existing, error: existingErr } = await supabase
+      .from("meet_roster_athletes")
+      .select("id")
+      .eq("program_id", programId)
+      .eq("meet_id", meetId)
+      .eq("athlete_id", athleteId)
+      .limit(1);
+
+    if (existingErr) return { ok: false, error: existingErr.message };
+
+    if (!existing || existing.length === 0) {
+      const { error: insErr } = await supabase.from("meet_roster_athletes").insert({
+        program_id: programId,
+        meet_id: meetId,
+        athlete_id: athleteId,
+        attendance_state: "attending",
+      });
+
+      if (insErr) return { ok: false, error: insErr.message };
+    }
   } else {
-    const { error } = await supabase
+    // Idempotent remove: delete any accidental duplicates.
+    const { error: delErr } = await supabase
       .from("meet_roster_athletes")
       .delete()
-      .eq("meet_id", meetId)
       .eq("program_id", programId)
+      .eq("meet_id", meetId)
       .eq("athlete_id", athleteId);
 
-    if (error) throw error;
+    if (delErr) return { ok: false, error: delErr.message };
   }
+
+  revalidatePath(`/programs/${programId}/meets/builder`);
+  return { ok: true };
 }

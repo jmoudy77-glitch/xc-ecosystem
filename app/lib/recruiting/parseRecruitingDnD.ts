@@ -2,9 +2,20 @@
 
 import { isRecruitDiscoveryDnDPayload, type RecruitDiscoveryDnDPayload } from "@/app/lib/recruiting/portalDnD";
 
+type RecruitStabilizationDnDPayload = {
+  kind: "recruit_stabilization_candidate";
+  programId: string;
+  athleteId: string;
+  displayName: string;
+  eventGroup: string | null;
+  gradYear: number | null;
+  originKey: "surfaced" | "favorites";
+  originMeta: Record<string, unknown>;
+};
+
 export function parseRecruitingDnDPayload(
   e: DragEvent | React.DragEvent
-): RecruitDiscoveryDnDPayload | null {
+): RecruitDiscoveryDnDPayload | RecruitStabilizationDnDPayload | null {
   const dt = (e as any)?.dataTransfer;
   if (!dt) return null;
 
@@ -18,6 +29,7 @@ export function parseRecruitingDnDPayload(
   try {
     const parsed = JSON.parse(raw);
     if (isRecruitDiscoveryDnDPayload(parsed)) return parsed;
+    if (parsed?.kind === "recruit_stabilization_candidate") return parsed as RecruitStabilizationDnDPayload;
     return null;
   } catch {
     return null;

@@ -9,16 +9,7 @@ export function RecruitingSurfacedPanel({ children }: { children?: React.ReactNo
         <div className="text-sm font-medium">Surfaced</div>
         <div className="text-xs text-muted-foreground">Engine-curated candidates (read-only)</div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3">
-        {children ?? (
-          <div className="rounded-md border bg-muted/20 px-3 py-3">
-            <div className="text-sm font-medium">Not wired yet</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              This panel will be populated by the Recruiting M1 surfaced cohort.
-            </div>
-          </div>
-        )}
-      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-3">{children}</div>
     </section>
   );
 }

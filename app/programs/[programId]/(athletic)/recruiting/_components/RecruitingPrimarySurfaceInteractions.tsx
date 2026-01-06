@@ -39,7 +39,7 @@ export function SlotDropZone({ slot, onDropAthlete }: Props) {
 
     // 2) Discovery Portal candidate payload (new)
     const discovery = parseRecruitingDnDPayload(e);
-    if (!discovery) return;
+    if (!discovery || discovery.kind !== "recruit_discovery_candidate") return;
 
     if ((discovery.eventGroup ?? null) !== (slot.eventGroupKey ?? null)) return;
 

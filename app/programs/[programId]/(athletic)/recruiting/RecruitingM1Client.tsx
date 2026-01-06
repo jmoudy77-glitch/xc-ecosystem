@@ -7,6 +7,8 @@ import { RecruitingPrimarySurfaceWired } from "./_components/RecruitingPrimarySu
 import type { RecruitingEventGroupRow } from "./_components/types";
 import { RecruitingSurfacedPanel } from "./RecruitingSurfacedPanel";
 import { RecruitingFavoritesPanel } from "./RecruitingFavoritesPanel";
+import { RecruitingSurfacedPanelClient } from "./RecruitingSurfacedPanelClient";
+import { RecruitingFavoritesPanelClient } from "./RecruitingFavoritesPanelClient";
 
 type Props = {
   programId: string;
@@ -37,7 +39,9 @@ export default function RecruitingM1Client({ programId }: Props) {
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-4">
       <div className="col-span-12 min-h-0 lg:col-span-3">
-        <RecruitingSurfacedPanel />
+        <RecruitingSurfacedPanel>
+          <RecruitingSurfacedPanelClient programId={programId} />
+        </RecruitingSurfacedPanel>
       </div>
 
       <div className="col-span-12 min-h-0 lg:col-span-6">
@@ -45,7 +49,9 @@ export default function RecruitingM1Client({ programId }: Props) {
       </div>
 
       <div className="col-span-12 min-h-0 lg:col-span-3">
-        <RecruitingFavoritesPanel />
+        <RecruitingFavoritesPanel>
+          <RecruitingFavoritesPanelClient programId={programId} />
+        </RecruitingFavoritesPanel>
       </div>
     </div>
   );

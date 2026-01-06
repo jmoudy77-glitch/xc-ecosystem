@@ -29,6 +29,37 @@ function supabaseServer(cookieStore: any) {
   });
 }
 
+type RawRow = {
+  athlete_id: string;
+  relationship_type?: string | null;
+  archived_at?: string | null;
+  athlete?: { id: string; first_name: string; last_name: string } | null;
+};
+
+function collapse(rows: RawRow[]): BuildAthlete[] {
+  const byAthleteId = new Map<string, BuildAthlete>();
+
+  for (const r of rows) {
+    const a = (r as any)?.athlete;
+    const athleteId = a?.id as string | undefined;
+    const firstName = a?.first_name as string | undefined;
+    const lastName = a?.last_name as string | undefined;
+
+    if (!athleteId || !firstName || !lastName) continue;
+    if (!byAthleteId.has(athleteId)) {
+      byAthleteId.set(athleteId, { athleteId, firstName, lastName });
+    }
+  }
+
+  const athletes = Array.from(byAthleteId.values());
+  athletes.sort((a, b) => {
+    const ln = a.lastName.localeCompare(b.lastName);
+    if (ln !== 0) return ln;
+    return a.firstName.localeCompare(b.firstName);
+  });
+  return athletes;
+}
+
 export async function getProgramAthletesForBuild(programId: string): Promise<BuildAthlete[]> {
   const cookieStore = (await cookies()) as any;
   const supabase = supabaseServer(cookieStore);
@@ -36,55 +67,45 @@ export async function getProgramAthletesForBuild(programId: string): Promise<Bui
   // athletes table does NOT have program_id.
   // Program membership is represented via program_athletes (program_id, athlete_id).
   //
-  // Build requires a canonical, non-duplicated athlete set.
-  // We enforce this by:
-  // - excluding archived program_athletes rows
-  // - limiting to relationship types that represent an active roster candidate set
-  // - de-duping by athlete_id (stable client-side collapse)
-  const { data, error } = await supabase
-    .from("program_athletes")
-    .select(
-      `
-      athlete_id,
-      relationship_type,
-      archived_at,
-      athlete:athlete_id (
-        id,
-        first_name,
-        last_name
-      )
-    `
+  // We must return a canonical, de-duped athlete set suitable for Build.
+  // However, relationship_type values vary across environments/data.
+  // Strategy:
+  //  1) Prefer active rows that are "returning" or "recruit"
+  //  2) If that yields zero rows, fall back to ALL active rows (archived_at IS NULL)
+  const baseSelect = `
+    athlete_id,
+    relationship_type,
+    archived_at,
+    athlete:athlete_id (
+      id,
+      first_name,
+      last_name
     )
+  `;
+
+  const preferred = await supabase
+    .from("program_athletes")
+    .select(baseSelect)
     .eq("program_id", programId)
     .is("archived_at", null)
     .in("relationship_type", ["returning", "recruit"]);
 
-  if (error) throw error;
+  if (preferred.error) throw preferred.error;
 
-  const rows = (data ?? []) as any[];
+  const preferredRows = (preferred.data ?? []) as RawRow[];
 
-  const byAthleteId = new Map<string, BuildAthlete>();
-
-  for (const r of rows) {
-    const a = r?.athlete;
-    const athleteId = a?.id as string | undefined;
-    const firstName = a?.first_name as string | undefined;
-    const lastName = a?.last_name as string | undefined;
-
-    if (!athleteId || !firstName || !lastName) continue;
-
-    if (!byAthleteId.has(athleteId)) {
-      byAthleteId.set(athleteId, { athleteId, firstName, lastName });
-    }
+  if (preferredRows.length > 0) {
+    return collapse(preferredRows);
   }
 
-  const athletes = Array.from(byAthleteId.values());
+  const fallback = await supabase
+    .from("program_athletes")
+    .select(baseSelect)
+    .eq("program_id", programId)
+    .is("archived_at", null);
 
-  athletes.sort((a, b) => {
-    const ln = a.lastName.localeCompare(b.lastName);
-    if (ln !== 0) return ln;
-    return a.firstName.localeCompare(b.firstName);
-  });
+  if (fallback.error) throw fallback.error;
 
-  return athletes;
+  const fallbackRows = (fallback.data ?? []) as RawRow[];
+  return collapse(fallbackRows);
 }

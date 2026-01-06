@@ -127,7 +127,7 @@ function EventGroupRow({
 
       </div>
 
-      <div className="mt-3 flex flex-wrap items-start gap-3">
+      <div className="mt-3 flex flex-wrap items-start justify-start gap-3">
         {row.slots.map((slot) => (
           <div key={slot.slotId} className="shrink-0">
             <SlotCard

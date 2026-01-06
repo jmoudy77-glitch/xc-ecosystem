@@ -50,7 +50,7 @@ export function RecruitingPrimarySurfaceSkeleton({
         <div>
           <h2 className="text-sm font-semibold text-slate-100">Recruiting</h2>
           <p className="mt-1 text-[11px] text-muted">
-            Primary surface: click slot to expand. Left-click athlete for modal. Right-click athlete to set PRIMARY.
+            Primary surface: click primary avatar to expand. Left-click athlete for modal. Right-click athlete to set PRIMARY.
           </p>
         </div>
 
@@ -128,66 +128,45 @@ function EventGroupRow({
         <div className="text-[10px] text-muted">Expansion is horizontal; other rows do not reflow.</div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <div className="grid gap-3">
-          {row.slots.map((slot) => (
-            <SlotCard
-              key={slot.slotId}
-              slot={slot}
-              isExpanded={!!expandedSlot && expandedSlot.slotId === slot.slotId}
-              onToggleExpand={() => onToggleExpand(row.eventGroupKey, slot.slotId)}
-              onOpenAthlete={onOpenAthlete}
-              renderDropZone={renderDropZone}
-            />
-          ))}
-        </div>
-
-        <div className="hidden lg:block">
-          {expandedSlot ? (
-            <ExpandedSlotPanel
-              programId={programId}
-              row={row}
-              slot={expandedSlot}
-              onOpenAthlete={onOpenAthlete}
-              onSetPrimary={onSetPrimary}
-              onRemoveAthlete={onRemoveAthlete}
-            />
-          ) : (
-            <div className="rounded-xl border border-subtle bg-surface p-4">
-              <div className="text-xs font-semibold text-slate-100">Slot details</div>
-              <div className="mt-1 text-[11px] text-muted">Click primary avatar to expand (no hover semantics).</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {expandedSlot ? (
-        <div className="lg:hidden">
-          <ExpandedSlotPanel
+      <div className="grid gap-3">
+        {row.slots.map((slot) => (
+          <SlotCard
+            key={slot.slotId}
             programId={programId}
-            row={row}
-            slot={expandedSlot}
+            eventGroupKey={row.eventGroupKey}
+            slot={slot}
+            isExpanded={!!expandedSlot && expandedSlot.slotId === slot.slotId}
+            onToggleExpand={() => onToggleExpand(row.eventGroupKey, slot.slotId)}
             onOpenAthlete={onOpenAthlete}
             onSetPrimary={onSetPrimary}
             onRemoveAthlete={onRemoveAthlete}
+            renderDropZone={renderDropZone}
           />
-        </div>
-      ) : null}
+        ))}
+      </div>
     </section>
   );
 }
 
 function SlotCard({
+  programId,
+  eventGroupKey,
   slot,
   isExpanded,
   onToggleExpand,
   onOpenAthlete,
+  onSetPrimary,
+  onRemoveAthlete,
   renderDropZone,
 }: {
+  programId: string;
+  eventGroupKey: string;
   slot: RecruitingSlot;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
+  onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 }) {
   const total = slot.athleteIds.length;
@@ -254,21 +233,32 @@ function SlotCard({
           <PresenceMeter primary={primary} />
         </div>
       </div>
+
+      {isExpanded ? (
+        <ExpandedSlotOverlay
+          programId={programId}
+          slot={slot}
+          eventGroupKey={eventGroupKey}
+          onOpenAthlete={onOpenAthlete}
+          onSetPrimary={onSetPrimary}
+          onRemoveAthlete={onRemoveAthlete}
+        />
+      ) : null}
     </div>
   );
 }
 
-function ExpandedSlotPanel({
+function ExpandedSlotOverlay({
   programId,
-  row,
   slot,
+  eventGroupKey,
   onOpenAthlete,
   onSetPrimary,
   onRemoveAthlete,
 }: {
   programId: string;
-  row: RecruitingEventGroupRow;
   slot: RecruitingSlot;
+  eventGroupKey: string;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
@@ -277,19 +267,21 @@ function ExpandedSlotPanel({
   const requiresSelection = slot.primaryAthleteId === null && slot.athleteIds.length >= 2;
 
   return (
-    <div className="rounded-xl border border-subtle bg-surface p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold text-slate-100">
-            {row.label} • Slot <span className="font-mono text-slate-300">{slot.slotId}</span>
-          </div>
-          <div className="mt-1 text-[11px] text-muted">
-            Left-click athlete for modal. Right-click athlete to set PRIMARY.
-          </div>
+    <div
+      className={[
+        "absolute z-50",
+        "left-1/2 -translate-x-1/2 bottom-full mb-3",
+        "w-[min(92vw,720px)]",
+        "rounded-xl border border-subtle bg-slate-950/80 backdrop-blur",
+        "shadow-xl",
+      ].join(" ")}
+    >
+      <div className="flex items-center justify-between border-b border-subtle px-3 py-2">
+        <div className="text-xs font-semibold text-slate-100">
+          Slot <span className="font-mono text-slate-300">{slot.slotId}</span> • Expanded
         </div>
-
-        <div className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
-          {slot.athleteIds.length}/{RECRUITING_UI.slotMaxOccupancy}
+        <div className="text-[10px] text-muted">
+          Left-click athlete for modal · Right-click athlete to set PRIMARY
         </div>
       </div>
 
@@ -299,48 +291,51 @@ function ExpandedSlotPanel({
         </div>
       ) : null}
 
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 flex gap-4 overflow-x-auto px-3 pb-3">
         {athletes.length === 0 ? (
           <div className="text-[11px] text-muted">No athletes in slot.</div>
         ) : (
           athletes.map((a) => {
             const isPrimary = slot.primaryAthleteId === a.athleteId;
             return (
-              <DraggableAthleteChip
-                key={a.athleteId}
-                athlete={a}
-                eventGroupKey={row.eventGroupKey}
-                isPrimary={isPrimary}
-                onOpen={() => onOpenAthlete(a)}
-                onSetPrimary={() => onSetPrimary(row.eventGroupKey, slot.slotId, a.athleteId)}
-              />
+              <div key={a.athleteId} className="shrink-0">
+                <DraggableAthleteChip
+                  athlete={a}
+                  eventGroupKey={eventGroupKey}
+                  isPrimary={isPrimary}
+                  onOpen={() => onOpenAthlete(a)}
+                  onSetPrimary={() => onSetPrimary(eventGroupKey, slot.slotId, a.athleteId)}
+                />
+              </div>
             );
           })
         )}
       </div>
 
-      <SlotRemoveDropZone
-        slot={slot}
-        disabled={slot.athleteIds.some((id) => slot.athletesById[id]?.type === "returning")}
-        disabledReason="Returning athletes cannot be removed via Recruiting"
-        onRemoveAthlete={(athleteId) => {
-          // Perform origin-aware restoration (Discovery Portal lists) before M1 removes.
-          const entry = readOriginRegistryEntry(programId, athleteId);
-          if (entry) {
-            if (entry.originKey === "favorites") {
-              addToFavoritesIfMissing(programId, entry.candidate);
+      <div className="px-3 pb-3">
+        <SlotRemoveDropZone
+          slot={slot}
+          disabled={slot.athleteIds.some((id) => slot.athletesById[id]?.type === "returning")}
+          disabledReason="Returning athletes cannot be removed via Recruiting"
+          onRemoveAthlete={(athleteId) => {
+            // Perform origin-aware restoration (Discovery Portal lists) before M1 removes.
+            const entry = readOriginRegistryEntry(programId, athleteId);
+            if (entry) {
+              if (entry.originKey === "favorites") {
+                addToFavoritesIfMissing(programId, entry.candidate);
+              } else {
+                unhideSurfacedCandidate(programId, athleteId);
+              }
+              clearOriginRegistryEntry(programId, athleteId);
             } else {
+              // Safe default: if we don't know origin, unhide surfaced.
               unhideSurfacedCandidate(programId, athleteId);
             }
-            clearOriginRegistryEntry(programId, athleteId);
-          } else {
-            // Safe default: if we don't know origin, unhide surfaced.
-            unhideSurfacedCandidate(programId, athleteId);
-          }
 
-          onRemoveAthlete(row.eventGroupKey, slot.slotId, athleteId);
-        }}
-      />
+            onRemoveAthlete(eventGroupKey, slot.slotId, athleteId);
+          }}
+        />
+      </div>
     </div>
   );
 }

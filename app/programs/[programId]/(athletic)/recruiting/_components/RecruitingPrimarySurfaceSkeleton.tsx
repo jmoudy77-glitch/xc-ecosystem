@@ -171,6 +171,8 @@ function SlotCard({
 }) {
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
+  // LOCK: SlotCard width flexes to avatar + p-3 padding (12px each side).
+  const cardWidthPx = RECRUITING_UI.avatar.sizePx + 24;
 
   const getEventsLabel = (a: any): string | null => {
     if (!a) return null;
@@ -203,10 +205,11 @@ function SlotCard({
 
       <div
         className={[
-          "w-[220px] max-w-full text-left",
+          "text-left",
           "rounded-xl bg-surface p-3",
           isExpanded ? "bg-surface/90" : "bg-surface",
         ].join(" ")}
+        style={{ width: cardWidthPx }}
       >
         {/* Slot header intentionally removed per locked contract */}
 
@@ -223,11 +226,11 @@ function SlotCard({
               <PrimaryAvatar primary={primary} totalInSlot={total} />
             </button>
             <div className="mt-2 text-center">
-              <div className="max-w-[9rem] truncate text-sm font-medium text-slate-100">
+              <div className="whitespace-normal break-words text-sm font-medium leading-tight text-slate-100">
                 {primary?.displayName ?? "Open slot"}
               </div>
               {primary ? (
-                <div className="mt-0.5 max-w-[9rem] truncate text-xs text-muted">
+                <div className="mt-0.5 whitespace-normal break-words text-xs leading-snug text-muted">
                   {getEventsLabel(primary) ?? ""}
                 </div>
               ) : null}

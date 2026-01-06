@@ -1,103 +1,82 @@
 /* File: app/programs/[programId]/meets/page.tsx */
 import { WorkflowHeader } from "@/app/components/meet_manager/WorkflowHeader";
+import { CreateMeetFormClient } from "@/app/components/meet_manager/CreateMeetFormClient";
 
 type PageProps = {
   params: Promise<{ programId: string }>;
+  searchParams?: Promise<{ tab?: string }>;
 };
 
-export default async function ProgramMeetsPage({ params }: PageProps) {
+export default async function MeetsInitiateLandingPage({ params, searchParams }: PageProps) {
   const { programId } = await params;
+  const sp = (await searchParams) ?? {};
+  const tab = (sp.tab ?? "create") as "create" | "join";
 
   return (
     <div className="px-6 py-6">
       <WorkflowHeader programId={programId} current="initiate" />
 
-      <div className="grid grid-cols-12 gap-4">
-        {/* LEFT RAIL — Investigate only */}
-        <aside className="col-span-12 md:col-span-4">
-          <div className="space-y-3">
-            <InvestigatePanel title="Join Requests" count={0} />
-            <InvestigatePanel title="Roster Issues" count={0} />
-            <InvestigatePanel title="Ops Tokens" count={0} />
-            <InvestigatePanel title="Results Flags" count={0} />
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_2fr]">
+        {/* Left column: triage / guidance */}
+        <div className="rounded-md border p-4">
+          <h1 className="text-lg font-semibold">Meet Manager</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Initiate sets the meet context. Build, Compete, and Review operate on that context.
+          </p>
+
+          <div className="mt-4 rounded-md border p-3">
+            <div className="text-sm font-semibold">Workflow</div>
+            <div className="mt-1 text-sm text-muted-foreground">Initiate → Build → Compete → Review</div>
           </div>
-        </aside>
-
-        {/* RIGHT PANEL — Create | Join */}
-        <main className="col-span-12 md:col-span-8">
-          <div className="rounded-md border">
-            <div className="flex border-b">
-              <Tab label="Create" active />
-              <Tab label="Join" />
-            </div>
-
-            <div className="p-4">
-              {/* CREATE STUB */}
-              <div>
-                <h2 className="text-sm font-medium">Create a new meet</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Meet creation form will appear here. Date selection will surface
-                  conflicts within 100 miles.
-                </p>
-              </div>
-
-              <div className="my-6 h-px bg-border" />
-
-              {/* JOIN STUB */}
-              <div>
-                <h2 className="text-sm font-medium">Join an existing meet</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Map-based discovery with date and radius filters will appear here.
-                </p>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function Tab({ label, active = false }: { label: string; active?: boolean }) {
-  return (
-    <div
-      className={[
-        "px-4 py-2 text-sm",
-        active
-          ? "border-b-2 border-foreground font-medium"
-          : "text-muted-foreground",
-      ].join(" ")}
-    >
-      {label}
-    </div>
-  );
-}
-
-function InvestigatePanel({
-  title,
-  count,
-}: {
-  title: string;
-  count: number;
-}) {
-  const hasItems = count > 0;
-  return (
-    <div className="rounded-md border p-3">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">{title}</div>
-        <div
-          className={[
-            "rounded-full px-2 py-0.5 text-xs",
-            hasItems ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground",
-          ].join(" ")}
-        >
-          {count}
         </div>
-      </div>
-      <div className="mt-2 text-xs text-muted-foreground">
-        {hasItems
-          ? "Action required."
-          : "No outstanding items."}
+
+        {/* Right column: Create / Join */}
+        <div className="rounded-md border p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Initiate</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                Create a new meet or join an existing meet.
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <a
+                href={`/programs/${programId}/meets?tab=create`}
+                aria-disabled={tab === "create"}
+                className={[
+                  "h-9 rounded-md px-3 text-sm inline-flex items-center border",
+                  tab === "create" ? "bg-muted text-foreground pointer-events-none" : "bg-background hover:bg-muted",
+                ].join(" ")}
+              >
+                Create
+              </a>
+              <a
+                href={`/programs/${programId}/meets?tab=join`}
+                aria-disabled={tab === "join"}
+                className={[
+                  "h-9 rounded-md px-3 text-sm inline-flex items-center border",
+                  tab === "join" ? "bg-muted text-foreground pointer-events-none" : "bg-background hover:bg-muted",
+                ].join(" ")}
+              >
+                Join
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {tab === "create" ? (
+              <CreateMeetFormClient programId={programId} />
+            ) : (
+              <div className="rounded-md border p-4">
+                <h2 className="text-base font-semibold">Join an existing meet</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Join flow is not implemented yet. This panel will become the date/radius map filter surface.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

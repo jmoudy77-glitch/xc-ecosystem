@@ -136,6 +136,7 @@ function EventGroupRow({
               slot={slot}
               isExpanded={!!expandedSlot && expandedSlot.slotId === slot.slotId}
               onToggleExpand={() => onToggleExpand(row.eventGroupKey, slot.slotId)}
+              onOpenAthlete={onOpenAthlete}
               renderDropZone={renderDropZone}
             />
           ))}
@@ -154,7 +155,7 @@ function EventGroupRow({
           ) : (
             <div className="rounded-xl border border-subtle bg-surface p-4">
               <div className="text-xs font-semibold text-slate-100">Slot details</div>
-              <div className="mt-1 text-[11px] text-muted">Click a slot to expand (no hover semantics).</div>
+              <div className="mt-1 text-[11px] text-muted">Click primary avatar to expand (no hover semantics).</div>
             </div>
           )}
         </div>
@@ -180,29 +181,37 @@ function SlotCard({
   slot,
   isExpanded,
   onToggleExpand,
+  onOpenAthlete,
   renderDropZone,
 }: {
   slot: RecruitingSlot;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 }) {
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
 
+  const onPrimaryAvatarClick = () => {
+    if (!primary) return;
+    if (total <= 1) {
+      onOpenAthlete(primary);
+      return;
+    }
+    onToggleExpand();
+  };
+
   return (
     <div className="relative">
       {renderDropZone ? <div className="absolute inset-0 z-10">{renderDropZone(slot)}</div> : null}
 
-      <button
-        type="button"
-        onClick={onToggleExpand}
+      <div
         className={[
           "w-full text-left",
-          "rounded-xl border bg-surface p-4 transition",
+          "rounded-xl border bg-surface p-4",
           isExpanded ? "border-slate-200/30" : "border-subtle",
         ].join(" ")}
-        aria-expanded={isExpanded}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -219,7 +228,19 @@ function SlotCard({
 
         <div className="mt-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <PrimaryAvatar primary={primary} totalInSlot={total} />
+            <button
+              type="button"
+              className="rounded-full"
+              onClick={onPrimaryAvatarClick}
+              aria-label={primary ? `Open ${primary.displayName}` : "Primary slot"}
+              title={
+                total <= 1
+                  ? "Open athlete"
+                  : "Expand slot"
+              }
+            >
+              <PrimaryAvatar primary={primary} totalInSlot={total} />
+            </button>
             <div className="min-w-0">
               <div className="truncate text-xs font-semibold text-slate-100">
                 {primary?.displayName ?? "Open slot"}
@@ -232,7 +253,7 @@ function SlotCard({
 
           <PresenceMeter primary={primary} />
         </div>
-      </button>
+      </div>
     </div>
   );
 }

@@ -125,7 +125,6 @@ function EventGroupRow({
           </span>
         </div>
 
-        <div className="text-[10px] text-muted">Expansion is horizontal; other rows do not reflow.</div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-start gap-3">
@@ -206,32 +205,27 @@ function SlotCard({
           <div className="text-[10px] text-muted">{slot.primaryAthleteId ? "PRIMARY set" : "PRIMARY empty"}</div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="mt-4 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center">
+            <PresenceMeter primary={primary} />
             <button
               type="button"
-              className="rounded-full"
+              className="mt-2 rounded-full"
               onClick={onPrimaryAvatarClick}
               aria-label={primary ? `Open ${primary.displayName}` : "Primary slot"}
-              title={
-                total <= 1
-                  ? "Open athlete"
-                  : "Expand slot"
-              }
+              title={primary ? (total <= 1 ? "Open athlete" : "Expand slot") : undefined}
             >
               <PrimaryAvatar primary={primary} totalInSlot={total} />
             </button>
-            <div className="min-w-0">
-              <div className="truncate text-xs font-semibold text-slate-100">
+            <div className="mt-2 text-center">
+              <div className="max-w-[9rem] truncate text-sm font-medium text-slate-100">
                 {primary?.displayName ?? "Open slot"}
               </div>
-              <div className="mt-0.5 text-[11px] text-muted">
-                {primary ? `PRIMARY • ${primary.type}` : "Drop into empty slot → PRIMARY (locked behavior)"}
+              <div className="mt-0.5 max-w-[9rem] truncate text-xs text-muted">
+                {eventGroupKey}
               </div>
             </div>
           </div>
-
-          <PresenceMeter primary={primary} />
         </div>
       </div>
 
@@ -392,27 +386,16 @@ function PrimaryAvatar({
 }
 
 function PresenceMeter({ primary }: { primary: RecruitingAthleteSummary | null }) {
-  if (!primary) {
-    return <div className="text-[10px] text-muted">Meter renders only on PRIMARY (locked behavior)</div>;
-  }
+  // LOCK: meter is always present but dormant when there is no primary; no instructional copy.
+  if (!primary) return <div className="h-1.5 w-16 rounded-full bg-slate-200/5" />;
 
   const fillPct = primary.type === "recruit" ? 0 : 58;
 
   return (
     <div className="flex items-center gap-2">
-      <div
-        className="overflow-hidden rounded-full border border-subtle bg-slate-900"
-        style={{
-          width: RECRUITING_UI.meter.widthPx,
-          height: RECRUITING_UI.meter.heightPx,
-          borderRadius: RECRUITING_UI.meter.radiusPx,
-        }}
-        aria-label="Slot presence meter"
-        title="Historical contribution to event group (athlete-based)."
-      >
+      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200/10" aria-label="Slot presence meter">
         <div className="h-full bg-slate-100/70" style={{ width: `${fillPct}%` }} />
       </div>
-      <span className="text-[10px] text-muted">{fillPct}%</span>
     </div>
   );
 }

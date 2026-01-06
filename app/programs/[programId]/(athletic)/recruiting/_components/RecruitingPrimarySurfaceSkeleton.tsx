@@ -203,27 +203,14 @@ function SlotCard({
 
       <div
         className={[
-          "w-[280px] max-w-full text-left",
-          "rounded-xl border bg-surface p-4",
-          isExpanded ? "border-slate-200/30" : "border-subtle",
+          "w-[220px] max-w-full text-left",
+          "rounded-xl bg-surface p-3",
+          isExpanded ? "bg-surface/90" : "bg-surface",
         ].join(" ")}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="text-[10px] font-medium text-slate-200/80">
-              Slot <span className="font-mono text-slate-300">{slot.slotId}</span>
-            </div>
-            <span className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
-              {total}/{RECRUITING_UI.slotMaxOccupancy}
-            </span>
-          </div>
+        {/* Slot header intentionally removed per locked contract */}
 
-          {slot.primaryAthleteId ? (
-            <div className="text-[10px] text-slate-200/60">PRIMARY</div>
-          ) : null}
-        </div>
-
-        <div className="mt-4 flex items-center justify-center">
+        <div className="mt-2 flex items-center justify-center">
           <div className="flex flex-col items-center justify-center">
             <PresenceMeter primary={primary} />
             <button
@@ -241,7 +228,7 @@ function SlotCard({
               </div>
               {primary ? (
                 <div className="mt-0.5 max-w-[9rem] truncate text-xs text-muted">
-                  {getEventsLabel(primary) ?? "—"}
+                  {getEventsLabel(primary) ?? ""}
                 </div>
               ) : null}
             </div>

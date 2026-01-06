@@ -45,7 +45,7 @@ export function RecruitingPrimarySurfaceSkeleton({
   renderDropZone,
 }: Props) {
   return (
-    <div className="space-y-5">
+    <div className="w-full space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-100">Recruiting</h2>
@@ -59,7 +59,7 @@ export function RecruitingPrimarySurfaceSkeleton({
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="w-full space-y-6">
         {rows.length === 0 ? (
           <EmptyState />
         ) : (

@@ -10,7 +10,7 @@ type PageProps = {
 export default async function RecruitingPage({ params }: PageProps) {
   const { programId } = await params;
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6">
+    <main className="mx-auto w-full max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm text-muted-foreground">Recruiting</div>

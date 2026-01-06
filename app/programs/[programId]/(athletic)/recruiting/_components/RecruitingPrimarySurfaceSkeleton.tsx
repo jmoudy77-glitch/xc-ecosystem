@@ -44,14 +44,12 @@ export function RecruitingPrimarySurfaceSkeleton({
   onRemoveAthlete,
   renderDropZone,
 }: Props) {
+  const isDev = process.env.NODE_ENV !== "production";
   return (
     <div className="w-full space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-100">Recruiting</h2>
-          <p className="mt-1 text-[11px] text-muted">
-            Primary surface: click primary avatar to expand. Left-click athlete for modal. Right-click athlete to set PRIMARY.
-          </p>
         </div>
 
         <div className="hidden text-right text-[11px] text-muted sm:block">
@@ -110,6 +108,7 @@ function EventGroupRow({
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 }) {
+  const isDev = process.env.NODE_ENV !== "production";
   const expandedSlot =
     expanded?.eventGroupKey === row.eventGroupKey
       ? row.slots.find((s) => s.slotId === expanded.slotId) ?? null
@@ -120,9 +119,11 @@ function EventGroupRow({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-100">{row.label}</span>
-          <span className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
-            {row.slots.length} slots
-          </span>
+          {isDev ? (
+            <span className="rounded-full border border-subtle px-2 py-0.5 text-[10px] text-muted">
+              {row.slots.length} slots
+            </span>
+          ) : null}
         </div>
 
       </div>

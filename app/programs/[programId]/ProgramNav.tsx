@@ -559,8 +559,6 @@ const PROGRAM_NAV_GROUPS: ProgramNavGroup[] = [
         id: "meets",
         label: "Meets",
         href: (ctx) => `/programs/${ctx.programId}/meets`,
-        disabled: true,
-        badge: "Coming Soon",
         order: 10,
       },
     ],

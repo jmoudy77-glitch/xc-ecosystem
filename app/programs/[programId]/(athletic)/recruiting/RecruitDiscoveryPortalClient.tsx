@@ -408,6 +408,12 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     return inFav ?? inSurfaced;
   }, [favorites, surfaced, selectedId]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    const stillExists = surfaced.some((c) => c.id === selectedId) || favorites.some((c) => c.id === selectedId);
+    if (!stillExists) setSelectedId(null);
+  }, [favorites, selectedId, surfaced]);
+
   return (
     <div className="h-full w-full p-3 min-h-0">
       <div
@@ -691,7 +697,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         disabled={isFav(c.id)}
                         title={isFav(c.id) ? "Already in Favorites" : "Add to Favorites"}
                       >
-                        {isFav(c.id) ? "Favorited" : "Favorite"}
+                        {isFav(c.id) ? "Added" : "Add"}
                       </button>
                     </div>
                   </li>

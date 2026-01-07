@@ -815,7 +815,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                             {c.displayName}
                           </div>
                           <div className="mt-0.5 text-[11px] text-muted truncate">
-                            {c.eventGroup ?? \"—\"} <span className="text-subtle">·</span> {c.gradYear ?? \"—\"}
+                            {c.eventGroup ?? "—"} <span className="text-subtle">·</span> {c.gradYear ?? "—"}
                           </div>
                           {cues.length > 0 ? (
                             <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -1024,33 +1024,44 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         </section>
 
         {/* Athlete profile panel (middle, 40%, 80% height) */}
-        <section className="col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel min-h-0 overflow-hidden">
-          <div className="relative h-full min-h-0">
+        <section className="col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
+          <div className="border-b border-subtle px-3 py-3">
+            <div className="text-sm font-semibold">Athlete</div>
+            <div className="text-[11px] text-muted">
+              {selected ? "Profile preview (non-contextual)." : "Select an athlete to view their profile."}
+            </div>
+          </div>
+
+          <div className="relative flex-1 min-h-0">
             <div className="absolute right-3 top-3 z-10">
               <button
                 type="button"
-                className="glass-pill glass-pill--brand-soft inline-flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] disabled:opacity-60"
+                className="glass-pill glass-pill--brand-soft inline-flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
                 disabled={!selected}
                 onClick={() => {
                   if (!selected) return;
                   if (isFav(selected.id)) removeFavorite(selected.id);
                   else addFavorite(selected);
                 }}
-                aria-label={selected && isFav(selected.id) ? "Remove from favorites" : "Add to favorites"}
+                aria-label={
+                  selected && isFav(selected.id) ? "Remove from favorites" : "Add to favorites"
+                }
                 title={selected && isFav(selected.id) ? "Remove from favorites" : "Add to favorites"}
               >
-                {selected && isFav(selected.id) ? "♥" : "♡"}
+                <span className="text-sm">{selected && isFav(selected.id) ? "♥" : "♡"}</span>
               </button>
             </div>
 
             <div className="h-full min-h-0 overflow-auto p-3 glass-scrollbar">
               {selected ? (
-                <AthleteProfileClient {...buildAthleteProfileInput(selected)} />
+                <div className="min-w-0">
+                  <AthleteProfileClient {...buildAthleteProfileInput(selected)} />
+                </div>
               ) : (
                 <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
                   <div className="text-sm font-medium">No athlete selected</div>
                   <div className="mt-1 text-[11px] text-muted">
-                    Select an athlete from Results or Favorites to view their profile.
+                    Choose an athlete from Results or Favorites to preview their profile.
                   </div>
                 </div>
               )}

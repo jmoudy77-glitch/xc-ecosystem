@@ -229,6 +229,15 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     }
   };
 
+  const clearSearch = () => {
+    setQ("");
+    setEventGroupFilter("all");
+    setGradYearFilter("all");
+    setSurfaced([]);
+    setHasSearched(false);
+    setSelectedId(null);
+  };
+
   // After the first explicit search, keep results synced to filter changes.
   useEffect(() => {
     if (!hasSearched) return;
@@ -493,25 +502,26 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 </select>
               </div>
 
-              <button
-                type="button"
-                className="h-9 rounded-md border px-3 text-sm hover:bg-muted disabled:opacity-60"
-                onClick={runSearch}
-                disabled={isSearching}
-                title="Search"
-                aria-disabled={isSearching}
-              >
-                {isSearching ? "Searching…" : "Search"}
-              </button>
-
-              <button
-                type="button"
-                className="h-9 rounded-md border px-3 text-sm hover:bg-muted"
-                onClick={resetFilters}
-                title="Reset filters"
-              >
-                Reset
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="h-9 rounded-md border px-3 text-sm hover:bg-muted disabled:opacity-60"
+                  onClick={runSearch}
+                  disabled={isSearching}
+                  title="Search"
+                  aria-disabled={isSearching}
+                >
+                  {isSearching ? "Searching…" : "Search"}
+                </button>
+                <button
+                  type="button"
+                  className="h-9 rounded-md border px-3 text-sm hover:bg-muted"
+                  onClick={clearSearch}
+                  title="Clear search and filters"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
 
             <div className="text-xs text-muted-foreground">{activeFilterSummary}</div>

@@ -825,8 +825,8 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                           aria-hidden="true"
                           className="pointer-events-none absolute inset-0"
                         >
-                          <div className="absolute inset-0 bg-[radial-gradient(900px_140px_at_0%_0%,color-mix(in_oklab,var(--brand)_16%,transparent)_0%,transparent_62%)]" />
-                          <div className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,var(--brand)_22%,transparent)]" />
+                          <div className="absolute inset-0 bg-[radial-gradient(900px_140px_at_0%_0%,color-mix(in_oklab,white_8%,transparent)_0%,transparent_70%)]" />
+                          <div className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,white_12%,transparent)]" />
                         </div>
                       ) : null}
                       <div className="flex items-start justify-between gap-3">
@@ -927,13 +927,13 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
               data-results-rail
               aria-hidden="true"
               className={cn(
-                "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200",
+                "pointer-events-none absolute inset-x-0 top-0 h-14 opacity-0 transition-opacity duration-200",
                 activeList === "results" && "opacity-100"
               )}
             >
-              <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,var(--brand)_28%,transparent)_0%,transparent_60%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,transparent,transparent)]" />
-              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,var(--brand)_24%,transparent)]" />
+              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,white_10%,transparent)]" />
             </div>
             <div className="text-sm font-semibold truncate">Results</div>
             <div className="text-[11px] text-muted">
@@ -1013,8 +1013,8 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                           aria-hidden="true"
                           className="pointer-events-none absolute inset-0"
                         >
-                          <div className="absolute inset-0 bg-[radial-gradient(900px_140px_at_0%_0%,color-mix(in_oklab,var(--brand)_16%,transparent)_0%,transparent_62%)]" />
-                          <div className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,var(--brand)_22%,transparent)]" />
+                          <div className="absolute inset-0 bg-[radial-gradient(900px_140px_at_0%_0%,color-mix(in_oklab,white_8%,transparent)_0%,transparent_70%)]" />
+                          <div className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,white_12%,transparent)]" />
                         </div>
                       ) : null}
                       <div className="flex items-start justify-between gap-3">

@@ -140,9 +140,8 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
     seedAction = async () => {
       "use server";
       const res = await seedMeetEventsForHostedBuild({
-        programId,
-        hostMeetId: selectedMeetId,
-        builderPath: pagePath,
+        meetId: selectedMeetId,
+        buildPathToRevalidate: pagePath,
       });
       if (!res.ok) {
         redirect(
@@ -152,9 +151,9 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
         );
       }
       redirect(
-        `${pagePath}?hostMeetId=${selectedMeetId}&seed=${encodeURIComponent(
-          res.status
-        )}&inserted=${encodeURIComponent(String(res.inserted ?? 0))}`
+        `${pagePath}?hostMeetId=${selectedMeetId}&seed=ok&inserted=${encodeURIComponent(
+          String(res.inserted ?? 0)
+        )}`
       );
     };
 

@@ -125,7 +125,7 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
           <div
             ref={modalRef}
             tabIndex={-1}
-            className="relative flex w-full max-w-6xl flex-col rounded-2xl ring-1 ring-panel panel shadow-elev-2 max-h-[calc(100vh-2rem)] overflow-hidden"
+            className="relative flex w-full max-w-6xl flex-col rounded-2xl ring-1 ring-panel panel-muted shadow-elev-4 max-h-[calc(100vh-2rem)] overflow-hidden"
           >
             {/* Training-like workspace header (breadcrumb + title/subtitle + right meta/actions) */}
             <div className="border-b border-subtle px-5 py-4">
@@ -164,8 +164,10 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <RecruitDiscoveryPortalClient programId={programId} sport={sport} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <div className="p-3">
+                <RecruitDiscoveryPortalClient programId={programId} sport={sport} />
+              </div>
             </div>
           </div>
         </div>

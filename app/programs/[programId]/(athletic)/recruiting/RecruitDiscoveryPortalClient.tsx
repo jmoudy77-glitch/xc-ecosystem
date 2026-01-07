@@ -623,15 +623,20 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   return (
     <div className="h-full w-full p-4 min-h-0">
       <div
-        className="grid h-full min-h-0 gap-3"
-        style={{
-          // Use fr ratios with minmax(0, …) to prevent rounding overflow/clipping.
-          // 30/40/30 => 3fr/4fr/3fr
-          // 20/80 => 1fr/4fr
-          gridTemplateColumns: "minmax(0, 3fr) minmax(0, 4fr) minmax(0, 3fr)",
-          gridTemplateRows: "minmax(0, 1fr) minmax(0, 4fr)",
-        }}
+        data-discovery-tray
+        className="h-full min-h-0 overflow-hidden rounded-2xl ring-1 ring-panel panel-muted shadow-elev-3"
       >
+        <div className="h-full min-h-0 p-3">
+          <div
+            className="grid h-full min-h-0 gap-3"
+            style={{
+              // Use fr ratios with minmax(0, …) to prevent rounding overflow/clipping.
+              // 30/40/30 => 3fr/4fr/3fr
+              // 20/80 => 1fr/4fr
+              gridTemplateColumns: "minmax(0, 3fr) minmax(0, 4fr) minmax(0, 3fr)",
+              gridTemplateRows: "minmax(0, 1fr) minmax(0, 4fr)",
+            }}
+          >
         {/* Filter/Search panel */}
         <section className="col-span-2 row-span-1 rounded-2xl ring-1 ring-panel panel min-h-0 overflow-hidden">
           <div className="flex h-full flex-col gap-3 px-4 py-3">
@@ -1089,6 +1094,8 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             </div>
           </div>
         </section>
+          </div>
+        </div>
       </div>
     </div>
   );

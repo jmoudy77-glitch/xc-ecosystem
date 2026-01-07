@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import AthleteProfileClient from "@/app/athletes/[athleteId]/AthleteProfileClient";
 import { type RecruitDiscoveryCandidate } from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
 import {
   safeJsonParse,
@@ -29,6 +30,55 @@ type Props = {
   programId: string;
   sport: string;
 };
+
+function buildAthleteProfileInput(c: Candidate) {
+  const m = (c?.originMeta ?? {}) as any;
+
+  const schoolName =
+    (typeof m?.school === "string" && m.school.trim()) ||
+    (typeof m?.hs_school_name === "string" && m.hs_school_name.trim()) ||
+    (typeof m?.hs_name === "string" && m.hs_name.trim()) ||
+    null;
+
+  const city =
+    (typeof m?.city === "string" && m.city.trim()) ||
+    (typeof m?.hs_city === "string" && m.hs_city.trim()) ||
+    null;
+
+  const state =
+    (typeof m?.state === "string" && m.state.trim()) ||
+    (typeof m?.hs_state === "string" && m.hs_state.trim()) ||
+    (typeof m?.home_state === "string" && m.home_state.trim()) ||
+    null;
+
+  const schoolLocation = city && state ? `${city}, ${state}` : city ? city : state ? state : null;
+
+  const avatarUrl =
+    (typeof (c as any)?.avatarUrl === "string" && (c as any).avatarUrl.trim()) ||
+    (typeof m?.avatarUrl === "string" && m.avatarUrl.trim()) ||
+    (typeof m?.avatar_url === "string" && m.avatar_url.trim()) ||
+    null;
+
+  const gender = (typeof m?.gender === "string" && m.gender.trim()) || null;
+
+  return {
+    athlete: {
+      id: c.id,
+      fullName: c.displayName,
+      gradYear: typeof c.gradYear === "number" ? c.gradYear : null,
+      schoolName,
+      schoolLocation,
+      eventGroup: c.eventGroup ?? null,
+      avatarUrl,
+      gender,
+    },
+    roleContext: {
+      // Discovery athlete panel must remain non-contextual / non-coach-tooling.
+      isCoachView: false,
+      isAthleteSelf: false,
+    },
+  };
+}
 
 function normalizeCandidate(raw: any, originKey: OriginKey): Candidate | null {
   const id = typeof raw?.id === "string" && raw.id.trim() ? raw.id.trim() : null;
@@ -944,53 +994,37 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
           </div>
         </section>
 
-        <section className="col-span-1 row-span-1 rounded-lg border bg-card flex flex-col min-h-0">
-          <div className="border-b p-3">
-            <div className="text-sm font-medium">Athlete</div>
-            <div className="text-xs text-muted-foreground">Selected athlete profile (informational).</div>
-          </div>
+        <section className="col-span-1 row-span-1 rounded-lg border bg-card min-h-0">
+          <div className="relative h-full min-h-0">
+            <div className="absolute right-3 top-3 z-10">
+              <button
+                type="button"
+                className="h-9 w-9 rounded-full border bg-background text-sm hover:bg-muted disabled:opacity-60"
+                disabled={!selected}
+                onClick={() => {
+                  if (!selected) return;
+                  if (isFav(selected.id)) removeFavorite(selected.id);
+                  else addFavorite(selected);
+                }}
+                aria-label={selected && isFav(selected.id) ? "Remove from favorites" : "Add to favorites"}
+                title={selected && isFav(selected.id) ? "Remove from favorites" : "Add to favorites"}
+              >
+                {selected && isFav(selected.id) ? "♥" : "♡"}
+              </button>
+            </div>
 
-          <div className="min-h-0 overflow-auto p-3">
-            {!selected ? (
-              <div className="text-sm text-muted-foreground">Select an athlete from Results or Favorites.</div>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <div className="text-lg font-semibold">{selected.displayName}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {selected.eventGroup ?? "—"} · {selected.gradYear ?? "—"}
+            <div className="h-full min-h-0 overflow-auto p-3">
+              {selected ? (
+                <AthleteProfileClient {...buildAthleteProfileInput(selected)} />
+              ) : (
+                <div className="rounded-md border bg-muted/20 px-3 py-3">
+                  <div className="text-sm font-medium">No athlete selected</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Select an athlete from Results or Favorites to view their profile.
                   </div>
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {candidateCues(selected).map((cue) => (
-                    <div key={cue.label} className="rounded-md border bg-muted/10 px-2 py-1">
-                      <div className="text-[10px] text-muted-foreground">{cue.label}</div>
-                      <div className="text-xs font-mono">{cue.value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-md border bg-muted/10 p-3">
-                  <div className="text-xs font-medium">Raw Metadata</div>
-                  <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] text-muted-foreground">
-                    {JSON.stringify(selected.originMeta ?? {}, null, 2)}
-                  </pre>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-md border px-3 py-2 text-sm hover:bg-muted disabled:opacity-60"
-                    onClick={() => addFavorite(selected)}
-                    disabled={isFav(selected.id)}
-                    title={isFav(selected.id) ? "Already in Favorites" : "Add to Favorites"}
-                  >
-                    {isFav(selected.id) ? "Favorited" : "Add to Favorites"}
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </section>
       </div>

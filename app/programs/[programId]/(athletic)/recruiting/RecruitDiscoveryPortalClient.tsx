@@ -134,9 +134,11 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   const [favorites, setFavorites] = useState<Candidate[]>([]);
   const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeList, setActiveList] = useState<"results" | "favorites">("results");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
+  const rowRefs = useRef<Record<string, HTMLElement | null>>({});
 
   // Controls
   const [q, setQ] = useState("");
@@ -441,6 +443,124 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     return rows;
   }, [favorites, favoritesOrder, q, eventGroupFilter, gradYearFilter, sortKey]);
 
+  const resultIds = useMemo(() => filteredSurfaced.map((c) => c.id), [filteredSurfaced]);
+  const favoriteIds = useMemo(() => filteredFavorites.map((c) => c.id), [filteredFavorites]);
+
+  const scrollToId = (id: string) => {
+    const el = rowRefs.current[id];
+    if (!el) return;
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+      // Best-effort.
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const exists = resultIds.includes(selectedId) || favoriteIds.includes(selectedId);
+    if (!exists) {
+      setSelectedId(null);
+      return;
+    }
+    scrollToId(selectedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultIds, favoriteIds]);
+
+  useEffect(() => {
+    const isTypingTarget = (t: EventTarget | null) => {
+      if (!t || !(t as any).tagName) return false;
+      const el = t as HTMLElement;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return true;
+      if ((el as any).isContentEditable) return true;
+      return false;
+    };
+
+    const moveWithin = (dir: -1 | 1) => {
+      const ids = activeList === "results" ? resultIds : favoriteIds;
+      if (ids.length === 0) return;
+      const current = selectedId && ids.includes(selectedId) ? selectedId : null;
+      const idx = current ? ids.indexOf(current) : -1;
+      const nextIdx =
+        idx === -1
+          ? dir === 1
+            ? 0
+            : ids.length - 1
+          : Math.min(Math.max(idx + dir, 0), ids.length - 1);
+      const nextId = ids[nextIdx];
+      setSelectedId(nextId);
+      scrollToId(nextId);
+    };
+
+    const switchList = (next: "results" | "favorites") => {
+      if (next === activeList) return;
+      setActiveList(next);
+      const ids = next === "results" ? resultIds : favoriteIds;
+      if (ids.length === 0) return;
+      const fallback = selectedId && ids.includes(selectedId) ? selectedId : ids[0];
+      setSelectedId(fallback);
+      scrollToId(fallback);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        moveWithin(1);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        moveWithin(-1);
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        switchList("results");
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        switchList("favorites");
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSelectedId(null);
+        return;
+      }
+      if (e.key === "Enter") {
+        if (selectedId) {
+          e.preventDefault();
+          scrollToId(selectedId);
+        }
+        return;
+      }
+      if (e.key === "a" || e.key === "A") {
+        if (!selectedId) return;
+        e.preventDefault();
+        const inFav = isFav(selectedId);
+        const candidate =
+          favorites.find((c) => c.id === selectedId) ??
+          surfaced.find((c) => c.id === selectedId) ??
+          null;
+        if (!candidate) return;
+        if (inFav) {
+          removeFavorite(selectedId);
+        } else {
+          addFavorite(candidate);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeList, resultIds, favoriteIds, selectedId, favorites, surfaced]);
+
   const pinFavoriteToTop = (candidateId: string) => {
     setFavoritesOrder((prev) => {
       const next = [candidateId, ...prev.filter((id) => id !== candidateId)];
@@ -637,6 +757,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                     {filteredFavorites.map((c) => (
                       <li
                         key={c.id}
+                        ref={(el) => {
+                          rowRefs.current[c.id] = el;
+                        }}
                         className={`flex items-center justify-between rounded-md border px-3 py-2 ${
                           selectedId === c.id ? "bg-muted/20" : ""
                         }`}
@@ -644,7 +767,10 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         <button
                           type="button"
                           className="min-w-0 flex-1 text-left"
-                          onClick={() => setSelectedId(c.id)}
+                          onClick={() => {
+                            setSelectedId(c.id);
+                            setActiveList("favorites");
+                          }}
                           title="Select athlete"
                         >
                           <div className="truncate text-sm font-medium">{c.displayName}</div>
@@ -754,6 +880,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 {filteredSurfaced.map((c) => (
                   <li
                     key={c.id}
+                    ref={(el) => {
+                      rowRefs.current[c.id] = el;
+                    }}
                     className={`flex items-center justify-between rounded-md border px-3 py-2 ${
                       selectedId === c.id ? "bg-muted/20" : ""
                     }`}
@@ -761,7 +890,10 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                     <button
                       type="button"
                       className="min-w-0 flex-1 text-left"
-                      onClick={() => setSelectedId(c.id)}
+                      onClick={() => {
+                        setSelectedId(c.id);
+                        setActiveList("results");
+                      }}
                       title="Select athlete"
                     >
                       <div className="truncate text-sm font-medium">{c.displayName}</div>

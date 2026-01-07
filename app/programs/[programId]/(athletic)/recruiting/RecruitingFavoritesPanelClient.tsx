@@ -8,16 +8,57 @@ import {
   type RecruitingPanelCandidate,
 } from "./RecruitingCandidateChip";
 import {
-  loadFavoritesForProgram,
-  saveFavoritesForProgram,
   type StabilizationFavorite,
 } from "./_helpers/stabilizationFavorites";
+import { readFavorites, removeFromFavorites } from "@/app/lib/recruiting/portalStorage";
 
 export function RecruitingFavoritesPanelClient({ programId }: { programId: string }) {
   const [rows, setRows] = React.useState<StabilizationFavorite[]>([]);
 
-  const refresh = React.useCallback(() => {
-    setRows(loadFavoritesForProgram(programId));
+  const refresh = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/recruiting/favorites/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ programId, sport: "xc" }),
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (!json?.ok || !Array.isArray(json.data)) return;
+
+      const local = readFavorites(programId);
+      const byId = new Map<string, any>(
+        local
+          .map((c: any) => {
+            const id = String(c?.id ?? c?.athleteId ?? c?.athlete_id ?? "").trim();
+            return id ? [id, c] : null;
+          })
+          .filter(Boolean) as Array<[string, any]>
+      );
+
+      const mapped = json.data.map((row: any) => {
+        const id = String(row?.athlete_id ?? "").trim();
+        const localRow = byId.get(id);
+        const displayName = String(
+          localRow?.displayName ?? localRow?.display_name ?? localRow?.name ?? ""
+        ).trim();
+        const fallbackLabel = id ? `Athlete ${id.slice(0, 8)}` : "Athlete";
+        return {
+          athleteId: id,
+          displayName: displayName || fallbackLabel,
+          eventGroup: (localRow?.eventGroup ?? localRow?.event_group ?? null) as any,
+          gradYear:
+            (typeof localRow?.gradYear === "number" ? localRow.gradYear :
+            typeof localRow?.grad_year === "number" ? localRow.grad_year : null) as any,
+          originKey: "favorites",
+          originMeta: { ...((localRow?.originMeta ?? {}) as any), pinned: row?.pinned ?? false },
+        } as StabilizationFavorite;
+      });
+
+      setRows(mapped);
+    } catch {
+      // Best-effort; keep existing rows on failure.
+    }
   }, [programId]);
 
   React.useEffect(() => {
@@ -33,10 +74,19 @@ export function RecruitingFavoritesPanelClient({ programId }: { programId: strin
     return () => window.removeEventListener("xc:recruiting:favorites:changed" as any, handler);
   }, [programId, refresh]);
 
-  const remove = (athleteId: string) => {
-    const next = rows.filter((c) => c.athleteId !== athleteId);
-    saveFavoritesForProgram(programId, next);
-    setRows(next);
+  const remove = async (athleteId: string) => {
+    try {
+      await fetch("/api/recruiting/favorites/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ programId, sport: "xc", athleteId }),
+      });
+    } catch {
+      // ignore: best-effort
+    }
+
+    removeFromFavorites(programId, athleteId);
+    await refresh();
     window.dispatchEvent(
       new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
     );

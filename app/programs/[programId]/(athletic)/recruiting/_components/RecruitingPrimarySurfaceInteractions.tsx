@@ -60,6 +60,17 @@ export function SlotDropZone({ slot, onDropAthlete }: Props) {
     // While placed, suppress candidate in their origin list.
     if (discovery.originKey === "favorites") {
       removeFromFavorites(discovery.programId, discovery.candidateId);
+      fetch("/api/recruiting/favorites/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programId: discovery.programId,
+          sport: "xc",
+          athleteId: discovery.candidateId,
+        }),
+      }).catch(() => {
+        // Best-effort delete; client cache already updated.
+      });
     } else {
       hideSurfacedCandidate(discovery.programId, discovery.candidateId);
     }

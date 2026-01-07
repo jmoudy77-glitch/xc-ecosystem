@@ -9,9 +9,8 @@ import {
   type RecruitingPanelCandidate,
 } from "./RecruitingCandidateChip";
 import {
-  loadFavoritesForProgram,
-  saveFavoritesForProgram,
-} from "./_helpers/stabilizationFavorites";
+  addToFavoritesIfMissing,
+} from "@/app/lib/recruiting/portalStorage";
 
 export function RecruitingSurfacedPanelClient({ programId }: { programId: string }) {
   const [rows, setRows] = React.useState<RecruitingPanelCandidate[]>([]);
@@ -63,18 +62,27 @@ export function RecruitingSurfacedPanelClient({ programId }: { programId: string
     };
   }, [programId]);
 
-  const addToFavorites = (c: RecruitingPanelCandidate) => {
-    const favs = loadFavoritesForProgram(programId);
-    if (favs.some((x) => x.athleteId === c.athleteId)) return;
-    const next = [
-      {
-        ...c,
-        originKey: "favorites" as const,
-        originMeta: { ...(c.originMeta ?? {}), favoritedAt: new Date().toISOString() },
-      },
-      ...favs,
-    ];
-    saveFavoritesForProgram(programId, next);
+  const addToFavorites = async (c: RecruitingPanelCandidate) => {
+    try {
+      await fetch("/api/recruiting/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programId,
+          sport: "xc",
+          athleteId: c.athleteId,
+        }),
+      });
+    } catch {
+      // Best-effort; continue to local cache for UI.
+    }
+
+    addToFavoritesIfMissing(programId, {
+      id: c.athleteId,
+      displayName: c.displayName,
+      eventGroup: c.eventGroup,
+      gradYear: c.gradYear,
+    });
     window.dispatchEvent(
       new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
     );

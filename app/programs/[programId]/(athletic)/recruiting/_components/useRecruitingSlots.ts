@@ -15,7 +15,9 @@ type SlotAction =
   | { type: "SET_PRIMARY"; eventGroupKey: string; slotId: string; athleteId: string }
   | { type: "REMOVE_ATHLETE"; eventGroupKey: string; slotId: string; athleteId: string };
 
-type InternalAction = { type: "CLEAR_EVENTS" };
+type InternalAction =
+  | { type: "CLEAR_EVENTS" }
+  | { type: "HYDRATE_ROWS"; rows: RecruitingEventGroupRow[] };
 
 type Action = SlotAction | InternalAction;
 
@@ -56,6 +58,9 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "CLEAR_EVENTS":
       return state.pendingEvents.length === 0 ? state : { ...state, pendingEvents: [] };
+
+    case "HYDRATE_ROWS":
+      return { ...state, rows: action.rows, pendingEvents: [] };
 
     case "DROP_IN_SLOT": {
       const { eventGroupKey, slotId, athleteId } = action;

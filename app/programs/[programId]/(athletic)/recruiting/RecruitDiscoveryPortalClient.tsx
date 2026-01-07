@@ -224,7 +224,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   const [stabilizationFavIds, setStabilizationFavIds] = useState<Set<string>>(new Set());
   const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [activeList, setActiveList] = useState<"results" | "favorites">("results");
+  const [activeList, setActiveList] = useState<"results" | "favorites" | "profile">("results");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
@@ -560,7 +560,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
 
       if (isTyping) return;
 
-      const list = activeList === "results" ? filteredSurfaced : filteredFavorites;
+      const list = activeList === "favorites" ? filteredFavorites : filteredSurfaced;
       if (list.length === 0) return;
 
       const idx = selectedId ? list.findIndex((x) => x.id === selectedId) : -1;
@@ -759,8 +759,20 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         </section>
 
         {/* Favorites panel (right, 30%, 100% height) */}
-        <section className="col-span-1 row-span-2 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
-          <div className="border-b border-subtle px-3 py-3">
+        <section onMouseDown={() => setActiveList("favorites")} className="col-span-1 row-span-2 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
+          <div className="relative overflow-hidden border-b border-subtle px-3 py-3">
+            <div
+              data-favorites-rail
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute inset-x-0 top-0 h-14 opacity-0 transition-opacity duration-200",
+                activeList === "favorites" && "opacity-100"
+              )}
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
+              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,white_10%,transparent)]" />
+            </div>
+
             <div className="text-sm font-semibold truncate">Favorites</div>
             <div className="text-[11px] text-muted">
               Discovery-local shortlist. Exports to Stabilization on close.
@@ -1082,8 +1094,20 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         </section>
 
         {/* Athlete profile panel (middle, 40%, 80% height) */}
-        <section className="col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
-          <div className="border-b border-subtle px-3 py-3">
+        <section onMouseDown={() => setActiveList("profile")} className="col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
+          <div className="relative overflow-hidden border-b border-subtle px-3 py-3">
+            <div
+              data-athlete-rail
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute inset-x-0 top-0 h-14 opacity-0 transition-opacity duration-200",
+                activeList === "profile" && "opacity-100"
+              )}
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
+              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,white_10%,transparent)]" />
+            </div>
+
             <div className="text-sm font-semibold truncate">Athlete</div>
             <div className="text-[11px] text-muted">
               {selected ? "Profile preview (non-contextual)." : "Select an athlete to view their profile."}

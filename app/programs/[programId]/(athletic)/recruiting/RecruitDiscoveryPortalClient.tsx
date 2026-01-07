@@ -2,22 +2,18 @@
 
 "use client";
 
-import Link from "next/link";
+import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   readRecruitDiscoverySurfacedCandidates,
   type RecruitDiscoveryCandidate,
 } from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
-import { type RecruitDiscoveryDnDPayload } from "@/app/lib/recruiting/portalDnD";
 import {
-  readHiddenSurfacedIds,
-  favoritesStorageKey,
   safeJsonParse,
-  hideSurfacedCandidate,
-  clearHiddenSurfaced,
   readFavoritesOrder,
   writeFavoritesOrder,
   clearFavoritesOrder,
+  favoritesStorageKey,
 } from "@/app/lib/recruiting/portalStorage";
 
 type OriginKey = "surfaced" | "favorites";
@@ -35,6 +31,7 @@ type Candidate = {
 
 type Props = {
   programId: string;
+  sport: string;
 };
 
 function normalizeCandidate(raw: any, originKey: OriginKey): Candidate | null {
@@ -135,46 +132,41 @@ function saveFavorites(programId: string, favorites: Candidate[]) {
   window.localStorage.setItem(favoritesStorageKey(programId), JSON.stringify(favorites));
 }
 
-function toDnDPayload(programId: string, c: Candidate): RecruitDiscoveryDnDPayload {
-  return {
-    kind: "recruit_discovery_candidate",
-    programId,
-
-    candidateId: c.id,
-    displayName: c.displayName,
-    eventGroup: c.eventGroup ?? null,
-    gradYear: c.gradYear ?? null,
-
-    originKey: c.originKey,
-    originMeta: c.originMeta ?? {},
-  };
+async function upsertStabilizationFavorite(args: {
+  programId: string;
+  sport: string;
+  athleteId: string;
+  position: number;
+}) {
+  await fetch("/api/recruiting/favorites", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      programId: args.programId,
+      sport: args.sport,
+      athleteId: args.athleteId,
+      position: args.position,
+      pinned: false,
+    }),
+  });
 }
 
-function setDragData(e: React.DragEvent, payload: RecruitDiscoveryDnDPayload) {
-  try {
-    e.dataTransfer.setData("application/x-xcsys-recruiting", JSON.stringify(payload));
-  } catch {
-    // no-op
-  }
-  try {
-    e.dataTransfer.setData("text/plain", JSON.stringify(payload));
-  } catch {
-    // no-op
-  }
-  e.dataTransfer.effectAllowed = "copy";
-}
-
-export default function RecruitDiscoveryPortalClient({ programId }: Props) {
+const RecruitDiscoveryPortalClient = React.forwardRef<
+  { exportFavoritesToStabilization: () => Promise<void> },
+  Props
+>(function RecruitDiscoveryPortalClient({ programId, sport }: Props, ref) {
   const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
   const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
-  const [hiddenSurfacedIds, setHiddenSurfacedIds] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Controls
   const [q, setQ] = useState("");
   const [eventGroupFilter, setEventGroupFilter] = useState<string>("all");
   const [gradYearFilter, setGradYearFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("fit");
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const activeFilterSummary = useMemo(() => {
     const parts: string[] = [];
@@ -194,33 +186,22 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
 
   useEffect(() => {
     setFavorites(loadFavorites(programId));
-    setHiddenSurfacedIds(readHiddenSurfacedIds(programId));
     setFavoritesOrder(readFavoritesOrder(programId));
   }, [programId]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      const rows: RecruitDiscoveryCandidate[] =
-        await readRecruitDiscoverySurfacedCandidates({ programId });
-
+  const runSearch = async () => {
+    setIsSearching(true);
+    setHasSearched(true);
+    try {
+      const rows: RecruitDiscoveryCandidate[] = await readRecruitDiscoverySurfacedCandidates({ programId });
       const normalized = (rows ?? [])
         .map((row) => normalizeCandidate(row, "surfaced"))
-        .filter((c): c is Candidate => !!c)
-        .filter((c) => !hiddenSurfacedIds.has(c.id));
-
-      if (!cancelled) setSurfaced(normalized);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [programId, hiddenSurfacedIds]);
-
-  const hideFromSurfaced = (candidateId: string) => {
-    hideSurfacedCandidate(programId, candidateId);
-    setHiddenSurfacedIds(readHiddenSurfacedIds(programId));
+        .filter((c): c is Candidate => !!c);
+      setSurfaced(normalized);
+      if (normalized.length > 0 && !selectedId) setSelectedId(normalized[0].id);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const isFav = (candidateId: string) => favorites.some((c) => c.id === candidateId);
@@ -391,217 +372,136 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
     });
   };
 
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    const inSurfaced = surfaced.find((c) => c.id === selectedId) ?? null;
+    const inFav = favorites.find((c) => c.id === selectedId) ?? null;
+    return inFav ?? inSurfaced;
+  }, [favorites, surfaced, selectedId]);
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      exportFavoritesToStabilization: async () => {
+        const orderedIds =
+          favoritesOrder.length > 0
+            ? favoritesOrder.filter((id) => favorites.some((f) => f.id === id))
+            : [];
+        const remaining = favorites.map((f) => f.id).filter((id) => !orderedIds.includes(id));
+        const finalIds = [...orderedIds, ...remaining];
+
+        for (let i = 0; i < finalIds.length; i++) {
+          const id = finalIds[i];
+          await upsertStabilizationFavorite({
+            programId,
+            sport,
+            athleteId: id,
+            position: i + 1,
+          });
+        }
+      },
+    }),
+    [favorites, favoritesOrder, programId, sport]
+  );
+
   return (
-    <div className="w-full">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm text-muted-foreground">Recruiting</div>
-          <h1 className="truncate text-xl font-semibold">Recruit Discovery Portal</h1>
-          <div className="text-sm text-muted-foreground">
-            Program: <span className="font-mono">{programId}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            className="rounded-md border px-3 py-2 text-sm hover:bg-muted"
-            href={`/app/programs/${programId}/recruiting`}
-          >
-            Back to Stabilization
-          </Link>
-        </div>
-      </div>
-
-      {/* Controls (minimal-touch, single row) */}
-      <div className="mb-3 rounded-lg border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-md border bg-background px-3 py-2">
-            <div className="text-xs text-muted-foreground">Search</div>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Name, school, state, event group…"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-muted-foreground">Event</div>
-            <select
-              value={eventGroupFilter}
-              onChange={(e) => setEventGroupFilter(e.target.value)}
-              className="h-9 rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="all">All</option>
-              {allEventGroups.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-muted-foreground">Grad</div>
-            <select
-              value={gradYearFilter}
-              onChange={(e) => setGradYearFilter(e.target.value)}
-              className="h-9 rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="all">All</option>
-              {allGradYears.map((y) => (
-                <option key={y} value={String(y)}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-muted-foreground">Sort</div>
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="h-9 rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="fit">Fit</option>
-              <option value="name">Name</option>
-              <option value="gradYear">Grad Year</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            className="h-9 rounded-md border px-3 text-sm hover:bg-muted"
-            onClick={resetFilters}
-            title="Reset filters"
-          >
-            Reset
-          </button>
-        </div>
-        <div className="mt-2 text-xs text-muted-foreground">{activeFilterSummary}</div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <section className="rounded-lg border bg-card">
-          <div className="border-b p-3">
-            <div className="text-sm font-medium">Surfaced</div>
-            <div className="text-xs text-muted-foreground">
-              {filteredSurfaced.length === surfaced.length
-                ? surfacedHeader
-                : `${filteredSurfaced.length} of ${surfaced.length} surfaced (filtered).`}
-            </div>
-          </div>
-
-          <div className="p-3">
-            {surfaced.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No surfaced candidates found.</div>
-            ) : (
-              <>
-                {filteredSurfaced.length === 0 ? (
-                  <div className="rounded-md border bg-muted/20 px-3 py-3">
-                    <div className="text-sm font-medium">No matches in Surfaced</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Filters removed all surfaced candidates. Reset filters to widen results.
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-                        onClick={resetFilters}
-                      >
-                        Reset filters
-                      </button>
-                      <div className="text-xs text-muted-foreground">{activeFilterSummary}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <ul className="space-y-2">
-                    {filteredSurfaced.map((c) => (
-                      <li
-                        key={c.id}
-                        className="flex items-center justify-between rounded-md border px-3 py-2"
-                        draggable
-                        onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
-                        title="Drag to Recruiting Stabilization slot"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{c.displayName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
-                          </div>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {candidateCues(c)
-                              .slice(0, 3)
-                              .map((cue) => (
-                                <span
-                                  key={cue.label}
-                                  className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                  title={`${cue.label}: ${cue.value}`}
-                                >
-                                  <span className="opacity-70">{cue.label}</span>
-                                  <span className="font-mono">{cue.value}</span>
-                                </span>
-                              ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                            onClick={() => addFavorite(c)}
-                            disabled={isFav(c.id)}
-                            title={isFav(c.id) ? "Already in Favorites" : "Add to Favorites"}
-                          >
-                            {isFav(c.id) ? "Favorited" : "Favorite"}
-                          </button>
-
-                          <button
-                            type="button"
-                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                            onClick={() => hideFromSurfaced(c.id)}
-                            title="Hide from Surfaced list (local)"
-                          >
-                            Hide
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-
-            {hiddenSurfacedIds.size > 0 && (
-              <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2">
-                <div className="text-xs text-muted-foreground">
-                  Hidden from Surfaced (local):{" "}
-                  <span className="font-mono">{hiddenSurfacedIds.size}</span>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                  onClick={() => {
-                    clearHiddenSurfaced(programId);
-                    setHiddenSurfacedIds(new Set());
-                  }}
-                  title="Show hidden surfaced candidates again"
-                >
-                  Show hidden
-                </button>
+    <div className="h-full w-full p-3">
+      <div
+        className="grid h-full gap-3"
+        style={{
+          gridTemplateColumns: "30% 40% 30%",
+          gridTemplateRows: "20% 80%",
+        }}
+      >
+        <section className="col-span-2 row-span-1 rounded-lg border bg-card p-3">
+          <div className="flex h-full flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-md border bg-background px-3 py-2">
+                <div className="text-xs text-muted-foreground">Search</div>
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Name, school, state, event group…"
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                />
               </div>
-            )}
+
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Event</div>
+                <select
+                  value={eventGroupFilter}
+                  onChange={(e) => setEventGroupFilter(e.target.value)}
+                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                >
+                  <option value="all">All</option>
+                  {allEventGroups.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Grad</div>
+                <select
+                  value={gradYearFilter}
+                  onChange={(e) => setGradYearFilter(e.target.value)}
+                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                >
+                  <option value="all">All</option>
+                  {allGradYears.map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Sort</div>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as SortKey)}
+                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                >
+                  <option value="fit">Fit</option>
+                  <option value="name">Name</option>
+                  <option value="gradYear">Grad Year</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                className="h-9 rounded-md border px-3 text-sm hover:bg-muted disabled:opacity-60"
+                onClick={runSearch}
+                disabled={isSearching}
+                title="Search"
+              >
+                {isSearching ? "Searching…" : "Search"}
+              </button>
+
+              <button
+                type="button"
+                className="h-9 rounded-md border px-3 text-sm hover:bg-muted"
+                onClick={resetFilters}
+                title="Reset filters"
+              >
+                Reset
+              </button>
+            </div>
+
+            <div className="text-xs text-muted-foreground">{activeFilterSummary}</div>
           </div>
         </section>
 
-        <section className="rounded-lg border bg-card">
+        <section className="col-span-1 row-span-2 rounded-lg border bg-card">
           <div className="border-b p-3">
             <div className="text-sm font-medium">Favorites</div>
-            <div className="text-xs text-muted-foreground">Coach-curated shortlist (session cache v1).</div>
+            <div className="text-xs text-muted-foreground">Discovery-local shortlist. Exports on close.</div>
           </div>
 
-          <div className="p-3">
+          <div className="h-[calc(100%-53px)] overflow-auto p-3">
             {favorites.length === 0 ? (
               <div className="text-sm text-muted-foreground">No favorites yet.</div>
             ) : (
@@ -628,33 +528,23 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
                     {filteredFavorites.map((c) => (
                       <li
                         key={c.id}
-                        className="flex items-center justify-between rounded-md border px-3 py-2"
-                        draggable
-                        onDragStart={(e) => setDragData(e, toDnDPayload(programId, c))}
-                        title="Drag to Recruiting Stabilization slot"
+                        className={`flex items-center justify-between rounded-md border px-3 py-2 ${
+                          selectedId === c.id ? "bg-muted/20" : ""
+                        }`}
                       >
-                        <div className="min-w-0">
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => setSelectedId(c.id)}
+                          title="Select athlete"
+                        >
                           <div className="truncate text-sm font-medium">{c.displayName}</div>
                           <div className="text-xs text-muted-foreground">
                             {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
                           </div>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {candidateCues(c)
-                              .slice(0, 3)
-                              .map((cue) => (
-                                <span
-                                  key={cue.label}
-                                  className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                  title={`${cue.label}: ${cue.value}`}
-                                >
-                                  <span className="opacity-70">{cue.label}</span>
-                                  <span className="font-mono">{cue.value}</span>
-                                </span>
-                              ))}
-                          </div>
-                        </div>
+                        </button>
 
-                        <div className="flex items-center gap-1">
+                        <div className="ml-2 flex items-center gap-1">
                           <button
                             type="button"
                             className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
@@ -713,7 +603,146 @@ export default function RecruitDiscoveryPortalClient({ programId }: Props) {
             )}
           </div>
         </section>
+
+        <section className="col-span-1 row-span-1 rounded-lg border bg-card">
+          <div className="border-b p-3">
+            <div className="text-sm font-medium">Results</div>
+            <div className="text-xs text-muted-foreground">
+              {!hasSearched
+                ? "Empty until Search is run."
+                : filteredSurfaced.length === surfaced.length
+                  ? surfacedHeader
+                  : `${filteredSurfaced.length} of ${surfaced.length} results (filtered).`}
+            </div>
+          </div>
+
+          <div className="h-[calc(100%-53px)] overflow-auto p-3">
+            {!hasSearched ? (
+              <div className="text-sm text-muted-foreground">Run a search to populate results.</div>
+            ) : surfaced.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No results found.</div>
+            ) : filteredSurfaced.length === 0 ? (
+              <div className="rounded-md border bg-muted/20 px-3 py-3">
+                <div className="text-sm font-medium">No matches</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Filters removed all results. Reset filters to widen results.
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                    onClick={resetFilters}
+                  >
+                    Reset filters
+                  </button>
+                  <div className="text-xs text-muted-foreground">{activeFilterSummary}</div>
+                </div>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {filteredSurfaced.map((c) => (
+                  <li
+                    key={c.id}
+                    className={`flex items-center justify-between rounded-md border px-3 py-2 ${
+                      selectedId === c.id ? "bg-muted/20" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => setSelectedId(c.id)}
+                      title="Select athlete"
+                    >
+                      <div className="truncate text-sm font-medium">{c.displayName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {candidateCues(c)
+                          .slice(0, 3)
+                          .map((cue) => (
+                            <span
+                              key={cue.label}
+                              className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                              title={`${cue.label}: ${cue.value}`}
+                            >
+                              <span className="opacity-70">{cue.label}</span>
+                              <span className="font-mono">{cue.value}</span>
+                            </span>
+                          ))}
+                      </div>
+                    </button>
+
+                    <div className="ml-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                        onClick={() => addFavorite(c)}
+                        disabled={isFav(c.id)}
+                        title={isFav(c.id) ? "Already in Favorites" : "Add to Favorites"}
+                      >
+                        {isFav(c.id) ? "Favorited" : "Favorite"}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        <section className="col-span-1 row-span-1 rounded-lg border bg-card">
+          <div className="border-b p-3">
+            <div className="text-sm font-medium">Athlete</div>
+            <div className="text-xs text-muted-foreground">Selected athlete profile (informational).</div>
+          </div>
+
+          <div className="h-[calc(100%-53px)] overflow-auto p-3">
+            {!selected ? (
+              <div className="text-sm text-muted-foreground">Select an athlete from Results or Favorites.</div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <div className="text-lg font-semibold">{selected.displayName}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {selected.eventGroup ?? "—"} · {selected.gradYear ?? "—"}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {candidateCues(selected).map((cue) => (
+                    <div key={cue.label} className="rounded-md border bg-muted/10 px-2 py-1">
+                      <div className="text-[10px] text-muted-foreground">{cue.label}</div>
+                      <div className="text-xs font-mono">{cue.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-md border bg-muted/10 p-3">
+                  <div className="text-xs font-medium">Raw Metadata</div>
+                  <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] text-muted-foreground">
+                    {JSON.stringify(selected.originMeta ?? {}, null, 2)}
+                  </pre>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-muted disabled:opacity-60"
+                    onClick={() => addFavorite(selected)}
+                    disabled={isFav(selected.id)}
+                    title={isFav(selected.id) ? "Already in Favorites" : "Add to Favorites"}
+                  >
+                    {isFav(selected.id) ? "Favorited" : "Add to Favorites"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
-}
+});
+
+export default RecruitDiscoveryPortalClient;

@@ -5,10 +5,26 @@ import RecruitDiscoveryPortalClient from "./RecruitDiscoveryPortalClient";
 
 type Props = {
   programId: string;
+  sport?: string;
 };
 
-export default function RecruitingDiscoveryModalClient({ programId }: Props) {
+type DiscoveryPortalHandle = {
+  exportFavoritesToStabilization: () => Promise<void>;
+};
+
+export default function RecruitingDiscoveryModalClient({ programId, sport = "xc" }: Props) {
   const [open, setOpen] = React.useState(false);
+  const portalRef = React.useRef<DiscoveryPortalHandle | null>(null);
+
+  const closeWithExport = React.useCallback(async () => {
+    try {
+      await portalRef.current?.exportFavoritesToStabilization?.();
+    } catch {
+      // Best-effort export on close.
+    } finally {
+      setOpen(false);
+    }
+  }, []);
 
   return (
     <>
@@ -27,7 +43,7 @@ export default function RecruitingDiscoveryModalClient({ programId }: Props) {
           aria-modal="true"
           aria-label="Recruiting Discovery Portal"
         >
-          <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/60" onClick={closeWithExport} />
 
           <div className="relative mx-4 w-full max-w-6xl overflow-hidden rounded-xl border border-white/10 bg-black/80 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
@@ -39,14 +55,14 @@ export default function RecruitingDiscoveryModalClient({ programId }: Props) {
               <button
                 type="button"
                 className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-                onClick={() => setOpen(false)}
+                onClick={closeWithExport}
               >
-                Close
+                Done
               </button>
             </div>
 
-            <div className="max-h-[80vh] overflow-auto p-4">
-              <RecruitDiscoveryPortalClient programId={programId} />
+            <div className="h-[80vh]">
+              <RecruitDiscoveryPortalClient ref={portalRef} programId={programId} sport={sport} />
             </div>
           </div>
         </div>

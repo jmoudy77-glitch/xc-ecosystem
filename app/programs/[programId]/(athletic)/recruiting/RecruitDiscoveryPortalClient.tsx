@@ -807,7 +807,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                           className="min-w-0 flex-1 text-left focus:outline-none"
                           onClick={() => {
                             setSelectedId(c.id);
-                            setActiveList(\"favorites\");
+                            setActiveList("favorites");
                           }}
                           title="Select athlete"
                         >
@@ -835,7 +835,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                           <button
                             type="button"
                             className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                            onClick={() => moveFavorite(c.id, \"up\")}
+                            onClick={() => moveFavorite(c.id, "up")}
                             aria-label="Move up"
                             title="Move up"
                           >
@@ -844,7 +844,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                           <button
                             type="button"
                             className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                            onClick={() => moveFavorite(c.id, \"down\")}
+                            onClick={() => moveFavorite(c.id, "down")}
                             aria-label="Move down"
                             title="Move down"
                           >

@@ -800,8 +800,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         rowRefs.current[c.id] = el;
                       }}
                       className={cn(
-                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2",
-                        isSelected && "ring-2 ring-[var(--brand)]"
+                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2 transition-[box-shadow,transform,background-color] duration-200 will-change-transform",
+                        isSelected &&
+                          "bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] ring-1 ring-[color-mix(in_oklab,var(--brand)_34%,transparent)] shadow-[0_0_0_1px_color-mix(in_oklab,var(--brand)_18%,transparent),0_14px_36px_color-mix(in_oklab,black_55%,transparent)] translate-y-[-1px]"
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -965,8 +966,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         rowRefs.current[c.id] = el;
                       }}
                       className={cn(
-                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2",
-                        isSelected && "ring-2 ring-[var(--brand)]"
+                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2 transition-[box-shadow,transform,background-color] duration-200 will-change-transform",
+                        isSelected &&
+                          "bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] ring-1 ring-[color-mix(in_oklab,var(--brand)_34%,transparent)] shadow-[0_0_0_1px_color-mix(in_oklab,var(--brand)_18%,transparent),0_14px_36px_color-mix(in_oklab,black_55%,transparent)] translate-y-[-1px]"
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">

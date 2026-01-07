@@ -33,17 +33,20 @@ type RawRow = {
   athlete_id: string;
   relationship_type?: string | null;
   archived_at?: string | null;
-  athlete?: { id: string; first_name: string; last_name: string } | null;
+  athlete?:
+    | { id: string; first_name: string; last_name: string }
+    | { id: string; first_name: string; last_name: string }[]
+    | null;
 };
 
 function collapse(rows: RawRow[]): BuildAthlete[] {
   const byAthleteId = new Map<string, BuildAthlete>();
 
   for (const r of rows) {
-    const a = (r as any)?.athlete;
-    const athleteId = a?.id as string | undefined;
-    const firstName = a?.first_name as string | undefined;
-    const lastName = a?.last_name as string | undefined;
+    const a = Array.isArray(r.athlete) ? r.athlete[0] : r.athlete;
+    const athleteId = a?.id;
+    const firstName = a?.first_name;
+    const lastName = a?.last_name;
 
     if (!athleteId || !firstName || !lastName) continue;
     if (!byAthleteId.has(athleteId)) {

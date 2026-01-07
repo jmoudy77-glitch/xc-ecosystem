@@ -745,7 +745,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         <section className="col-span-1 row-span-2 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
           <div className="border-b border-subtle px-3 py-3">
             <div className="text-sm font-semibold">Favorites</div>
-            <div className="text-[11px] text-muted">Discovery-local shortlist. Exports on close.</div>
+            <div className="text-[11px] text-muted">
+              Discovery-local shortlist. Exports to Stabilization on close.
+            </div>
           </div>
 
           <div className="min-h-0 overflow-auto p-3 glass-scrollbar">
@@ -753,116 +755,121 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
               <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
                 <div className="text-sm font-medium">No favorites yet</div>
                 <div className="mt-1 text-[11px] text-muted">
-                  Add recruits from Results. This list is local to this device until you close the portal.
+                  Add recruits from Results to build a temporary shortlist.
+                </div>
+              </div>
+            ) : filteredFavorites.length === 0 ? (
+              <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+                <div className="text-sm font-medium">No matches</div>
+                <div className="mt-1 text-[11px] text-muted">
+                  Current filters removed all favorites.
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="glass-pill rounded-full px-3 py-1.5 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                    onClick={resetFilters}
+                  >
+                    Reset filters
+                  </button>
+                  <div className="text-[11px] text-muted">{activeFilterSummary}</div>
                 </div>
               </div>
             ) : (
-              <>
-                {filteredFavorites.length === 0 ? (
-                  <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
-                    <div className="text-sm font-medium">No matches</div>
-                    <div className="mt-1 text-[11px] text-muted">
-                      Filters removed all favorites. Reset filters to widen results.
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="glass-pill rounded-full px-3 py-1.5 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                        onClick={resetFilters}
-                      >
-                        Reset filters
-                      </button>
-                      <div className="text-[11px] text-muted">{activeFilterSummary}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <ul
-                    id={listboxIdFavorites}
-                    role="listbox"
-                    aria-label="Favorites list"
-                    aria-activedescendant={selectedId ? `fav-${selectedId}` : undefined}
-                    className="space-y-2"
-                  >
-                    {filteredFavorites.map((c) => {
-                      const isSelected = selectedId === c.id;
-                      return (
-                        <li
-                          key={c.id}
-                          id={`fav-${c.id}`}
-                          role="option"
-                          aria-selected={isSelected}
-                          ref={(el) => {
-                            rowRefs.current[c.id] = el;
+              <ul
+                id={listboxIdFavorites}
+                role="listbox"
+                aria-label="Favorites list"
+                aria-activedescendant={selectedId ? `fav-${selectedId}` : undefined}
+                className="space-y-2"
+              >
+                {filteredFavorites.map((c) => {
+                  const isSelected = selectedId === c.id;
+                  const cues = candidateCues(c).slice(0, 2);
+
+                  return (
+                    <li
+                      key={c.id}
+                      id={`fav-${c.id}`}
+                      role="option"
+                      aria-selected={isSelected}
+                      ref={(el) => {
+                        rowRefs.current[c.id] = el;
+                      }}
+                      className={cn(
+                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2",
+                        isSelected && "ring-2 ring-[var(--brand)]"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left focus:outline-none"
+                          onClick={() => {
+                            setSelectedId(c.id);
+                            setActiveList(\"favorites\");
                           }}
-                          className={cn(
-                            "flex items-start justify-between rounded-xl ring-1 ring-panel panel-muted px-3 py-2",
-                            isSelected && "ring-2 ring-[var(--brand)]"
-                          )}
+                          title="Select athlete"
                         >
+                          <div className="truncate text-sm font-semibold">
+                            {c.displayName}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-muted truncate">
+                            {c.eventGroup ?? \"—\"} <span className="text-subtle">·</span> {c.gradYear ?? \"—\"}
+                          </div>
+                          {cues.length > 0 ? (
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              {cues.map((cue) => (
+                                <Badge
+                                  key={cue.label}
+                                  label={cue.label}
+                                  value={cue.value}
+                                  mono
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+                        </button>
+
+                        <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
                           <button
                             type="button"
-                            className="min-w-0 flex-1 text-left focus:outline-none"
-                            onClick={() => {
-                              setSelectedId(c.id);
-                              setActiveList("favorites");
-                            }}
-                            title="Select athlete"
+                            className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                            onClick={() => moveFavorite(c.id, \"up\")}
+                            aria-label="Move up"
+                            title="Move up"
                           >
-                            <div className="truncate text-sm font-semibold">{c.displayName}</div>
-                            <div className="text-[11px] text-muted">
-                              {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
-                            </div>
+                            ↑
                           </button>
-
-                          <div className="ml-2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                              onClick={() => pinFavoriteToTop(c.id)}
-                              title="Pin to top"
-                              aria-label="Pin to top"
-                            >
-                              Pin
-                            </button>
-                            <button
-                              type="button"
-                              className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                              onClick={() => moveFavorite(c.id, "up")}
-                              title="Move up"
-                              aria-label="Move up"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                              onClick={() => moveFavorite(c.id, "down")}
-                              title="Move down"
-                              aria-label="Move down"
-                            >
-                              ↓
-                            </button>
-                            <button
-                              type="button"
-                              className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                              onClick={() => removeFavorite(c.id)}
-                              title="Remove from Favorites"
-                              aria-label="Remove from Favorites"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </>
+                          <button
+                            type="button"
+                            className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                            onClick={() => moveFavorite(c.id, \"down\")}
+                            aria-label="Move down"
+                            title="Move down"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            className="glass-pill rounded-full px-2 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                            onClick={() => removeFavorite(c.id)}
+                            aria-label="Remove from favorites"
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
 
             {favorites.length > 0 ? (
               <div className="mt-3 flex items-center justify-between rounded-xl ring-1 ring-panel panel-muted px-3 py-2">
-                <div className="text-[11px] text-muted">Order is local to this device.</div>
+                <div className="text-[11px] text-muted">Ordering is local to this device.</div>
                 <button
                   type="button"
                   className="glass-pill rounded-full px-2.5 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
@@ -870,7 +877,6 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                     clearFavoritesOrder(programId);
                     setFavoritesOrder([]);
                   }}
-                  title="Reset favorite ordering"
                 >
                   Reset order
                 </button>

@@ -135,6 +135,8 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const debounceRef = useRef<number | null>(null);
 
   // Controls
   const [q, setQ] = useState("");
@@ -196,6 +198,10 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   }, []);
 
   const runSearch = async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsSearching(true);
     setHasSearched(true);
     try {
@@ -213,6 +219,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
           limit: 100,
           offset: 0,
         }),
+        signal: controller.signal,
       });
       const json = await res.json();
       if (!res.ok) {
@@ -224,8 +231,14 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         setSurfaced(normalized);
         if (normalized.length > 0 && !selectedId) setSelectedId(normalized[0].id);
       }
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        setSurfaced([]);
+      }
     } finally {
-      setIsSearching(false);
+      if (abortRef.current === controller) {
+        setIsSearching(false);
+      }
     }
   };
 
@@ -271,6 +284,19 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     void runSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventGroupFilter, gradYearFilter, hasSearched]);
+
+  // Debounce typing after the first explicit search.
+  useEffect(() => {
+    if (!hasSearched) return;
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      runSearch();
+    }, 300);
+    return () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, hasSearched]);
 
   const isFav = (candidateId: string) => favorites.some((c) => c.id === candidateId);
 

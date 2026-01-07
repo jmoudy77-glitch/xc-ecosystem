@@ -80,7 +80,7 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
         >
           <div className="absolute inset-0 bg-black/60" onClick={closeWithExport} />
 
-          <div className="relative w-full max-w-6xl overflow-hidden rounded-xl border border-white/10 bg-black/80 shadow-2xl max-h-[calc(100vh-2rem)]">
+          <div className="relative flex w-full max-w-6xl flex-col rounded-xl border border-white/10 bg-black/80 shadow-2xl max-h-[calc(100vh-2rem)]">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <div className="min-w-0">
                 <div className="text-xs text-white/50">Recruiting</div>
@@ -96,7 +96,7 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
               </button>
             </div>
 
-            <div className="h-[80vh] max-h-[calc(100vh-2rem-52px)]">
+            <div className="flex-1 min-h-0 overflow-auto">
               <RecruitDiscoveryPortalClient programId={programId} sport={sport} />
             </div>
           </div>

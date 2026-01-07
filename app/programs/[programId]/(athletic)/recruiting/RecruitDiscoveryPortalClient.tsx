@@ -358,9 +358,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   }, [favorites, surfaced, selectedId]);
 
   return (
-    <div className="h-full w-full p-3">
+    <div className="h-full w-full p-3 min-h-0">
       <div
-        className="grid h-full gap-3"
+        className="grid h-full min-h-0 gap-3"
         style={{
           gridTemplateColumns: "30% 40% 30%",
           gridTemplateRows: "20% 80%",
@@ -454,7 +454,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             <div className="text-xs text-muted-foreground">Discovery-local shortlist. Exports on close.</div>
           </div>
 
-          <div className="h-[calc(100%-53px)] overflow-auto p-3">
+          <div className="min-h-0 overflow-auto p-3">
             {favorites.length === 0 ? (
               <div className="text-sm text-muted-foreground">No favorites yet.</div>
             ) : (
@@ -569,7 +569,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             </div>
           </div>
 
-          <div className="h-[calc(100%-53px)] overflow-auto p-3">
+          <div className="min-h-0 overflow-auto p-3">
             {!hasSearched ? (
               <div className="text-sm text-muted-foreground">Run a search to populate results.</div>
             ) : surfaced.length === 0 ? (
@@ -650,7 +650,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             <div className="text-xs text-muted-foreground">Selected athlete profile (informational).</div>
           </div>
 
-          <div className="h-[calc(100%-53px)] overflow-auto p-3">
+          <div className="min-h-0 overflow-auto p-3">
             {!selected ? (
               <div className="text-sm text-muted-foreground">Select an athlete from Results or Favorites.</div>
             ) : (

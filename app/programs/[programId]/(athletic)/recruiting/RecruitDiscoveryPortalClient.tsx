@@ -622,10 +622,12 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
       >
         {/* Filter/Search panel */}
         <section className="col-span-2 row-span-1 rounded-2xl ring-1 ring-panel panel min-h-0 overflow-hidden">
-          <div className="flex h-full flex-col gap-2 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-xl ring-1 ring-panel panel-muted px-3 py-2">
-                <div className="text-[11px] text-muted">Search</div>
+          <div className="flex h-full flex-col gap-3 px-4 py-3">
+            {/* Controls row */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Left: dominant search */}
+              <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-xl ring-1 ring-panel panel-muted px-3 py-2">
+                <div className="text-[11px] text-muted shrink-0">Search</div>
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -639,6 +641,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 />
               </div>
 
+              {/* Middle: compact selects */}
               <div className="flex items-center gap-2">
                 <div className="text-[11px] text-muted">Event</div>
                 <select
@@ -687,14 +690,15 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 </select>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Right: actions */}
+              <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
                   className="glass-pill glass-pill--brand-soft rounded-full px-3 py-2 text-sm ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] disabled:opacity-60"
                   onClick={runSearch}
                   disabled={isSearching}
-                  title="Search"
                   aria-disabled={isSearching}
+                  title="Search"
                 >
                   {isSearching ? "Searching…" : "Search"}
                 </button>
@@ -709,6 +713,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
               </div>
             </div>
 
+            {/* Training-style subtext */}
             <div className="text-[11px] text-muted">{activeFilterSummary}</div>
 
             {activeChips.length > 0 ? (

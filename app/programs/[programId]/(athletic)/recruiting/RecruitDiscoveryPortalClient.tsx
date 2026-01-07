@@ -84,6 +84,16 @@ function candidateFitScore(c: Candidate): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+function scoreForMeta(m: Record<string, unknown> | null | undefined): number | null {
+  if (!m || typeof m !== "object") return null;
+  const v =
+    (typeof (m as any).score === "number" && (m as any).score) ||
+    (typeof (m as any).fit_score === "number" && (m as any).fit_score) ||
+    (typeof (m as any).recruiting_score === "number" && (m as any).recruiting_score) ||
+    null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
 function candidateCues(c: Candidate): { label: string; value: string }[] {
   const cues: { label: string; value: string }[] = [];
   const m = c.originMeta ?? {};
@@ -92,10 +102,10 @@ function candidateCues(c: Candidate): { label: string; value: string }[] {
   const fit = candidateFitScore(c);
   if (fit > 0) cues.push({ label: "Fit", value: String(Math.round(fit)) });
 
-  // Source (origin)
+  const score = scoreForMeta(m);
   cues.push({
-    label: "Source",
-    value: c.originKey === "surfaced" ? "Surfaced" : "Favorite",
+    label: "Scout Score",
+    value: score === null ? "—" : String(Math.round(score)),
   });
 
   // Optional: state / school if present in meta

@@ -362,11 +362,14 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
       <div
         className="grid h-full min-h-0 gap-3"
         style={{
-          gridTemplateColumns: "30% 40% 30%",
-          gridTemplateRows: "20% 80%",
+          // Use fr ratios with minmax(0, …) to prevent rounding overflow/clipping.
+          // 30/40/30 => 3fr/4fr/3fr
+          // 20/80 => 1fr/4fr
+          gridTemplateColumns: "minmax(0, 3fr) minmax(0, 4fr) minmax(0, 3fr)",
+          gridTemplateRows: "minmax(0, 1fr) minmax(0, 4fr)",
         }}
       >
-        <section className="col-span-2 row-span-1 rounded-lg border bg-card p-3">
+        <section className="col-span-2 row-span-1 rounded-lg border bg-card p-3 min-h-0 overflow-hidden">
           <div className="flex h-full flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-md border bg-background px-3 py-2">
@@ -448,7 +451,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
           </div>
         </section>
 
-        <section className="col-span-1 row-span-2 rounded-lg border bg-card">
+        <section className="col-span-1 row-span-2 rounded-lg border bg-card flex flex-col min-h-0">
           <div className="border-b p-3">
             <div className="text-sm font-medium">Favorites</div>
             <div className="text-xs text-muted-foreground">Discovery-local shortlist. Exports on close.</div>
@@ -557,7 +560,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
           </div>
         </section>
 
-        <section className="col-span-1 row-span-1 rounded-lg border bg-card">
+        <section className="col-span-1 row-span-1 rounded-lg border bg-card flex flex-col min-h-0">
           <div className="border-b p-3">
             <div className="text-sm font-medium">Results</div>
             <div className="text-xs text-muted-foreground">
@@ -644,7 +647,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
           </div>
         </section>
 
-        <section className="col-span-1 row-span-1 rounded-lg border bg-card">
+        <section className="col-span-1 row-span-1 rounded-lg border bg-card flex flex-col min-h-0">
           <div className="border-b p-3">
             <div className="text-sm font-medium">Athlete</div>
             <div className="text-xs text-muted-foreground">Selected athlete profile (informational).</div>

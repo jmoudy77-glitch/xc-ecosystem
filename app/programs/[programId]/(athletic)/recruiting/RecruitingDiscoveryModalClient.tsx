@@ -20,24 +20,32 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
   const exportFavoritesToStabilization = React.useCallback(async () => {
     if (typeof window === "undefined") return;
 
-    const favorites = safeJsonParse<any[]>(window.localStorage.getItem(favoritesStorageKey(programId)));
-    if (!Array.isArray(favorites) || favorites.length === 0) return;
+    const favoritesRaw = safeJsonParse<any[]>(
+      window.localStorage.getItem(favoritesStorageKey(programId))
+    );
+    if (!Array.isArray(favoritesRaw) || favoritesRaw.length === 0) return;
 
-    const order = readFavoritesOrder(programId);
-    const idsInFavorites = favorites
-      .map((r) => (typeof r?.id === "string" ? r.id : null))
-      .filter((v): v is string => !!v);
+    // De-dupe by athleteId (first occurrence wins).
+    const seen = new Set<string>();
+    const favorites = favoritesRaw.filter((r) => {
+      if (typeof r?.id !== "string") return false;
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
 
-    const ordered =
-      Array.isArray(order) && order.length > 0
-        ? order.filter((id) => idsInFavorites.includes(id))
-        : [];
+    const order = readFavoritesOrder(programId) ?? [];
+    const idsInFavorites = favorites.map((r) => r.id);
+
+    // Stable order: explicit order first, then remaining in insertion order.
+    const ordered = order.filter((id) => idsInFavorites.includes(id));
 
     const remaining = idsInFavorites.filter((id) => !ordered.includes(id));
     const finalIds = [...ordered, ...remaining];
 
     for (let i = 0; i < finalIds.length; i++) {
       const athleteId = finalIds[i];
+      // Idempotent write: backend enforces uniqueness per (program, athlete).
       await fetch("/api/recruiting/favorites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

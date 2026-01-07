@@ -10,10 +10,19 @@ import { seedMeetEventsForHostedBuild } from "@/app/actions/meet_manager/seedMee
 import { getMeetRosterAthleteIds } from "@/app/actions/meet_manager/getMeetRosterAthleteIds";
 import { getMeetEventsForEntries } from "@/app/actions/meet_manager/getMeetEventsForEntries";
 import { getMeetEntriesForAttendingBuild } from "@/app/actions/meet_manager/getMeetEntriesForAttendingBuild";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+import { redirect } from "next/navigation";
 
 type PageProps = {
   params: Promise<{ programId: string }>;
-  searchParams?: Promise<{ attendMeetId?: string; hostMeetId?: string }>;
+  searchParams?: Promise<{
+    attendMeetId?: string;
+    hostMeetId?: string;
+    seed?: string;
+    n?: string;
+    err?: string;
+  }>;
 };
 
 export default async function MeetBuilderPage({ params, searchParams }: PageProps) {
@@ -22,6 +31,9 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
 
   const attendMeetId = sp.attendMeetId ?? "";
   const hostMeetId = sp.hostMeetId ?? "";
+  const seedStatus = sp.seed ?? "";
+  const seedInserted = sp.n ?? "";
+  const seedError = sp.err ?? "";
 
   const isAttending = Boolean(attendMeetId);
   const isHosting = Boolean(hostMeetId) && !isAttending;
@@ -36,7 +48,26 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
   let loadError: string | null = null;
 
   try {
-    options = await getBuildMeetOptions(programId);
+  options = await getBuildMeetOptions(programId);
+
+  function supabaseServer(cookieStore: any) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !anonKey) {
+      throw new Error("Missing Supabase env vars.");
+    }
+
+    return createServerClient(url, anonKey, {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set() {},
+        remove() {},
+      },
+    });
+  }
   } catch (e: any) {
     loadError = e?.message ? String(e.message) : "Failed to load meet options.";
   }
@@ -99,6 +130,58 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
     }
   }
 
+  let seedAction: (() => Promise<void>) | null = null;
+  let meetEventCount = 0;
+  let meetEventTypes: string[] = [];
+  let meetEventsError: string | null = null;
+
+  if (isHosting) {
+    const selectedMeetId = hostMeetId;
+
+    seedAction = async () => {
+      "use server";
+      const res = await seedMeetEventsForHostedBuild({
+        programId,
+        hostMeetId: selectedMeetId,
+        builderPath: pagePath,
+      });
+      if (!res.ok) {
+        redirect(
+          `${pagePath}?hostMeetId=${selectedMeetId}&seed=error&err=${encodeURIComponent(
+            res.error ?? "Seed failed."
+          )}`
+        );
+      }
+      redirect(
+        `${pagePath}?hostMeetId=${selectedMeetId}&seed=${encodeURIComponent(
+          res.status
+        )}&n=${encodeURIComponent(String(res.inserted ?? 0))}`
+      );
+    };
+
+    try {
+      const cookieStore = (await cookies()) as any;
+      const supabase = supabaseServer(cookieStore);
+
+      const { data, error } = await supabase
+        .from("meet_events")
+        .select("event_type")
+        .eq("meet_id", selectedMeetId);
+
+      if (error) {
+        meetEventsError = error.message;
+      } else {
+        meetEventTypes = Array.from(
+          new Set((data ?? []).map((r: any) => String(r.event_type ?? "").trim()).filter(Boolean))
+        );
+        meetEventTypes.sort((a, b) => a.localeCompare(b));
+        meetEventCount = meetEventTypes.length;
+      }
+    } catch (e: any) {
+      meetEventsError = e?.message ?? "Failed to load meet events.";
+    }
+  }
+
   return (
     <div className="px-6 py-6">
       <WorkflowHeader
@@ -145,23 +228,38 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
           </div>
 
           <div className="rounded-md border border-white/15 bg-white/5 p-6">
+            {seedStatus === "error" ? (
+              <div className="mb-4 rounded-md border border-red-400/30 bg-red-950/20 p-3 text-sm text-white/90">
+                <div className="font-semibold">Initialize events failed</div>
+                <div className="mt-1 text-white/80">{seedError || "Unknown error."}</div>
+              </div>
+            ) : seedStatus ? (
+              <div className="mb-4 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white/90">
+                <div className="font-semibold">Initialize events</div>
+                <div className="mt-1 text-white/80">
+                  Status: <span className="font-medium">{seedStatus}</span>
+                  {seedInserted ? (
+                    <>
+                      {" "}
+                      • Inserted: <span className="font-medium">{seedInserted}</span>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-base font-semibold">Meet events</div>
                 <div className="mt-1 text-sm text-white/70">
-                  No events configured yet.
+                  {meetEventsError
+                    ? `Unable to load events: ${meetEventsError}`
+                    : meetEventCount > 0
+                      ? `${meetEventCount} events configured.`
+                      : "No events configured yet."}
                 </div>
               </div>
-              <form
-                action={async () => {
-                  "use server";
-                  await seedMeetEventsForHostedBuild({
-                    programId,
-                    hostMeetId,
-                    builderPath: pagePath,
-                  });
-                }}
-              >
+              <form action={seedAction ?? undefined}>
                 <button
                   type="submit"
                   className="rounded-md border border-white/20 bg-black/30 px-4 py-2 text-sm text-white hover:bg-black/40"
@@ -170,6 +268,19 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
                 </button>
               </form>
             </div>
+
+            {meetEventTypes.length > 0 ? (
+              <div className="mt-4 rounded-md border border-white/10 bg-black/20 p-3 text-sm text-white/80">
+                <div className="font-medium text-white/90">Configured</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {meetEventTypes.map((t) => (
+                    <span key={t} className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (

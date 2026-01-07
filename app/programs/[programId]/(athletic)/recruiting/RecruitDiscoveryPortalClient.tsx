@@ -744,13 +744,13 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         {/* Favorites panel (right, 30%, 100% height) */}
         <section className="col-span-1 row-span-2 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
           <div className="border-b border-subtle px-3 py-3">
-            <div className="text-sm font-semibold">Favorites</div>
+            <div className="text-sm font-semibold truncate">Favorites</div>
             <div className="text-[11px] text-muted">
               Discovery-local shortlist. Exports to Stabilization on close.
             </div>
           </div>
 
-          <div className="min-h-0 overflow-auto p-3 glass-scrollbar">
+          <div className="min-h-0 overflow-auto overflow-x-hidden p-3 glass-scrollbar">
             {favorites.length === 0 ? (
               <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
                 <div className="text-sm font-medium">No favorites yet</div>
@@ -888,7 +888,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         {/* Results panel (left, 30%, 80% height) */}
         <section className="col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
           <div className="border-b border-subtle px-3 py-3">
-            <div className="text-sm font-semibold">Results</div>
+            <div className="text-sm font-semibold truncate">Results</div>
             <div className="text-[11px] text-muted">
               {!hasSearched
                 ? "Empty until Search is run."
@@ -898,7 +898,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             </div>
           </div>
 
-          <div className="min-h-0 overflow-auto p-3 glass-scrollbar">
+          <div className="min-h-0 overflow-auto overflow-x-hidden p-3 glass-scrollbar">
             {!hasSearched ? (
               <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
                 <div className="text-sm font-medium">Run a search</div>
@@ -1026,7 +1026,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         {/* Athlete profile panel (middle, 40%, 80% height) */}
         <section className="col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
           <div className="border-b border-subtle px-3 py-3">
-            <div className="text-sm font-semibold">Athlete</div>
+            <div className="text-sm font-semibold truncate">Athlete</div>
             <div className="text-[11px] text-muted">
               {selected ? "Profile preview (non-contextual)." : "Select an athlete to view their profile."}
             </div>
@@ -1052,7 +1052,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
               </button>
             </div>
 
-            <div className="h-full min-h-0 overflow-auto p-3 glass-scrollbar">
+            <div className="h-full min-h-0 overflow-auto overflow-x-hidden p-3 glass-scrollbar">
               {selected ? (
                 <div className="min-w-0">
                   <AthleteProfileClient {...buildAthleteProfileInput(selected)} />

@@ -14,15 +14,36 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { redirect } from "next/navigation";
 
+
+function supabaseServer() {
+  const cookieStore = cookies() as any;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anon) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  }
+
+  return createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+      set(name: string, value: string, options: any) {
+        cookieStore.set({ name, value, ...options });
+      },
+      remove(name: string, options: any) {
+        cookieStore.set({ name, value: "", ...options, maxAge: 0 });
+      },
+    },
+  });
+}
+
+
 type PageProps = {
   params: Promise<{ programId: string }>;
-  searchParams?: Promise<{
-    attendMeetId?: string;
-    hostMeetId?: string;
-    seed?: string;
-    n?: string;
-    err?: string;
-  }>;
+  searchParams?: Promise<{ attendMeetId?: string; hostMeetId?: string; seed?: string; inserted?: string; error?: string }>;
 };
 
 export default async function MeetBuilderPage({ params, searchParams }: PageProps) {
@@ -32,12 +53,12 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
   const attendMeetId = sp.attendMeetId ?? "";
   const hostMeetId = sp.hostMeetId ?? "";
   const seedStatus = sp.seed ?? "";
-  const seedInserted = sp.n ?? "";
-  const seedError = sp.err ?? "";
+  const seedInserted = sp.inserted ?? "";
+  const seedError = sp.error ?? "";
 
   const isAttending = Boolean(attendMeetId);
   const isHosting = Boolean(hostMeetId) && !isAttending;
-  const pagePath = `/programs/${programId}/meets/builder`;
+  const buildPath = `/programs/${programId}/meets/builder`;
 
   let options: Awaited<ReturnType<typeof getBuildMeetOptions>> = {
     hosted: [],
@@ -147,7 +168,7 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
       });
       if (!res.ok) {
         redirect(
-          `${pagePath}?hostMeetId=${selectedMeetId}&seed=error&err=${encodeURIComponent(
+          `${pagePath}?hostMeetId=${selectedMeetId}&seed=error&error=${encodeURIComponent(
             res.error ?? "Seed failed."
           )}`
         );
@@ -155,7 +176,7 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
       redirect(
         `${pagePath}?hostMeetId=${selectedMeetId}&seed=${encodeURIComponent(
           res.status
-        )}&n=${encodeURIComponent(String(res.inserted ?? 0))}`
+        )}&inserted=${encodeURIComponent(String(res.inserted ?? 0))}`
       );
     };
 
@@ -165,7 +186,7 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
 
       const { data, error } = await supabase
         .from("meet_events")
-        .select("event_type")
+        .select("event_type, xc_state, tf_state, field_state, created_at")
         .eq("meet_id", selectedMeetId);
 
       if (error) {

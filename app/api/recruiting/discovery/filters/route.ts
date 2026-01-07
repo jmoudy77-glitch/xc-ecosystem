@@ -33,21 +33,35 @@ export async function POST(req: Request) {
     }
   );
 
-  const egRes = await supabase
-    .from("athletes")
-    .select("event_group")
-    .not("event_group", "is", null)
+  const paRes = await supabase
+    .from("program_athletes")
+    .select("athlete_id")
+    .eq("program_id", body.programId)
     .limit(5000);
+
+  const returningIds =
+    paRes.error || !Array.isArray(paRes.data)
+      ? []
+      : paRes.data
+          .map((r: any) => (typeof r?.athlete_id === "string" ? r.athlete_id : null))
+          .filter((v: any): v is string => !!v);
+
+  let egQ = supabase.from("athletes").select("id, event_group").not("event_group", "is", null).limit(3000);
+  let gyQ = supabase.from("athletes").select("id, grad_year").not("grad_year", "is", null).limit(3000);
+
+  if (returningIds.length > 0) {
+    const inList = `(${returningIds.join(",")})`;
+    egQ = egQ.not("id", "in", inList);
+    gyQ = gyQ.not("id", "in", inList);
+  }
+
+  const egRes = await egQ;
 
   if (egRes.error) {
     return NextResponse.json({ error: egRes.error.message }, { status: 400 });
   }
 
-  const gyRes = await supabase
-    .from("athletes")
-    .select("grad_year")
-    .not("grad_year", "is", null)
-    .limit(5000);
+  const gyRes = await gyQ;
 
   if (gyRes.error) {
     return NextResponse.json({ error: gyRes.error.message }, { status: 400 });

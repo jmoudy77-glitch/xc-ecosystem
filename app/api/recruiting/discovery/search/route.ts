@@ -93,6 +93,11 @@ export async function POST(req: Request) {
         `first_name.ilike.%${t}%,last_name.ilike.%${t}%,hs_school_name.ilike.%${t}%,hs_state.ilike.%${t}%`
       );
     }
+  } else {
+    const hasFilter = (body.eventGroup && body.eventGroup !== "all") || typeof body.gradYear === "number";
+    if (!hasFilter) {
+      return NextResponse.json({ rows: [] });
+    }
   }
 
   const res = await q;

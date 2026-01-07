@@ -3,10 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  readRecruitDiscoverySurfacedCandidates,
-  type RecruitDiscoveryCandidate,
-} from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
+import { type RecruitDiscoveryCandidate } from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
 import {
   safeJsonParse,
   readFavoritesOrder,
@@ -146,6 +143,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
+  const [filterEventGroups, setFilterEventGroups] = useState<string[]>([]);
+  const [filterGradYears, setFilterGradYears] = useState<number[]>([]);
+
   const activeFilterSummary = useMemo(() => {
     const parts: string[] = [];
     if (q.trim()) parts.push(`Search: "${q.trim()}"`);
@@ -167,16 +167,58 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     setFavoritesOrder(readFavoritesOrder(programId));
   }, [programId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/recruiting/discovery/filters", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ programId, sport }),
+        });
+        const json = await res.json();
+        if (!cancelled && res.ok) {
+          setFilterEventGroups(Array.isArray(json?.eventGroups) ? json.eventGroups : []);
+          setFilterGradYears(Array.isArray(json?.gradYears) ? json.gradYears : []);
+        }
+      } catch {
+        // Best-effort filters.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [programId, sport]);
+
   const runSearch = async () => {
     setIsSearching(true);
     setHasSearched(true);
     try {
-      const rows: RecruitDiscoveryCandidate[] = await readRecruitDiscoverySurfacedCandidates({ programId });
-      const normalized = (rows ?? [])
-        .map((row) => normalizeCandidate(row, "surfaced"))
-        .filter((c): c is Candidate => !!c);
-      setSurfaced(normalized);
-      if (normalized.length > 0 && !selectedId) setSelectedId(normalized[0].id);
+      const gradYear =
+        gradYearFilter === "all" ? null : Number.isFinite(Number(gradYearFilter)) ? Number(gradYearFilter) : null;
+      const res = await fetch("/api/recruiting/discovery/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programId,
+          sport,
+          q: q.trim() ? q.trim() : null,
+          eventGroup: eventGroupFilter,
+          gradYear,
+          limit: 100,
+          offset: 0,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setSurfaced([]);
+      } else {
+        const normalized = (json?.rows ?? [])
+          .map((row: RecruitDiscoveryCandidate) => normalizeCandidate(row, "surfaced"))
+          .filter((c): c is Candidate => !!c);
+        setSurfaced(normalized);
+        if (normalized.length > 0 && !selectedId) setSelectedId(normalized[0].id);
+      }
     } finally {
       setIsSearching(false);
     }
@@ -224,18 +266,20 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   }, [surfaced.length]);
 
   const allEventGroups = useMemo(() => {
+    if (filterEventGroups.length > 0) return filterEventGroups;
     const s = new Set<string>();
     for (const c of surfaced) if (c.eventGroup) s.add(c.eventGroup);
     for (const c of favorites) if (c.eventGroup) s.add(c.eventGroup);
     return Array.from(s).sort((a, b) => a.localeCompare(b));
-  }, [surfaced, favorites]);
+  }, [filterEventGroups, surfaced, favorites]);
 
   const allGradYears = useMemo(() => {
+    if (filterGradYears.length > 0) return filterGradYears;
     const s = new Set<number>();
     for (const c of surfaced) if (typeof c.gradYear === "number") s.add(c.gradYear);
     for (const c of favorites) if (typeof c.gradYear === "number") s.add(c.gradYear);
     return Array.from(s).sort((a, b) => a - b);
-  }, [surfaced, favorites]);
+  }, [filterGradYears, surfaced, favorites]);
 
   const filteredSurfaced = useMemo(() => {
     const query = norm(q);

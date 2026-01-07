@@ -568,8 +568,11 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         setActiveList((prev) => (prev === "results" ? "favorites" : "results"));
         e.preventDefault();
       } else if (e.key === "Escape") {
-        setSelectedId(null);
-        e.preventDefault();
+        const active = document.activeElement as HTMLElement | null;
+        if (active && active.closest('[role="dialog"]')) {
+          setSelectedId(null);
+          e.preventDefault();
+        }
       } else if (e.key.toLowerCase() === "a") {
         if (!selectedId) return;
         const inFav = isFav(selectedId);

@@ -58,7 +58,7 @@ export default function AthleteProfileClient({ athlete, roleContext }: Props) {
         {/* Main content (header + two-column body) */}
         <div className="w-full md:flex-1">
         {/* Header */}
-        <header className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+        <header className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             {/* Left side: portrait photo block + basic info */}
             <div className="flex flex-row items-start gap-4">
@@ -88,7 +88,7 @@ export default function AthleteProfileClient({ athlete, roleContext }: Props) {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 md:text-sm">
+                <p className="text-xs text-slate-400 md:text-sm truncate">
                   {athlete.schoolName && (
                     <>
                       {athlete.schoolName}

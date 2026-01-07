@@ -169,10 +169,29 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
   );
 
   const onRemoveAthlete = React.useCallback(
-    (eventGroupKey: string, slotId: string, athleteId: string) => {
+    async (eventGroupKey: string, slotId: string, athleteId: string) => {
+      const slot = rows.find((r) => r.eventGroupKey === eventGroupKey)?.slots.find((s) => s.slotId === slotId);
+      const athlete = slot?.athletesById[athleteId];
+
+      if (athlete?.type === "returning") {
+        return;
+      }
+
       dispatch({ type: "REMOVE_ATHLETE", eventGroupKey, slotId, athleteId });
+
+      if (athlete?.type === "recruit") {
+        try {
+          await fetch("/api/recruiting/favorites/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ programId, sport: "xc", athleteId }),
+          });
+        } catch {
+          // Best-effort delete only.
+        }
+      }
     },
-    [dispatch]
+    [dispatch, programId, rows]
   );
 
   const renderDropZone = React.useCallback(

@@ -224,6 +224,13 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     }
   };
 
+  // After the first explicit search, keep results synced to filter changes.
+  useEffect(() => {
+    if (!hasSearched) return;
+    void runSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventGroupFilter, gradYearFilter, hasSearched]);
+
   const isFav = (candidateId: string) => favorites.some((c) => c.id === candidateId);
 
   const addFavorite = (c: Candidate) => {
@@ -421,6 +428,9 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") runSearch();
+                  }}
                   placeholder="Name, school, state, event group…"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
                 />

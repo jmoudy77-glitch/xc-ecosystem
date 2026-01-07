@@ -1,3 +1,4 @@
+/public/docs/05_ai_systems/ai_output_record_contract.md
 # AI Output Record Contract
 **Authority Level:** AI Contract (binding)  
 **Purpose:** Define the minimum required fields for any persisted AI output to ensure auditability and reproducibility.

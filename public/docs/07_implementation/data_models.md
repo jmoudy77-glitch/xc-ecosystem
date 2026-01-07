@@ -1,3 +1,4 @@
+/public/docs/07_implementation/data_models.md
 # Data Models (Implementation View)
 **Authority Level:** Implementation Law (binding)  
 **Purpose:** Provide practical modeling rules aligned to Domain Models and Architecture Law.

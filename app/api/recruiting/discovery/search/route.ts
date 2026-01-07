@@ -80,18 +80,35 @@ export async function POST(req: Request) {
 
   const queryText = normalizeQuery(body.q);
   if (queryText) {
-    const tokens = queryText.split(/\s+/).filter(Boolean);
-    if (tokens.length >= 2) {
-      const a = tokens[0];
-      const b = tokens[1];
-      q = q.or(
-        `and(first_name.ilike.%${a}%,last_name.ilike.%${b}%),and(first_name.ilike.%${b}%,last_name.ilike.%${a}%),hs_school_name.ilike.%${queryText}%`
-      );
-    } else {
-      const t = tokens[0];
-      q = q.or(
-        `first_name.ilike.%${t}%,last_name.ilike.%${t}%,hs_school_name.ilike.%${t}%,hs_state.ilike.%${t}%`
-      );
+    const clauses = queryText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const ors: string[] = [];
+    for (const clause of clauses) {
+      const tokens = clause.split(/\s+/).filter(Boolean);
+      if (tokens.length >= 2) {
+        const a = tokens[0];
+        const b = tokens[1];
+        ors.push(
+          `and(first_name.ilike.%${a}%,last_name.ilike.%${b}%)`,
+          `and(first_name.ilike.%${b}%,last_name.ilike.%${a}%)`,
+          `hs_school_name.ilike.%${clause}%`
+        );
+      } else {
+        const t = tokens[0];
+        ors.push(
+          `first_name.ilike.%${t}%`,
+          `last_name.ilike.%${t}%`,
+          `hs_school_name.ilike.%${t}%`,
+          `hs_state.ilike.%${t}%`
+        );
+      }
+    }
+
+    if (ors.length > 0) {
+      q = q.or(ors.join(","));
     }
   } else {
     const hasFilter = (body.eventGroup && body.eventGroup !== "all") || typeof body.gradYear === "number";

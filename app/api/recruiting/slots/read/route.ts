@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 
 export async function POST(req: Request) {
   const body = await req.json();
+  const cookieStore = (await cookies()) as any;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,13 +12,13 @@ export async function POST(req: Request) {
     {
       cookies: {
         get(name) {
-          return cookies().get(name)?.value;
+          return cookieStore.get(name)?.value;
         },
         set(name, value, options) {
-          cookies().set({ name, value, ...options });
+          cookieStore.set({ name, value, ...options });
         },
         remove(name, options) {
-          cookies().set({ name, value: "", ...options, maxAge: 0 });
+          cookieStore.set({ name, value: "", ...options, maxAge: 0 });
         },
       },
     }

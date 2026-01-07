@@ -105,6 +105,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: res.error.message }, { status: 400 });
   }
 
+  const athleteIds = Array.isArray(res.data)
+    ? res.data
+        .map((r: any) => (typeof r?.id === "string" ? r.id : null))
+        .filter((v: any): v is string => !!v)
+    : [];
+
+  const scoreByAthleteId = new Map<string, number>();
+  if (athleteIds.length > 0) {
+    const scoresRes = await supabase
+      .from("athlete_scores")
+      .select("athlete_id, global_overall")
+      .in("athlete_id", athleteIds);
+
+    if (!scoresRes.error && Array.isArray(scoresRes.data)) {
+      for (const s of scoresRes.data as any[]) {
+        const id = typeof s?.athlete_id === "string" ? s.athlete_id : null;
+        if (!id) continue;
+        const v = Number(s?.global_overall);
+        if (!Number.isFinite(v)) continue;
+        scoreByAthleteId.set(id, v);
+      }
+    }
+  }
+
   const rows = (res.data ?? []).map((r: any) => ({
     id: r.id,
     displayName: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(),
@@ -115,6 +139,7 @@ export async function POST(req: Request) {
       school: r.hs_school_name ?? null,
       city: r.hs_city ?? null,
       state: r.hs_state ?? null,
+      score: scoreByAthleteId.get(r.id) ?? null,
     },
   }));
 

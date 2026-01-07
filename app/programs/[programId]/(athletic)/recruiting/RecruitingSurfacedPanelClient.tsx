@@ -89,17 +89,17 @@ export function RecruitingSurfacedPanelClient({ programId }: { programId: string
   };
 
   if (loading) {
-    return <div className="text-sm text-muted-foreground">Loading…</div>;
+    return <div className="text-[11px] text-muted">Loading…</div>;
   }
   if (err) {
-    return <div className="text-sm text-muted-foreground">{err}</div>;
+    return <div className="text-[11px] text-muted">{err}</div>;
   }
   if (rows.length === 0) {
-    return <div className="text-sm text-muted-foreground">No surfaced candidates.</div>;
+    return <div className="text-[11px] text-muted">No surfaced candidates.</div>;
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 min-h-0 overflow-auto overflow-x-hidden glass-scrollbar">
       {rows.map((c) => (
         <RecruitingCandidateChip
           key={c.athleteId}

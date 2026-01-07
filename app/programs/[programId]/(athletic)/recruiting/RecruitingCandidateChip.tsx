@@ -41,7 +41,7 @@ export function RecruitingCandidateChip({
 }: Props) {
   return (
     <div
-      className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+      className="flex items-center justify-between gap-2 rounded-xl ring-1 ring-panel panel-muted px-3 py-2"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(
@@ -52,8 +52,8 @@ export function RecruitingCandidateChip({
       title="Drag into a slot"
     >
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium">{candidate.displayName}</div>
-        <div className="text-xs text-muted-foreground">
+        <div className="truncate text-sm font-semibold">{candidate.displayName}</div>
+        <div className="text-[11px] text-muted truncate">
           {candidate.eventGroup ?? "—"} · {candidate.gradYear ?? "—"}
         </div>
       </div>
@@ -62,7 +62,7 @@ export function RecruitingCandidateChip({
         {candidate.originKey === "surfaced" && onFavorite ? (
           <button
             type="button"
-            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+            className="glass-pill rounded-full px-2.5 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
             onClick={onFavorite}
             title="Add to Favorites"
           >
@@ -72,7 +72,7 @@ export function RecruitingCandidateChip({
         {candidate.originKey === "favorites" && onRemoveFavorite ? (
           <button
             type="button"
-            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+            className="glass-pill rounded-full px-2.5 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
             onClick={onRemoveFavorite}
             title="Remove from Favorites"
           >

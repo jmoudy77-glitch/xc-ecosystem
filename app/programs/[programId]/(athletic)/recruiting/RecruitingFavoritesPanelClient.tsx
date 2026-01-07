@@ -93,28 +93,50 @@ export function RecruitingFavoritesPanelClient({ programId }: { programId: strin
   };
 
   if (rows.length === 0) {
-    return <div className="text-sm text-muted-foreground">No favorites yet.</div>;
+    return (
+      <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+        <div className="text-sm font-medium">No favorites yet</div>
+        <div className="mt-1 text-[11px] text-muted">
+          Favorites appear here after they are added in Stabilization.
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-2">
-      {rows.map((c) => (
-        <RecruitingCandidateChip
-          key={c.athleteId}
-          programId={programId}
-          candidate={
-            {
-              athleteId: c.athleteId,
-              displayName: c.displayName,
-              eventGroup: c.eventGroup,
-              gradYear: c.gradYear,
-              originKey: "favorites",
-              originMeta: c.originMeta ?? {},
-            } as RecruitingPanelCandidate
-          }
-          onRemoveFavorite={() => remove(c.athleteId)}
-        />
-      ))}
+    <div className="min-h-0 overflow-auto overflow-x-hidden glass-scrollbar">
+      <div className="space-y-2">
+        {rows.map((c) => (
+          <RecruitingCandidateChip
+            key={c.athleteId}
+            programId={programId}
+            candidate={
+              {
+                athleteId: c.athleteId,
+                displayName: c.displayName,
+                eventGroup: c.eventGroup,
+                gradYear: c.gradYear,
+                originKey: "favorites",
+                originMeta: c.originMeta ?? {},
+              } as RecruitingPanelCandidate
+            }
+            onRemoveFavorite={() => remove(c.athleteId)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between rounded-xl ring-1 ring-panel panel-muted px-3 py-2">
+        <div className="text-[11px] text-muted">Order follows Stabilization favorites.</div>
+        <button
+          type="button"
+          className="glass-pill rounded-full px-2.5 py-1 text-[11px] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] disabled:opacity-60"
+          disabled
+          title="Ordering is managed by Stabilization"
+          aria-disabled="true"
+        >
+          Reset order
+        </button>
+      </div>
     </div>
   );
 }

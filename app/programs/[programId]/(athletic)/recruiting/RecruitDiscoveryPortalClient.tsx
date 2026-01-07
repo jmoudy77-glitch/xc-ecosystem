@@ -814,11 +814,21 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         rowRefs.current[c.id] = el;
                       }}
                       className={cn(
-                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2 transition-[box-shadow,transform,background-color] duration-200 will-change-transform",
+                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2 transition-[box-shadow,transform,background-color] duration-200 will-change-transform relative overflow-hidden",
                         isSelected &&
                           "bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] ring-1 ring-[color-mix(in_oklab,var(--brand)_34%,transparent)] shadow-[0_0_0_1px_color-mix(in_oklab,var(--brand)_18%,transparent),0_14px_36px_color-mix(in_oklab,black_55%,transparent)] translate-y-[-1px]"
                       )}
                     >
+                      {isSelected ? (
+                        <div
+                          data-selected-wash
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0"
+                        >
+                          <div className="absolute inset-0 bg-[radial-gradient(900px_140px_at_0%_0%,color-mix(in_oklab,var(--brand)_16%,transparent)_0%,transparent_62%)]" />
+                          <div className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,var(--brand)_22%,transparent)]" />
+                        </div>
+                      ) : null}
                       <div className="flex items-start justify-between gap-3">
                         <button
                           type="button"
@@ -912,7 +922,19 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
               "shadow-elev-2 translate-y-[-1px] shadow-[0_0_0_1px_color-mix(in_oklab,var(--brand)_22%,transparent),0_18px_44px_color-mix(in_oklab,black_50%,transparent)]"
           )}
         >
-          <div className="border-b border-subtle px-3 py-3">
+          <div className="relative overflow-hidden border-b border-subtle px-3 py-3">
+            <div
+              data-results-rail
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200",
+                activeList === "results" && "opacity-100"
+              )}
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,var(--brand)_28%,transparent)_0%,transparent_60%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,transparent,transparent)]" />
+              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,var(--brand)_24%,transparent)]" />
+            </div>
             <div className="text-sm font-semibold truncate">Results</div>
             <div className="text-[11px] text-muted">
               {!hasSearched
@@ -980,11 +1002,21 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         rowRefs.current[c.id] = el;
                       }}
                       className={cn(
-                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2 transition-[box-shadow,transform,background-color] duration-200 will-change-transform",
+                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2 transition-[box-shadow,transform,background-color] duration-200 will-change-transform relative overflow-hidden",
                         isSelected &&
                           "bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] ring-1 ring-[color-mix(in_oklab,var(--brand)_34%,transparent)] shadow-[0_0_0_1px_color-mix(in_oklab,var(--brand)_18%,transparent),0_14px_36px_color-mix(in_oklab,black_55%,transparent)] translate-y-[-1px]"
                       )}
                     >
+                      {isSelected ? (
+                        <div
+                          data-selected-wash
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0"
+                        >
+                          <div className="absolute inset-0 bg-[radial-gradient(900px_140px_at_0%_0%,color-mix(in_oklab,var(--brand)_16%,transparent)_0%,transparent_62%)]" />
+                          <div className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,var(--brand)_22%,transparent)]" />
+                        </div>
+                      ) : null}
                       <div className="flex items-start justify-between gap-3">
                         <button
                           type="button"

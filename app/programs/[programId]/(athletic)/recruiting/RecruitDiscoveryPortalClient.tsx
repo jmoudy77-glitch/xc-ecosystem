@@ -238,6 +238,33 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     setSelectedId(null);
   };
 
+  const activeChips = useMemo(() => {
+    const chips: Array<{ key: string; label: string; onClear: () => void }> = [];
+    const qv = q.trim();
+    if (qv) {
+      chips.push({
+        key: "q",
+        label: `Query: ${qv}`,
+        onClear: () => setQ(""),
+      });
+    }
+    if (eventGroupFilter !== "all") {
+      chips.push({
+        key: "eg",
+        label: `Event: ${eventGroupFilter}`,
+        onClear: () => setEventGroupFilter("all"),
+      });
+    }
+    if (gradYearFilter !== "all") {
+      chips.push({
+        key: "gy",
+        label: `Grad: ${gradYearFilter}`,
+        onClear: () => setGradYearFilter("all"),
+      });
+    }
+    return chips;
+  }, [q, eventGroupFilter, gradYearFilter]);
+
   // After the first explicit search, keep results synced to filter changes.
   useEffect(() => {
     if (!hasSearched) return;
@@ -525,6 +552,29 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             </div>
 
             <div className="text-xs text-muted-foreground">{activeFilterSummary}</div>
+
+            {activeChips.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {activeChips.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    className="rounded-full border px-2 py-1 text-xs"
+                    onClick={c.onClear}
+                    aria-label={`Clear ${c.label}`}
+                  >
+                    {c.label} <span className="ml-1 text-muted-foreground">×</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="rounded-full border px-2 py-1 text-xs"
+                  onClick={clearSearch}
+                >
+                  Reset all
+                </button>
+              </div>
+            ) : null}
           </div>
         </section>
 

@@ -61,18 +61,18 @@ export default function AthleteProfileClient({ athlete, roleContext }: Props) {
         <header className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             {/* Left side: portrait photo block + basic info */}
-            <div className="flex flex-col gap-3">
-              <div className="h-[320px] w-[160px] md:h-[384px] md:w-[192px] rounded-xl bg-slate-800">
+            <div className="flex flex-row items-start gap-4">
+              <div className="w-[96px] md:w-[115px] aspect-[1/1.85] rounded-xl bg-slate-800 overflow-hidden">
                 <Avatar
                   src={athlete.avatarUrl || undefined}
                   name={athlete.fullName}
                   size="xl"
                   variant="square"
                   bordered={false}
-                  className="h-full w-full object-cover rounded-xl"
+                  className="h-full w-full object-cover"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-base font-semibold text-slate-100 md:text-lg">
                     {athlete.fullName}

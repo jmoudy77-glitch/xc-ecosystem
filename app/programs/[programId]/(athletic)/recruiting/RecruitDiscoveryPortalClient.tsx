@@ -84,31 +84,37 @@ function buildAthleteProfileInput(c: Candidate) {
 }
 
 function normalizeCandidate(raw: any, originKey: OriginKey): Candidate | null {
-  const id = typeof raw?.id === "string" && raw.id.trim() ? raw.id.trim() : null;
+  const row = raw as any;
+
+  const id =
+    (typeof row?.id === "string" && row.id.trim()) ||
+    (typeof row?.athleteId === "string" && row.athleteId.trim()) ||
+    (typeof row?.athlete_id === "string" && row.athlete_id.trim()) ||
+    null;
+
   const displayName =
-    typeof raw?.displayName === "string" && raw.displayName.trim()
-      ? raw.displayName.trim()
-      : null;
+    (typeof row?.displayName === "string" && row.displayName.trim()) ||
+    (typeof row?.name === "string" && row.name.trim()) ||
+    (typeof row?.fullName === "string" && row.fullName.trim()) ||
+    ((typeof row?.firstName === "string" || typeof row?.lastName === "string") &&
+    `${row?.firstName ?? ""} ${row?.lastName ?? ""}`.trim()) ||
+    null;
 
   if (!id || !displayName) return null;
 
   const eventGroup =
-    typeof raw?.eventGroup === "string" && raw.eventGroup.trim()
-      ? raw.eventGroup.trim()
-      : typeof raw?.event_group === "string" && raw.event_group.trim()
-        ? raw.event_group.trim()
-        : null;
+    (typeof row?.eventGroup === "string" && row.eventGroup.trim()) ||
+    (typeof row?.event_group === "string" && row.event_group.trim()) ||
+    null;
 
   const gradYear =
-    typeof raw?.gradYear === "number" && Number.isFinite(raw.gradYear)
-      ? raw.gradYear
-      : typeof raw?.grad_year === "number" && Number.isFinite(raw.grad_year)
-        ? raw.grad_year
-        : null;
+    (typeof row?.gradYear === "number" && Number.isFinite(row.gradYear) && row.gradYear) ||
+    (typeof row?.grad_year === "number" && Number.isFinite(row.grad_year) && row.grad_year) ||
+    null;
 
   const originMeta =
-    raw?.originMeta && typeof raw.originMeta === "object"
-      ? (raw.originMeta as Record<string, unknown>)
+    row?.originMeta && typeof row.originMeta === "object"
+      ? (row.originMeta as Record<string, unknown>)
       : {};
 
   return {

@@ -127,19 +127,41 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
             tabIndex={-1}
             className="relative flex w-full max-w-6xl flex-col rounded-2xl ring-1 ring-panel panel shadow-elev-2 max-h-[calc(100vh-2rem)] overflow-hidden"
           >
-            <div className="flex items-center justify-between border-b border-subtle px-4 py-3">
-              <div className="min-w-0">
-                <div className="text-[11px] text-muted">Recruiting</div>
-                <div className="truncate text-sm font-semibold">Discovery Portal</div>
-              </div>
+            {/* Training-like workspace header (breadcrumb + title/subtitle + right meta/actions) */}
+            <div className="border-b border-subtle px-5 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-[11px] text-muted truncate">
+                    Dashboard <span className="mx-1 text-subtle">›</span> Recruiting{" "}
+                    <span className="mx-1 text-subtle">›</span> Discovery
+                  </div>
+                  <div className="mt-1 truncate text-base font-semibold">
+                    Recruiting Discovery Portal
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted">
+                    Search eligible recruits, curate a shortlist, export favorites on close.
+                  </div>
+                </div>
 
-              <button
-                type="button"
-                className="glass-pill glass-pill--brand-soft rounded-full px-3 py-1.5 text-xs ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                onClick={closeWithExport}
-              >
-                Done
-              </button>
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex flex-col items-end text-[11px] text-muted">
+                    <div className="truncate">
+                      Program: <span className="text-subtle font-mono">{programId}</span>
+                    </div>
+                    <div className="truncate">
+                      Sport: <span className="text-subtle">{sport}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="glass-pill glass-pill--brand-soft rounded-full px-3 py-1.5 text-xs ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                    onClick={closeWithExport}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden">

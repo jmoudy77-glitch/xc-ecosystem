@@ -6,6 +6,7 @@ import { AttendingEntriesEditorClient } from "@/app/components/meet_manager/Atte
 
 import { getBuildMeetOptions } from "@/app/actions/meet_manager/getBuildMeetOptions";
 import { getProgramAthletesForBuild } from "@/app/actions/meet_manager/getProgramAthletesForBuild";
+import { seedMeetEventsForHostedBuild } from "@/app/actions/meet_manager/seedMeetEventsForHostedBuild";
 import { getMeetRosterAthleteIds } from "@/app/actions/meet_manager/getMeetRosterAthleteIds";
 import { getMeetEventsForEntries } from "@/app/actions/meet_manager/getMeetEventsForEntries";
 import { getMeetEntriesForAttendingBuild } from "@/app/actions/meet_manager/getMeetEntriesForAttendingBuild";
@@ -24,6 +25,7 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
 
   const isAttending = Boolean(attendMeetId);
   const isHosting = Boolean(hostMeetId) && !isAttending;
+  const pagePath = `/programs/${programId}/meets/builder`;
 
   let options: Awaited<ReturnType<typeof getBuildMeetOptions>> = {
     hosted: [],
@@ -134,22 +136,39 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
           </ul>
         </div>
       ) : isHosting ? (
-        <div className="space-y-4">
-          <div className="rounded-md border p-4">
-            <h1 className="mb-2 text-lg font-semibold">Hosted meet selected</h1>
-            <p className="text-sm text-muted-foreground">
-              Hosted Build is not yet wired to configuration UI. This page now renders an enforced empty-state instead of a no-op.
-            </p>
-            <div className="mt-3 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-              hostMeetId: {hostMeetId}
+        <div className="w-full space-y-4">
+          <div className="rounded-md border border-white/15 bg-white/5 p-6">
+            <div className="text-lg font-semibold">Hosted meet setup</div>
+            <div className="mt-2 text-sm text-white/80">
+              This is your hosted meet configuration surface. Initialize meet events so attending teams can build entries.
             </div>
-            <div className="mt-3 text-sm text-muted-foreground">
-              Next wiring targets (no new features implied):
-              <ul className="mt-2 list-disc pl-5">
-                <li>Show hosted build guidance + required artifacts checklist.</li>
-                <li>Render minimal config stub when artifacts are missing.</li>
-                <li>Prevent silent selections by always presenting a visible next action.</li>
-              </ul>
+          </div>
+
+          <div className="rounded-md border border-white/15 bg-white/5 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-base font-semibold">Meet events</div>
+                <div className="mt-1 text-sm text-white/70">
+                  No events configured yet.
+                </div>
+              </div>
+              <form
+                action={async () => {
+                  "use server";
+                  await seedMeetEventsForHostedBuild({
+                    programId,
+                    hostMeetId,
+                    builderPath: pagePath,
+                  });
+                }}
+              >
+                <button
+                  type="submit"
+                  className="rounded-md border border-white/20 bg-black/30 px-4 py-2 text-sm text-white hover:bg-black/40"
+                >
+                  Initialize events
+                </button>
+              </form>
             </div>
           </div>
         </div>

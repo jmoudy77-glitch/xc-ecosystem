@@ -31,6 +31,7 @@ type Props = {
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
 
+  getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 };
 
@@ -42,6 +43,7 @@ export function RecruitingPrimarySurfaceSkeleton({
   onOpenAthlete,
   onSetPrimary,
   onRemoveAthlete,
+  getSlotHasPrimary,
   renderDropZone,
 }: Props) {
   const isDev = process.env.NODE_ENV !== "production";
@@ -71,6 +73,7 @@ export function RecruitingPrimarySurfaceSkeleton({
               onOpenAthlete={onOpenAthlete}
               onSetPrimary={onSetPrimary}
               onRemoveAthlete={onRemoveAthlete}
+              getSlotHasPrimary={getSlotHasPrimary}
               renderDropZone={renderDropZone}
             />
           ))
@@ -97,6 +100,7 @@ function EventGroupRow({
   onOpenAthlete,
   onSetPrimary,
   onRemoveAthlete,
+  getSlotHasPrimary,
   renderDropZone,
 }: {
   programId: string;
@@ -106,6 +110,7 @@ function EventGroupRow({
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 }) {
   const isDev = process.env.NODE_ENV !== "production";
@@ -140,6 +145,7 @@ function EventGroupRow({
               onOpenAthlete={onOpenAthlete}
               onSetPrimary={onSetPrimary}
               onRemoveAthlete={onRemoveAthlete}
+              getSlotHasPrimary={getSlotHasPrimary}
               renderDropZone={renderDropZone}
             />
           </div>
@@ -158,6 +164,7 @@ function SlotCard({
   onOpenAthlete,
   onSetPrimary,
   onRemoveAthlete,
+  getSlotHasPrimary,
   renderDropZone,
 }: {
   programId: string;
@@ -168,10 +175,12 @@ function SlotCard({
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
   renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
 }) {
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
+  const hasPrimary = getSlotHasPrimary ? getSlotHasPrimary(eventGroupKey, slot.slotId) : Boolean(primary);
   // LOCK: SlotCard width flexes to avatar + p-3 padding (12px each side).
   const cardWidthPx = RECRUITING_UI.avatar.sizePx + 34;
 
@@ -216,7 +225,7 @@ function SlotCard({
 
         <div className="mt-2 flex items-center justify-start">
           <div className="flex flex-col items-center justify-center">
-            <PresenceMeter primary={primary} />
+            <PresenceMeter hasPrimary={hasPrimary} />
             <button
               type="button"
               className="mt-2 rounded-full"
@@ -396,11 +405,11 @@ function PrimaryAvatar({
   );
 }
 
-function PresenceMeter({ primary }: { primary: RecruitingAthleteSummary | null }) {
+function PresenceMeter({ hasPrimary }: { hasPrimary: boolean }) {
   // LOCK: meter is always present but dormant when there is no primary; no instructional copy.
-  if (!primary) return <div className="h-1.5 w-16 rounded-full bg-slate-200/5" />;
+  if (!hasPrimary) return <div className="h-1.5 w-16 rounded-full bg-slate-200/5" />;
 
-  const fillPct = primary.type === "recruit" ? 0 : 58;
+  const fillPct = 58;
 
   return (
     <div className="flex items-center gap-2">

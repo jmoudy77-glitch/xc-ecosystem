@@ -9,6 +9,7 @@ import { AthleteFactsModal } from "./AthleteFactsModal";
 import { useRecruitingSlots } from "./useRecruitingSlots";
 import type { RecruitingEventGroupRow, RecruitingSlot, RecruitingAthleteSummary } from "./types";
 import { readFavorites, readOriginRegistryEntry } from "@/app/lib/recruiting/portalStorage";
+import { useRecruitingSlotPresence } from "../_hooks/useRecruitingSlotPresence";
 
 type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
@@ -37,6 +38,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
   const [expanded, setExpanded] = React.useState<ExpandedKey>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalAthlete, setModalAthlete] = React.useState<RecruitingAthleteSummary | null>(null);
+  const presence = useRecruitingSlotPresence({ programId, sport: "xc" });
 
   const buildRowsFromAssignments = React.useCallback(
     (assignments: SlotAssignment[]) => {
@@ -222,6 +224,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
         onSetPrimary={onSetPrimary}
         onRemoveAthlete={onRemoveAthlete}
         renderDropZone={renderDropZone}
+        getSlotHasPrimary={presence.hasPrimary}
       />
 
       <AthleteFactsModal open={modalOpen} athlete={modalAthlete} onClose={onCloseModal} />

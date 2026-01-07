@@ -14,32 +14,28 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { redirect } from "next/navigation";
 
+async function supabaseServer() {
+  // NOTE: cookies() can be async in newer Next; always await to ensure cookieStore has .get()
+  const cookieStore = (await cookies()) as any;
 
-function supabaseServer() {
-  const cookieStore = cookies() as any;
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anon) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
-
-  return createServerClient(url, anon, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set() {
+          // no-op in this context
+        },
+        remove() {
+          // no-op in this context
+        },
       },
-      set(name: string, value: string, options: any) {
-        cookieStore.set({ name, value, ...options });
-      },
-      remove(name: string, options: any) {
-        cookieStore.set({ name, value: "", ...options, maxAge: 0 });
-      },
-    },
-  });
+    }
+  );
 }
-
 
 type PageProps = {
   params: Promise<{ programId: string }>;
@@ -59,6 +55,7 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
   const isAttending = Boolean(attendMeetId);
   const isHosting = Boolean(hostMeetId) && !isAttending;
   const buildPath = `/programs/${programId}/meets/builder`;
+  const pagePath = buildPath;
 
   let options: Awaited<ReturnType<typeof getBuildMeetOptions>> = {
     hosted: [],
@@ -69,26 +66,7 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
   let loadError: string | null = null;
 
   try {
-  options = await getBuildMeetOptions(programId);
-
-  function supabaseServer(cookieStore: any) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !anonKey) {
-      throw new Error("Missing Supabase env vars.");
-    }
-
-    return createServerClient(url, anonKey, {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set() {},
-        remove() {},
-      },
-    });
-  }
+    options = await getBuildMeetOptions(programId);
   } catch (e: any) {
     loadError = e?.message ? String(e.message) : "Failed to load meet options.";
   }
@@ -181,8 +159,7 @@ export default async function MeetBuilderPage({ params, searchParams }: PageProp
     };
 
     try {
-      const cookieStore = (await cookies()) as any;
-      const supabase = supabaseServer(cookieStore);
+      const supabase = await supabaseServer();
 
       const { data, error } = await supabase
         .from("meet_events")

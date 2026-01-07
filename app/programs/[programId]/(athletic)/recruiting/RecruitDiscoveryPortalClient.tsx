@@ -894,11 +894,21 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
 
           <div className="min-h-0 overflow-auto p-3 glass-scrollbar">
             {!hasSearched ? (
-              <div className="text-sm text-muted">Run a search to populate results.</div>
+              <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+                <div className="text-sm font-medium">Run a search</div>
+                <div className="mt-1 text-[11px] text-muted">
+                  Results populate only after an explicit search or filter action.
+                </div>
+              </div>
             ) : isSearching ? (
               <div className="text-sm text-muted">Searching…</div>
             ) : surfaced.length === 0 ? (
-              <div className="text-sm text-muted">No matches for the current query or filters.</div>
+              <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+                <div className="text-sm font-medium">No matches</div>
+                <div className="mt-1 text-[11px] text-muted">
+                  Try a different query or widen filters.
+                </div>
+              </div>
             ) : filteredSurfaced.length === 0 ? (
               <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
                 <div className="text-sm font-medium">No matches</div>
@@ -927,6 +937,8 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 {filteredSurfaced.map((c) => {
                   const isSelected = selectedId === c.id;
                   const alreadyFav = isFav(c.id);
+                  const cues = candidateCues(c).slice(0, 3);
+
                   return (
                     <li
                       key={c.id}
@@ -937,37 +949,39 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         rowRefs.current[c.id] = el;
                       }}
                       className={cn(
-                        "flex items-start justify-between rounded-xl ring-1 ring-panel panel-muted px-3 py-2",
+                        "rounded-xl ring-1 ring-panel panel-muted px-3 py-2",
                         isSelected && "ring-2 ring-[var(--brand)]"
                       )}
                     >
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 text-left focus:outline-none"
-                        onClick={() => {
-                          setSelectedId(c.id);
-                          setActiveList("results");
-                        }}
-                        title="Select athlete"
-                      >
-                        <div className="truncate text-sm font-semibold">{c.displayName}</div>
-                        <div className="text-[11px] text-muted">
-                          {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
-                        </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left focus:outline-none"
+                          onClick={() => {
+                            setSelectedId(c.id);
+                            setActiveList("results");
+                          }}
+                          title="Select athlete"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="truncate text-sm font-semibold">{c.displayName}</div>
+                            {stabilizationFavIds.has(c.id) ? (
+                              <Badge
+                                tone="danger"
+                                value="♥"
+                                title="Already in Stabilization favorites"
+                                ariaLabel="Already in Stabilization favorites"
+                              />
+                            ) : null}
+                          </div>
 
-                        <div className="mt-1 flex flex-wrap items-center gap-1">
-                          {stabilizationFavIds.has(c.id) ? (
-                            <Badge
-                              tone="danger"
-                              value="♥"
-                              title="Already in Stabilization favorites"
-                              ariaLabel="Already in Stabilization favorites"
-                            />
-                          ) : null}
+                          <div className="mt-0.5 text-[11px] text-muted truncate">
+                            {c.eventGroup ?? "—"} <span className="text-subtle">·</span>{" "}
+                            {c.gradYear ?? "—"}
+                          </div>
 
-                          {candidateCues(c)
-                            .slice(0, 3)
-                            .map((cue) => (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {cues.map((cue) => (
                               <Badge
                                 key={cue.label}
                                 label={cue.label}
@@ -976,23 +990,24 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                                 title={`${cue.label}: ${cue.value}`}
                               />
                             ))}
-                        </div>
-                      </button>
-
-                      <div className="ml-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          className={cn(
-                            "glass-pill rounded-full px-3 py-1.5 text-[11px] ring-1 ring-panel focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]",
-                            alreadyFav ? "opacity-60 cursor-not-allowed" : "hover:opacity-95"
-                          )}
-                          onClick={() => addFavorite(c)}
-                          disabled={alreadyFav}
-                          aria-disabled={alreadyFav}
-                          title={alreadyFav ? "Already in Favorites" : "Add to Favorites"}
-                        >
-                          {alreadyFav ? "Added" : "Add"}
+                          </div>
                         </button>
+
+                        <div className="shrink-0 pt-0.5">
+                          <button
+                            type="button"
+                            className={cn(
+                              "glass-pill rounded-full px-3 py-1.5 text-[11px] ring-1 ring-panel focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]",
+                              alreadyFav ? "opacity-60 cursor-not-allowed" : "hover:opacity-95"
+                            )}
+                            onClick={() => addFavorite(c)}
+                            disabled={alreadyFav}
+                            aria-disabled={alreadyFav}
+                            title={alreadyFav ? "Already in Favorites" : "Add to Favorites"}
+                          >
+                            {alreadyFav ? "Added" : "Add"}
+                          </button>
+                        </div>
                       </div>
                     </li>
                   );

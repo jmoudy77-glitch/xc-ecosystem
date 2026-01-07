@@ -2,29 +2,64 @@
 
 import * as React from "react";
 import RecruitDiscoveryPortalClient from "./RecruitDiscoveryPortalClient";
+import {
+  favoritesStorageKey,
+  safeJsonParse,
+  readFavoritesOrder,
+} from "@/app/lib/recruiting/portalStorage";
 
 type Props = {
   programId: string;
   sport?: string;
 };
 
-type DiscoveryPortalHandle = {
-  exportFavoritesToStabilization: () => Promise<void>;
-};
-
 export default function RecruitingDiscoveryModalClient({ programId, sport = "xc" }: Props) {
   const [open, setOpen] = React.useState(false);
-  const portalRef = React.useRef<DiscoveryPortalHandle | null>(null);
+
+  const exportFavoritesToStabilization = React.useCallback(async () => {
+    if (typeof window === "undefined") return;
+
+    const favorites = safeJsonParse<any[]>(window.localStorage.getItem(favoritesStorageKey(programId)));
+    if (!Array.isArray(favorites) || favorites.length === 0) return;
+
+    const order = readFavoritesOrder(programId);
+    const idsInFavorites = favorites
+      .map((r) => (typeof r?.id === "string" ? r.id : null))
+      .filter((v): v is string => !!v);
+
+    const ordered =
+      Array.isArray(order) && order.length > 0
+        ? order.filter((id) => idsInFavorites.includes(id))
+        : [];
+
+    const remaining = idsInFavorites.filter((id) => !ordered.includes(id));
+    const finalIds = [...ordered, ...remaining];
+
+    for (let i = 0; i < finalIds.length; i++) {
+      const athleteId = finalIds[i];
+      await fetch("/api/recruiting/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programId,
+          sport,
+          athleteId,
+          position: i + 1,
+          pinned: false,
+        }),
+      });
+    }
+  }, [programId, sport]);
 
   const closeWithExport = React.useCallback(async () => {
     try {
-      await portalRef.current?.exportFavoritesToStabilization?.();
+      await exportFavoritesToStabilization();
     } catch {
       // Best-effort export on close.
     } finally {
       setOpen(false);
     }
-  }, []);
+  }, [exportFavoritesToStabilization]);
 
   return (
     <>
@@ -62,7 +97,7 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
             </div>
 
             <div className="h-[80vh]">
-              <RecruitDiscoveryPortalClient ref={portalRef} programId={programId} sport={sport} />
+              <RecruitDiscoveryPortalClient programId={programId} sport={sport} />
             </div>
           </div>
         </div>

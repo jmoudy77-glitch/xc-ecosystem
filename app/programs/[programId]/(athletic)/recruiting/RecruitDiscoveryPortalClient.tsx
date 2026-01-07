@@ -2,7 +2,6 @@
 
 "use client";
 
-import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   readRecruitDiscoverySurfacedCandidates,
@@ -132,29 +131,8 @@ function saveFavorites(programId: string, favorites: Candidate[]) {
   window.localStorage.setItem(favoritesStorageKey(programId), JSON.stringify(favorites));
 }
 
-async function upsertStabilizationFavorite(args: {
-  programId: string;
-  sport: string;
-  athleteId: string;
-  position: number;
-}) {
-  await fetch("/api/recruiting/favorites", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      programId: args.programId,
-      sport: args.sport,
-      athleteId: args.athleteId,
-      position: args.position,
-      pinned: false,
-    }),
-  });
-}
-
-const RecruitDiscoveryPortalClient = React.forwardRef<
-  { exportFavoritesToStabilization: () => Promise<void> },
-  Props
->(function RecruitDiscoveryPortalClient({ programId, sport }: Props, ref) {
+export default function RecruitDiscoveryPortalClient({ programId, sport }: Props) {
+  void sport;
   const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
   const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
@@ -378,31 +356,6 @@ const RecruitDiscoveryPortalClient = React.forwardRef<
     const inFav = favorites.find((c) => c.id === selectedId) ?? null;
     return inFav ?? inSurfaced;
   }, [favorites, surfaced, selectedId]);
-
-  React.useImperativeHandle(
-    ref,
-    () => ({
-      exportFavoritesToStabilization: async () => {
-        const orderedIds =
-          favoritesOrder.length > 0
-            ? favoritesOrder.filter((id) => favorites.some((f) => f.id === id))
-            : [];
-        const remaining = favorites.map((f) => f.id).filter((id) => !orderedIds.includes(id));
-        const finalIds = [...orderedIds, ...remaining];
-
-        for (let i = 0; i < finalIds.length; i++) {
-          const id = finalIds[i];
-          await upsertStabilizationFavorite({
-            programId,
-            sport,
-            athleteId: id,
-            position: i + 1,
-          });
-        }
-      },
-    }),
-    [favorites, favoritesOrder, programId, sport]
-  );
 
   return (
     <div className="h-full w-full p-3">
@@ -743,6 +696,4 @@ const RecruitDiscoveryPortalClient = React.forwardRef<
       </div>
     </div>
   );
-});
-
-export default RecruitDiscoveryPortalClient;
+}

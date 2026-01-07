@@ -96,8 +96,11 @@ function normalizeCandidate(raw: any, originKey: OriginKey): Candidate | null {
     (typeof row?.displayName === "string" && row.displayName.trim()) ||
     (typeof row?.name === "string" && row.name.trim()) ||
     (typeof row?.fullName === "string" && row.fullName.trim()) ||
+    (typeof row?.full_name === "string" && row.full_name.trim()) ||
     ((typeof row?.firstName === "string" || typeof row?.lastName === "string") &&
     `${row?.firstName ?? ""} ${row?.lastName ?? ""}`.trim()) ||
+    ((typeof row?.first_name === "string" || typeof row?.last_name === "string") &&
+    `${row?.first_name ?? ""} ${row?.last_name ?? ""}`.trim()) ||
     null;
 
   if (!id || !displayName) return null;
@@ -428,18 +431,18 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
       }
 
       const json = await res.json();
-      const rows = Array.isArray(json?.data) ? (json.data as RecruitDiscoveryCandidate[]) : [];
+      const rawRows: any[] = Array.isArray((json as any)?.rows)
+        ? (json as any).rows
+        : Array.isArray((json as any)?.data?.rows)
+          ? (json as any).data.rows
+          : Array.isArray((json as any)?.data)
+            ? (json as any).data
+            : Array.isArray((json as any)?.candidates)
+              ? (json as any).candidates
+              : [];
 
-      const normalized: Candidate[] = rows
-        .map((r: any) => ({
-          id: r.id,
-          displayName: r.full_name ?? r.fullName ?? r.name ?? "Unknown",
-          eventGroup: r.event_group ?? r.eventGroup ?? null,
-          gradYear: r.grad_year ?? r.gradYear ?? null,
-          originKey: "surfaced" as const,
-          originMeta: (r.originMeta && typeof r.originMeta === "object" ? r.originMeta : {}) as Record<string, unknown>,
-        }))
-        .map((r) => normalizeCandidate(r, "surfaced"))
+      const normalized: Candidate[] = (rawRows ?? [])
+        .map((row: RecruitDiscoveryCandidate) => normalizeCandidate(row, "surfaced"))
         .filter((c: Candidate | null): c is Candidate => Boolean(c));
 
       setSurfaced(normalized);

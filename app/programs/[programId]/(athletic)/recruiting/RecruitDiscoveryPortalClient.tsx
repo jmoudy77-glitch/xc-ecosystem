@@ -424,7 +424,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
       const json = await res.json();
       const rows = Array.isArray(json?.data) ? (json.data as RecruitDiscoveryCandidate[]) : [];
 
-      const normalized = rows
+      const normalized: Candidate[] = rows
         .map((r: any) => ({
           id: r.id,
           displayName: r.full_name ?? r.fullName ?? r.name ?? "Unknown",
@@ -434,7 +434,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
           originMeta: (r.originMeta && typeof r.originMeta === "object" ? r.originMeta : {}) as Record<string, unknown>,
         }))
         .map((r) => normalizeCandidate(r, "surfaced"))
-        .filter(Boolean) as Candidate[];
+        .filter((c: Candidate | null): c is Candidate => Boolean(c));
 
       setSurfaced(normalized);
 
@@ -478,7 +478,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   const addFavorite = (c: Candidate) => {
     setFavorites((prev) => {
       if (prev.some((x) => x.id === c.id)) return prev;
-      const next = [...prev, { ...c, originKey: "favorites" }];
+      const next: Candidate[] = [...prev, { ...c, originKey: "favorites" as const }];
       saveFavorites(programId, next);
       return next;
     });

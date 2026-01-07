@@ -889,7 +889,14 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
         </section>
 
         {/* Results panel (left, 30%, 80% height) */}
-        <section className="col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden">
+        <section
+          onMouseDown={() => setActiveList("results")}
+          className={cn(
+            "col-span-1 row-span-1 rounded-2xl ring-1 ring-panel panel flex flex-col min-h-0 overflow-hidden relative transition-[box-shadow,transform,filter] duration-200 will-change-transform",
+            activeList === "results" &&
+              "shadow-elev-2 translate-y-[-1px] shadow-[0_0_0_1px_color-mix(in_oklab,var(--brand)_22%,transparent),0_18px_44px_color-mix(in_oklab,black_50%,transparent)]"
+          )}
+        >
           <div className="border-b border-subtle px-3 py-3">
             <div className="text-sm font-semibold truncate">Results</div>
             <div className="text-[11px] text-muted">

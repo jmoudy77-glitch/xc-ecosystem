@@ -15,6 +15,7 @@ type Props = {
 
 export default function RecruitingDiscoveryModalClient({ programId, sport = "xc" }: Props) {
   const [open, setOpen] = React.useState(false);
+  const modalRef = React.useRef<HTMLDivElement | null>(null);
 
   const exportFavoritesToStabilization = React.useCallback(async () => {
     if (typeof window === "undefined") return;
@@ -61,6 +62,36 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
     }
   }, [exportFavoritesToStabilization]);
 
+  React.useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const root = modalRef.current;
+      if (!root) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey && active === first) {
+        last.focus();
+        e.preventDefault();
+      } else if (!e.shiftKey && active === last) {
+        first.focus();
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   return (
     <>
       <button
@@ -80,7 +111,11 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
         >
           <div className="absolute inset-0 bg-black/60" onClick={closeWithExport} />
 
-          <div className="relative flex w-full max-w-6xl flex-col rounded-xl border border-white/10 bg-black/80 shadow-2xl max-h-[calc(100vh-2rem)]">
+          <div
+            ref={modalRef}
+            tabIndex={-1}
+            className="relative flex w-full max-w-6xl flex-col rounded-xl border border-white/10 bg-black/80 shadow-2xl max-h-[calc(100vh-2rem)]"
+          >
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <div className="min-w-0">
                 <div className="text-xs text-white/50">Recruiting</div>

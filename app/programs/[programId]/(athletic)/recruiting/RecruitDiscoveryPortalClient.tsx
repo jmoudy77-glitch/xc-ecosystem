@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type RecruitDiscoveryCandidate } from "@/app/actions/recruiting/readRecruitDiscoverySurfacedCandidates";
 import {
   safeJsonParse,
@@ -134,6 +134,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   const [favorites, setFavorites] = useState<Candidate[]>([]);
   const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Controls
   const [q, setQ] = useState("");
@@ -189,6 +190,10 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
       cancelled = true;
     };
   }, [programId, sport]);
+
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   const runSearch = async () => {
     setIsSearching(true);
@@ -439,6 +444,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                   }}
                   placeholder="Name, school, state, event group…"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                  ref={searchInputRef}
                 />
               </div>
 
@@ -493,6 +499,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 onClick={runSearch}
                 disabled={isSearching}
                 title="Search"
+                aria-disabled={isSearching}
               >
                 {isSearching ? "Searching…" : "Search"}
               </button>
@@ -635,8 +642,10 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
           <div className="min-h-0 overflow-auto p-3">
             {!hasSearched ? (
               <div className="text-sm text-muted-foreground">Run a search to populate results.</div>
+            ) : isSearching ? (
+              <div className="text-sm text-muted-foreground">Searching…</div>
             ) : surfaced.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No results found.</div>
+              <div className="text-sm text-muted-foreground">No matches for the current query or filters.</div>
             ) : filteredSurfaced.length === 0 ? (
               <div className="rounded-md border bg-muted/20 px-3 py-3">
                 <div className="text-sm font-medium">No matches</div>

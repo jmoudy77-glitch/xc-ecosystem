@@ -1,3 +1,5 @@
+// app/programs/[programId]/(athletic)/recruiting/RecruitingDiscoveryModalClient.tsx
+
 "use client";
 
 import * as React from "react";
@@ -39,7 +41,6 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
 
     // Stable order: explicit order first, then remaining in insertion order.
     const ordered = order.filter((id) => idsInFavorites.includes(id));
-
     const remaining = idsInFavorites.filter((id) => !ordered.includes(id));
     const finalIds = [...ordered, ...remaining];
 
@@ -77,12 +78,14 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
       if (e.key !== "Tab") return;
       const root = modalRef.current;
       if (!root) return;
+
       const focusables = Array.from(
         root.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
         )
       );
       if (focusables.length === 0) return;
+
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
       const active = document.activeElement;
@@ -104,7 +107,7 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
     <>
       <button
         type="button"
-        className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+        className="glass-pill glass-pill--brand-soft inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-[var(--foreground)] ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
         onClick={() => setOpen(true)}
       >
         Discovery Portal
@@ -117,29 +120,29 @@ export default function RecruitingDiscoveryModalClient({ programId, sport = "xc"
           aria-modal="true"
           aria-label="Recruiting Discovery Portal"
         >
-          <div className="absolute inset-0 bg-black/60" onClick={closeWithExport} />
+          <div className="absolute inset-0 bg-black/70" onClick={closeWithExport} />
 
           <div
             ref={modalRef}
             tabIndex={-1}
-            className="relative flex w-full max-w-6xl flex-col rounded-xl border border-white/10 bg-black/80 shadow-2xl max-h-[calc(100vh-2rem)]"
+            className="relative flex w-full max-w-6xl flex-col rounded-2xl ring-1 ring-panel panel shadow-elev-2 max-h-[calc(100vh-2rem)] overflow-hidden"
           >
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-subtle px-4 py-3">
               <div className="min-w-0">
-                <div className="text-xs text-white/50">Recruiting</div>
-                <div className="truncate text-sm font-semibold text-white/90">Discovery Portal</div>
+                <div className="text-[11px] text-muted">Recruiting</div>
+                <div className="truncate text-sm font-semibold">Discovery Portal</div>
               </div>
 
               <button
                 type="button"
-                className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                className="glass-pill glass-pill--brand-soft rounded-full px-3 py-1.5 text-xs ring-1 ring-panel hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
                 onClick={closeWithExport}
               >
                 Done
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className="flex-1 min-h-0 overflow-hidden">
               <RecruitDiscoveryPortalClient programId={programId} sport={sport} />
             </div>
           </div>

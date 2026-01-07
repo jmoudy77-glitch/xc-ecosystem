@@ -192,6 +192,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
   void sport;
   const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
+  const [stabilizationFavIds, setStabilizationFavIds] = useState<Set<string>>(new Set());
   const [favoritesOrder, setFavoritesOrder] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeList, setActiveList] = useState<"results" | "favorites">("results");
@@ -232,6 +233,35 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
     setFavoritesOrder(readFavoritesOrder(programId));
   }, [programId]);
 
+  // Load stabilization favorites once (read-only indicator).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/recruiting/favorites/read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ programId, sport }),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+        const ids = new Set<string>(
+          Array.isArray(json?.data)
+            ? json.data
+                .map((r: any) => (typeof r?.athlete_id === "string" ? r.athlete_id : null))
+                .filter(Boolean)
+            : []
+        );
+        setStabilizationFavIds(ids);
+      } catch {
+        // best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [programId, sport]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -961,6 +991,15 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                         {c.eventGroup ?? "—"} · {c.gradYear ?? "—"}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1">
+                        {stabilizationFavIds.has(c.id) ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-rose-600"
+                            title="Already in Stabilization favorites"
+                            aria-label="Already in Stabilization favorites"
+                          >
+                            ♥
+                          </span>
+                        ) : null}
                         {candidateCues(c)
                           .slice(0, 3)
                           .map((cue) => (

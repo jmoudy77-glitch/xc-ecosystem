@@ -768,17 +768,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             >
               <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,transparent,transparent)]" />
-              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,white_10%,transparent)]" />
             </div>
-            <div className="text-sm font-semibold truncate">Results</div>
-            <div className="text-[11px] text-muted">
-              {!hasSearched
-                ? "Empty until Search is run."
-                : filteredSurfaced.length === surfaced.length
-                  ? surfacedHeader
-                  : `${filteredSurfaced.length} of ${surfaced.length} results (filtered).`}
-            </div>
-
             <div className="text-sm font-semibold truncate">Favorites</div>
             <div className="text-[11px] text-muted">
               Discovery-local shortlist. Exports to Stabilization on close.
@@ -948,7 +938,6 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             >
               <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,transparent,transparent)]" />
-              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,white_10%,transparent)]" />
             </div>
             <div className="text-sm font-semibold truncate">Results</div>
             <div className="text-[11px] text-muted">
@@ -1106,17 +1095,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             >
               <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,transparent,transparent)]" />
-              <div className="absolute bottom-0 left-0 right-0 h-px bg-[color-mix(in_oklab,white_10%,transparent)]" />
             </div>
-            <div className="text-sm font-semibold truncate">Results</div>
-            <div className="text-[11px] text-muted">
-              {!hasSearched
-                ? "Empty until Search is run."
-                : filteredSurfaced.length === surfaced.length
-                  ? surfacedHeader
-                  : `${filteredSurfaced.length} of ${surfaced.length} results (filtered).`}
-            </div>
-
             <div className="text-sm font-semibold truncate">Athlete</div>
             <div className="text-[11px] text-muted">
               {selected ? "Profile preview (non-contextual)." : "Select an athlete to view their profile."}

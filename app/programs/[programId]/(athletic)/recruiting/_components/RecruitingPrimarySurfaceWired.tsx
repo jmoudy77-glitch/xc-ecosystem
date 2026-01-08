@@ -44,6 +44,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ programId, sport: "xc", athleteId: ev.athleteId }),
           });
+        }
           if (!res.ok) return;
         } catch {
           return;
@@ -227,6 +228,20 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
 
       if (athlete?.type === "recruit") {
         try {
+          if (opts?.returnToOrigin) {
+          await fetch("/api/recruiting/slots/remove-durable", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              programId,
+              sport: "xc",
+              eventGroupKey,
+              slotId,
+              athleteId,
+              returnToOrigin: true,
+            }),
+          });
+        } else {
           await fetch("/api/recruiting/slots/remove", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -265,6 +280,23 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
       });
 
       try {
+        if (athlete?.type === "recruit" && athlete?.originList && athlete?.displayName) {
+        await fetch("/api/recruiting/slots/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            programId,
+            sport: "xc",
+            eventGroupKey: slot.eventGroupKey,
+            slotId: slot.slotId,
+            athleteId,
+            athleteType: "recruit",
+            originKey: athlete.originList,
+            displayName: athlete.displayName,
+            gradYear: athlete.gradYear ?? null,
+          }),
+        });
+      } else {
         await fetch("/api/recruiting/slots/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -277,7 +309,8 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
             athleteType: athlete?.type ?? "recruit",
           }),
         });
-        await loadSlotAssignments();
+      }
+      await loadSlotAssignments();
       } catch {
         // Best-effort persistence; UI stays optimistic.
       }

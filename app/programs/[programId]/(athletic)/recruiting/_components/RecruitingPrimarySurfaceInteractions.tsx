@@ -57,6 +57,49 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
+
+    // Prefer structured recruiting payloads when present (stable labels + origin)
+    const structured = parseRecruitingDnDPayload(e);
+    if (structured?.kind === "recruit_stabilization_candidate") {
+      if (normalizeEventGroupKey(structured.eventGroup) !== slot.eventGroupKey) return;
+
+      // record origin with real displayName (durable return-to-origin)
+      recordOrigin({
+        athleteId: structured.athleteId,
+        eventGroupKey: structured.eventGroup,
+        displayName: structured.displayName,
+        gradYear: structured.gradYear ?? null,
+        originList: structured.originKey,
+      });
+
+      if (structured.originKey === "favorites") {
+        fetch("/api/recruiting/favorites/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ programId, sport: "xc", athleteId: structured.athleteId }),
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("favorites/delete failed");
+            removeFromFavorites(programId, structured.athleteId);
+            window.dispatchEvent(new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } }));
+          })
+          .catch(() => {});
+      } else if (structured.originKey === "surfaced") {
+        hideSurfacedCandidate(programId, structured.athleteId);
+        window.dispatchEvent(new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } }));
+      }
+
+      onDropAthlete(structured.athleteId, {
+        athleteId: structured.athleteId,
+        displayName: structured.displayName,
+        type: "recruit",
+        originList: structured.originKey,
+        eventGroupKey: structured.eventGroup,
+        gradYear: structured.gradYear,
+      });
+      return;
+    }
+
     // Debug trace for drop payloads
     try {
       const dt = e.dataTransfer;
@@ -201,17 +244,6 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
         // ignore
       }
     }
-
-    // 2) Stabilization favorites/surfaced payload
-    const payload = parseRecruitingDnDPayload(e);
-    if (payload?.kind === "recruit_stabilization_candidate") {
-      if (normalizeEventGroupKey(payload.eventGroup) !== slot.eventGroupKey) {
-        console.info("[recruiting][drop] eventGroup mismatch (stabilization)", {
-          payload: payload.eventGroup,
-          slot: slot.eventGroupKey,
-        });
-        return;
-      }
       recordOrigin({
         athleteId: payload.athleteId,
         displayName: payload.displayName,

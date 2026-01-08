@@ -52,11 +52,12 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    const slotGroupKey = normalizeEventGroupKey(slot.eventGroupKey);
 
     // Prefer structured recruiting payloads when present (stable labels + origin)
     const structured = parseRecruitingDnDPayload(e);
     if (structured?.kind === "recruit_stabilization_candidate") {
-      if (normalizeEventGroupKey(structured.eventGroup) !== slot.eventGroupKey) return;
+      if (structured.eventGroup && normalizeEventGroupKey(structured.eventGroup) !== slotGroupKey) return;
 
       recordOrigin({
         athleteId: structured.athleteId,
@@ -100,7 +101,7 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
       try {
         const payload = JSON.parse(rawAthlete) as DragAthletePayload;
 
-        if (normalizeEventGroupKey(payload.eventGroupKey) !== slot.eventGroupKey) return;
+        if (payload.eventGroupKey && normalizeEventGroupKey(payload.eventGroupKey) !== slotGroupKey) return;
 
         recordOrigin(payload);
 
@@ -128,8 +129,8 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     if (rawText) {
       try {
         const payload = JSON.parse(rawText) as Partial<DragAthletePayload>;
-        if (payload?.athleteId && payload?.eventGroupKey) {
-          if (normalizeEventGroupKey(payload.eventGroupKey) !== slot.eventGroupKey) return;
+        if (payload?.athleteId) {
+          if (payload.eventGroupKey && normalizeEventGroupKey(payload.eventGroupKey) !== slotGroupKey) return;
 
           recordOrigin({
             athleteId: payload.athleteId,
@@ -163,7 +164,7 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     const discovery = structured?.kind === "recruit_discovery_candidate" ? structured : null;
     if (!discovery) return;
 
-    if (normalizeEventGroupKey(discovery.eventGroup) !== slot.eventGroupKey) return;
+    if (discovery.eventGroup && normalizeEventGroupKey(discovery.eventGroup) !== slotGroupKey) return;
 
     writeOriginRegistryEntry(programId, {
       candidate: {

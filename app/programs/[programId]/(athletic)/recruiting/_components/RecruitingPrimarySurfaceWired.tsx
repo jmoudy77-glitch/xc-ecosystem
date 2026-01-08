@@ -10,6 +10,7 @@ import { useRecruitingSlots } from "./useRecruitingSlots";
 import type { RecruitingEventGroupRow, RecruitingSlot, RecruitingAthleteSummary } from "./types";
 import {
   addToFavoritesIfMissing,
+  hideSurfacedCandidate,
   readFavorites,
   readOriginRegistryEntry,
   unhideSurfacedCandidate,
@@ -30,6 +31,15 @@ type SlotAssignment = {
   athlete_type: "returning" | "recruit";
   is_primary: boolean;
 };
+
+function normalizeEventGroupKey(value: string | null | undefined) {
+  if (!value) return null;
+  const v = value.toLowerCase();
+  if (v.includes("sprint")) return "sprint";
+  if (v.includes("mid")) return "mid";
+  if (v.includes("distance")) return "distance";
+  return v.replace(/\s+/g, "");
+}
 
 export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props) {
   const { rows, dispatch } = useRecruitingSlots(initialRows, {
@@ -108,9 +118,12 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
       };
 
       return initialRows.map((row) => {
+        const rowEventGroupKey = normalizeEventGroupKey(row.eventGroupKey);
         const nextSlots = row.slots.map((slot) => {
           const slotAssignments = assignments.filter(
-            (a) => a.event_group_key === row.eventGroupKey && a.slot_id === slot.slotId
+            (a) =>
+              normalizeEventGroupKey(a.event_group_key) === rowEventGroupKey &&
+              a.slot_id === slot.slotId
           );
 
           const athleteIds = slotAssignments.map((a) => a.athlete_id);
@@ -315,6 +328,16 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
           if (!res.ok) return;
         }
         await loadSlotAssignments();
+        if (athlete?.originList === "favorites") {
+          window.dispatchEvent(
+            new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
+          );
+        } else if (athlete?.originList === "surfaced") {
+          hideSurfacedCandidate(programId, athleteId);
+          window.dispatchEvent(
+            new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } })
+          );
+        }
       } catch {
         // Best-effort persistence; UI stays optimistic.
       }

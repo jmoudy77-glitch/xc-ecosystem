@@ -88,6 +88,7 @@ export default function TeamManagementShell({
     "—";
 
   return (
+    // NOTE: Roster Planning now opts out of shell-driven layout.
     <main
       className={
         needsSeasonSetup

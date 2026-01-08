@@ -10,7 +10,7 @@ export default async function RosterPlanningPage({
   const { programId, teamId } = await params;
 
   return (
-    <div className="w-full p-4">
+    <div className="flex h-full w-full flex-col">
       <RosterSandboxClient programId={programId} teamId={teamId} />
     </div>
   );

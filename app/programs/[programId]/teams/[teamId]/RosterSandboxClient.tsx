@@ -316,7 +316,7 @@ export default function RosterSandboxClient({
   const unlockDisabled = Boolean(lockDate && Date.now() >= lockDate.getTime());
 
   return (
-    <div className="w-full">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-100">Roster Planning</div>

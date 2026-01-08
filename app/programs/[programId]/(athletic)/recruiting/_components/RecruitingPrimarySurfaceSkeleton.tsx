@@ -248,7 +248,11 @@ function SlotCard({
   };
 
   return (
-    <div className="relative" {...(getDropHandlers ? getDropHandlers(slot) : {})}>
+    <div
+      className="relative"
+      data-recruiting-slot-card
+      {...(getDropHandlers ? getDropHandlers(slot) : {})}
+    >
 
       <div
         className={[
@@ -316,13 +320,19 @@ function ExpandedSlotOverlay({
   eventGroupKey: string;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
-  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (
+    eventGroupKey: string,
+    slotId: string,
+    athleteId: string,
+    opts?: { returnToOrigin?: boolean }
+  ) => void;
 }) {
   const athletes = slot.athleteIds.map((id) => slot.athletesById[id]).filter(Boolean);
   const requiresSelection = slot.primaryAthleteId === null && slot.athleteIds.length >= 2;
 
   return (
     <div
+      data-recruiting-expanded-overlay
       className={[
         "absolute z-50",
         "left-1/2 -translate-x-1/2 bottom-full mb-3",
@@ -360,6 +370,9 @@ function ExpandedSlotOverlay({
                   isPrimary={isPrimary}
                   onOpen={() => onOpenAthlete(a)}
                   onSetPrimary={() => onSetPrimary(eventGroupKey, slot.slotId, a.athleteId)}
+                  onRemove={() =>
+                    onRemoveAthlete(eventGroupKey, slot.slotId, a.athleteId, { returnToOrigin: true })
+                  }
                 />
               </div>
             );

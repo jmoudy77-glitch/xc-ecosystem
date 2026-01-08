@@ -13,7 +13,7 @@ export default async function RecruitingPage({ params }: PageProps) {
     <main className="mx-auto w-full max-w-7xl px-4 py-6">
       <div
         data-recruiting-tray
-        className="h-full min-h-0 overflow-hidden rounded-2xl ring-1 ring-panel panel-muted shadow-elev-3"
+        className="h-full min-h-0 overflow-visible rounded-2xl ring-1 ring-panel panel-muted shadow-elev-3"
       >
         <div className="h-full min-h-0 p-3">
           <div className="mb-4 flex items-center justify-between gap-3">

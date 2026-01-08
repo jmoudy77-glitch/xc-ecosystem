@@ -12,6 +12,7 @@ type Props = {
   isPrimary: boolean;
   onOpen: () => void;
   onSetPrimary: () => void;
+  onRemove?: () => void;
 };
 
 export function DraggableAthleteChip({
@@ -20,6 +21,7 @@ export function DraggableAthleteChip({
   isPrimary,
   onOpen,
   onSetPrimary,
+  onRemove,
 }: Props) {
   const onDragStart = (e: React.DragEvent) => {
     const payload: DragAthletePayload = {
@@ -28,6 +30,12 @@ export function DraggableAthleteChip({
     };
     e.dataTransfer.setData(DRAG_TYPES.ATHLETE, JSON.stringify(payload));
     e.dataTransfer.effectAllowed = "move";
+  };
+
+  const onDragEnd = (e: React.DragEvent) => {
+    if (!onRemove) return;
+    if (e.dataTransfer?.dropEffect && e.dataTransfer.dropEffect !== "none") return;
+    onRemove();
   };
 
   const onContextMenu = (e: React.MouseEvent) => {
@@ -53,6 +61,7 @@ export function DraggableAthleteChip({
         type="button"
         draggable
         onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         onClick={onOpen}
         onContextMenu={onContextMenu}
         className={[

@@ -170,6 +170,21 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
     loadSlotAssignments();
   }, [loadSlotAssignments]);
 
+  React.useEffect(() => {
+    if (!expanded) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (!target) return;
+      const inOverlay = target.closest("[data-recruiting-expanded-overlay]");
+      if (inOverlay) return;
+      setExpanded(null);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [expanded]);
+
   const onToggleExpand = React.useCallback((eventGroupKey: string, slotId: string) => {
     setExpanded((prev) => {
       if (prev?.eventGroupKey === eventGroupKey && prev.slotId === slotId) return null;

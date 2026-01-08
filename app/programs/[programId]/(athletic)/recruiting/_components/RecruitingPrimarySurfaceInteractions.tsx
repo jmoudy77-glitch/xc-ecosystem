@@ -39,16 +39,13 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     if (!payload.originList) return;
 
     writeOriginRegistryEntry(programId, {
-      athleteId: payload.athleteId,
+      candidateId: payload.athleteId,
       originKey: payload.originList,
-      candidate: {
-        id: payload.athleteId,
-        displayName: payload.displayName?.trim() || `Athlete ${payload.athleteId.slice(0, 8)}`,
-        eventGroup: payload.eventGroupKey ?? slot.eventGroupKey,
-        gradYear: payload.gradYear ?? null,
-      },
+      displayName: payload.displayName?.trim() || `Athlete ${payload.athleteId.slice(0, 8)}`,
+      eventGroup: payload.eventGroupKey ?? slot.eventGroupKey,
+      gradYear: payload.gradYear ?? null,
       createdAt: new Date().toISOString(),
-    } satisfies RecruitDiscoveryOriginRegistryEntry);
+    });
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -222,13 +219,14 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
 
     if (normalizeEventGroupKey(discovery.eventGroup) !== slot.eventGroupKey) return;
 
-    const originEntry: RecruitDiscoveryOriginRegistryEntry = {
-      athleteId: discovery.candidateId,
+    writeOriginRegistryEntry(programId, {
+      candidateId: discovery.candidateId,
       originKey: discovery.originKey,
-      candidate: discovery.candidate,
+      displayName: discovery.displayName,
+      eventGroup: discovery.eventGroup ?? null,
+      gradYear: discovery.gradYear ?? null,
       createdAt: new Date().toISOString(),
-    };
-    writeOriginRegistryEntry(programId, originEntry);
+    });
 
     if (discovery.originKey === "favorites") {
       fetch("/api/recruiting/favorites/delete", {

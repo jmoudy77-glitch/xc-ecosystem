@@ -283,36 +283,38 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
 
       try {
         if (athlete?.type === "recruit" && athlete?.originList && athlete?.displayName) {
-        await fetch("/api/recruiting/slots/move", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            programId,
-            sport: "xc",
-            eventGroupKey: slot.eventGroupKey,
-            slotId: slot.slotId,
-            athleteId,
-            athleteType: "recruit",
-            originKey: athlete.originList,
-            displayName: athlete.displayName,
-            gradYear: athlete.gradYear ?? null,
-          }),
-        });
-      } else {
-        await fetch("/api/recruiting/slots/add", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            programId,
-            sport: "xc",
-            eventGroupKey: slot.eventGroupKey,
-            slotId: slot.slotId,
-            athleteId,
-            athleteType: athlete?.type ?? "recruit",
-          }),
-        });
-      }
-      await loadSlotAssignments();
+          const res = await fetch("/api/recruiting/slots/move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              programId,
+              sport: "xc",
+              eventGroupKey: slot.eventGroupKey,
+              slotId: slot.slotId,
+              athleteId,
+              athleteType: "recruit",
+              originKey: athlete.originList,
+              displayName: athlete.displayName,
+              gradYear: athlete.gradYear ?? null,
+            }),
+          });
+          if (!res.ok) return;
+        } else {
+          const res = await fetch("/api/recruiting/slots/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              programId,
+              sport: "xc",
+              eventGroupKey: slot.eventGroupKey,
+              slotId: slot.slotId,
+              athleteId,
+              athleteType: athlete?.type ?? "recruit",
+            }),
+          });
+          if (!res.ok) return;
+        }
+        await loadSlotAssignments();
       } catch {
         // Best-effort persistence; UI stays optimistic.
       }

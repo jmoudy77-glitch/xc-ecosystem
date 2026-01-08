@@ -320,9 +320,6 @@ export default function RosterSandboxClient({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-100">Roster Planning</div>
-          <div className="text-[11px] text-muted truncate">
-            {teamSeasonId ? `Team Season: ${teamSeasonId}` : "Team Season: —"}
-          </div>
         </div>
 
         <div className="flex items-center gap-2">

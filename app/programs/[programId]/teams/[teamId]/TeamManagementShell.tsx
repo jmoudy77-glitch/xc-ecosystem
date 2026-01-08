@@ -132,7 +132,7 @@ export default function TeamManagementShell({
         </div>
       ) : (
         <>
-          {!isPracticePlanner ? (
+          {!isPracticePlanner && !isRosterPlanning ? (
             <>
               {/* Team / Season context */}
               <div className="mb-2 hidden items-center gap-2 md:flex">

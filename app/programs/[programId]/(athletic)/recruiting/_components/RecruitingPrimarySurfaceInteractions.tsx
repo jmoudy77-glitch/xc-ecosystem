@@ -90,7 +90,6 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
         recordOrigin(payload);
 
         if (payload.originList === "favorites") {
-          removeFromFavorites(programId, payload.athleteId);
           fetch("/api/recruiting/favorites/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -99,12 +98,17 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
               sport: "xc",
               athleteId: payload.athleteId,
             }),
-          }).catch(() => {
-            // best-effort
-          });
-          window.dispatchEvent(
-            new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
-          );
+          })
+            .then((res) => {
+              if (!res.ok) throw new Error("favorites/delete failed");
+              removeFromFavorites(programId, payload.athleteId);
+              window.dispatchEvent(
+                new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
+              );
+            })
+            .catch(() => {
+              // Keep local metadata intact on failure to avoid UI placeholder degradation.
+            });
         } else if (payload.originList === "surfaced") {
           hideSurfacedCandidate(programId, payload.athleteId);
           window.dispatchEvent(
@@ -152,7 +156,6 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
             originList: payload.originList,
           });
           if (payload.originList === "favorites") {
-            removeFromFavorites(programId, payload.athleteId);
             fetch("/api/recruiting/favorites/delete", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -161,12 +164,17 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
                 sport: "xc",
                 athleteId: payload.athleteId,
               }),
-            }).catch(() => {
-              // best-effort
-            });
-            window.dispatchEvent(
-              new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
-            );
+            })
+              .then((res) => {
+                if (!res.ok) throw new Error("favorites/delete failed");
+                removeFromFavorites(programId, payload.athleteId);
+                window.dispatchEvent(
+                  new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
+                );
+              })
+              .catch(() => {
+                // Keep local metadata intact on failure to avoid UI placeholder degradation.
+              });
           } else if (payload.originList === "surfaced") {
             hideSurfacedCandidate(programId, payload.athleteId);
             window.dispatchEvent(
@@ -212,7 +220,6 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
         originList: payload.originKey,
       });
       if (payload.originKey === "favorites") {
-        removeFromFavorites(programId, payload.athleteId);
         fetch("/api/recruiting/favorites/delete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -221,12 +228,17 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
             sport: "xc",
             athleteId: payload.athleteId,
           }),
-        }).catch(() => {
-          // best-effort
-        });
-        window.dispatchEvent(
-          new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
-        );
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("favorites/delete failed");
+            removeFromFavorites(programId, payload.athleteId);
+            window.dispatchEvent(
+              new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
+            );
+          })
+          .catch(() => {
+            // Keep local metadata intact on failure to avoid UI placeholder degradation.
+          });
       } else if (payload.originKey === "surfaced") {
         hideSurfacedCandidate(programId, payload.athleteId);
         window.dispatchEvent(

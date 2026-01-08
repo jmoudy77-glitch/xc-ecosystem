@@ -30,7 +30,12 @@ type Props = {
 
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
-  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (
+    eventGroupKey: string,
+    slotId: string,
+    athleteId: string,
+    opts?: { returnToOrigin?: boolean }
+  ) => void;
 
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
   getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
@@ -111,7 +116,12 @@ function EventGroupRow({
   onToggleExpand: (eventGroupKey: string, slotId: string) => void;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
-  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (
+    eventGroupKey: string,
+    slotId: string,
+    athleteId: string,
+    opts?: { returnToOrigin?: boolean }
+  ) => void;
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
   getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 }) {
@@ -176,7 +186,12 @@ function SlotCard({
   onToggleExpand: () => void;
   onOpenAthlete: (athlete: RecruitingAthleteSummary) => void;
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
-  onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
+  onRemoveAthlete: (
+    eventGroupKey: string,
+    slotId: string,
+    athleteId: string,
+    opts?: { returnToOrigin?: boolean }
+  ) => void;
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
   getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 }) {
@@ -229,7 +244,7 @@ function SlotCard({
   const onPrimaryAvatarDragEnd = (e: React.DragEvent) => {
     if (!primary) return;
     if (e.dataTransfer?.dropEffect && e.dataTransfer.dropEffect !== "none") return;
-    onRemoveAthlete(eventGroupKey, slot.slotId, primary.athleteId);
+    onRemoveAthlete(eventGroupKey, slot.slotId, primary.athleteId, { returnToOrigin: true });
   };
 
   return (

@@ -33,10 +33,21 @@ type SlotAssignment = {
 
 export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props) {
   const { rows, dispatch } = useRecruitingSlots(initialRows, {
-    onRecruitReturn: (ev) => {
+    onRecruitReturn: async (ev) => {
       const origin = readOriginRegistryEntry(programId, ev.athleteId);
 
       if (ev.originList === "favorites") {
+        // Favorites panel is server-authoritative: restore membership server-side first.
+        try {
+          const res = await fetch("/api/recruiting/favorites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ programId, sport: "xc", athleteId: ev.athleteId }),
+          });
+          if (!res.ok) return;
+        } catch {
+          return;
+        }
         const displayName =
           origin?.candidate?.displayName ?? (ev.athleteId ? `Athlete ${ev.athleteId.slice(0, 8)}` : "Athlete");
         addToFavoritesIfMissing(programId, {
@@ -164,7 +175,12 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
   }, []);
 
   const persistPrimary = React.useCallback(
-    async (eventGroupKey: string, slotId: string, athleteId: string) => {
+    async (
+      eventGroupKey: string,
+      slotId: string,
+      athleteId: string,
+      opts?: { returnToOrigin?: boolean }
+    ) => {
       const slot = rows.find((r) => r.eventGroupKey === eventGroupKey)?.slots.find((s) => s.slotId === slotId);
       const athlete = slot?.athletesById[athleteId];
       if (!athlete) return;
@@ -222,11 +238,13 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
               athleteId,
             }),
           });
-          await fetch("/api/recruiting/favorites/delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ programId, sport: "xc", athleteId }),
-          });
+          if (!opts?.returnToOrigin) {
+            await fetch("/api/recruiting/favorites/delete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ programId, sport: "xc", athleteId }),
+            });
+          }
           await loadSlotAssignments();
         } catch {
           // Best-effort delete only.

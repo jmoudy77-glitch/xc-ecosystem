@@ -10,4 +10,5 @@ export type DragAthletePayload = {
   displayName?: string;
   gradYear?: number | null;
   originList?: "favorites" | "surfaced";
+  fromSlotId?: string;
 };

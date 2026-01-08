@@ -48,18 +48,19 @@ export function RecruitingPrimarySurfaceSkeleton({
 }: Props) {
   const isDev = process.env.NODE_ENV !== "production";
   return (
-    <div className="w-full space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-100">Recruiting</h2>
+    <div className="w-full space-y-3">
+      <div className="relative overflow-hidden rounded-t-2xl ring-1 ring-panel panel-muted shadow-elev-2 border-b border-subtle px-3 py-3">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-14 opacity-100"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,transparent,transparent)]" />
         </div>
-
-        <div className="hidden text-right text-[11px] text-muted sm:block">
-          <div className="font-mono text-[10px] text-slate-300">{programId}</div>
-        </div>
+        <div className="text-sm font-semibold truncate text-slate-100">Roster Slots</div>
       </div>
 
-      <div className="w-full space-y-6">
+      <div className="w-full space-y-4">
         {rows.length === 0 ? (
           <EmptyState />
         ) : (

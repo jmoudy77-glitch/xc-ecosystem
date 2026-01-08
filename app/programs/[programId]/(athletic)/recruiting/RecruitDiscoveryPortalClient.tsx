@@ -63,6 +63,13 @@ function buildAthleteProfileInput(c: Candidate) {
     null;
 
   const gender = (typeof m?.gender === "string" && m.gender.trim()) || null;
+  const scoutScore =
+    (typeof m?.score === "number" && Number.isFinite(m.score) && m.score) ||
+    (typeof m?.fit_score === "number" && Number.isFinite(m.fit_score) && m.fit_score) ||
+    (typeof m?.recruiting_score === "number" &&
+      Number.isFinite(m.recruiting_score) &&
+      m.recruiting_score) ||
+    null;
 
   return {
     athlete: {
@@ -74,6 +81,7 @@ function buildAthleteProfileInput(c: Candidate) {
       eventGroup: c.eventGroup ?? null,
       avatarUrl,
       gender,
+      scoutScore,
     },
     roleContext: {
       // Discovery athlete panel must remain non-contextual / non-coach-tooling.
@@ -155,9 +163,6 @@ function scoreForMeta(m: Record<string, unknown> | null | undefined): number | n
 function candidateCues(c: Candidate): { label: string; value: string }[] {
   const cues: { label: string; value: string }[] = [];
   const m = c.originMeta ?? {};
-
-  const fit = candidateFitScore(c);
-  if (fit > 0) cues.push({ label: "Fit", value: String(Math.round(fit)) });
 
   const score = scoreForMeta(m);
   cues.push({ label: "Scout", value: score === null ? "—" : String(Math.round(score)) });
@@ -638,7 +643,14 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
             }}
           >
         {/* Filter/Search panel */}
-        <section className="col-span-2 row-span-1 rounded-2xl ring-1 ring-panel panel min-h-0 overflow-hidden">
+        <section className="relative col-span-2 row-span-1 rounded-2xl ring-1 ring-panel panel min-h-0 overflow-hidden shadow-elev-2">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-12 opacity-100"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(1200px_120px_at_0%_0%,color-mix(in_oklab,white_10%,transparent)_0%,transparent_65%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,transparent,transparent)]" />
+          </div>
           <div className="flex h-full flex-col gap-3 px-4 py-3">
             {/* Controls row */}
             <div className="flex flex-wrap items-center gap-3">
@@ -664,7 +676,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 <select
                   value={eventGroupFilter}
                   onChange={(e) => setEventGroupFilter(e.target.value)}
-                  className="h-9 rounded-xl ring-1 ring-panel panel-muted px-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                  className="h-9 rounded-xl border border-subtle ring-1 ring-panel panel-muted px-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
                   aria-label="Filter by event group"
                 >
                   <option value="all">All</option>
@@ -681,7 +693,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 <select
                   value={gradYearFilter}
                   onChange={(e) => setGradYearFilter(e.target.value)}
-                  className="h-9 rounded-xl ring-1 ring-panel panel-muted px-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                  className="h-9 rounded-xl border border-subtle ring-1 ring-panel panel-muted px-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
                   aria-label="Filter by graduation year"
                 >
                   <option value="all">All</option>
@@ -698,7 +710,7 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
                 <select
                   value={sortKey}
                   onChange={(e) => setSortKey(e.target.value as SortKey)}
-                  className="h-9 rounded-xl ring-1 ring-panel panel-muted px-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                  className="h-9 rounded-xl border border-subtle ring-1 ring-panel panel-muted px-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
                   aria-label="Sort results"
                 >
                   <option value="fit">Fit</option>

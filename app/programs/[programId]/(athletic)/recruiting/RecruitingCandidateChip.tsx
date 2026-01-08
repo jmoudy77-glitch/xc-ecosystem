@@ -3,6 +3,7 @@
 "use client";
 
 import * as React from "react";
+import { DRAG_TYPES } from "./_components/dragTypes";
 
 type RecruitingPanelCandidate = {
   athleteId: string;
@@ -44,6 +45,16 @@ export function RecruitingCandidateChip({
       className="flex items-center justify-between gap-2 rounded-xl ring-1 ring-panel panel-muted px-3 py-2"
       draggable
       onDragStart={(e) => {
+        const payload = {
+          athleteId: candidate.athleteId,
+          eventGroupKey: candidate.eventGroup ?? "",
+          displayName: candidate.displayName,
+          gradYear: candidate.gradYear ?? null,
+          originList: candidate.originKey,
+        };
+        e.dataTransfer.setData(DRAG_TYPES.ATHLETE, JSON.stringify(payload));
+        e.dataTransfer.setData("text/plain", JSON.stringify(payload));
+        e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData(
           "application/x-xcsys-recruiting",
           JSON.stringify(toDnDPayload(programId, candidate))

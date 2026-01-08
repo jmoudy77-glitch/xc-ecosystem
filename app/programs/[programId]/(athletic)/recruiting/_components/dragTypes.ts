@@ -7,4 +7,7 @@ export const DRAG_TYPES = {
 export type DragAthletePayload = {
   athleteId: string;
   eventGroupKey: string;
+  displayName?: string;
+  gradYear?: number | null;
+  originList?: "favorites" | "surfaced";
 };

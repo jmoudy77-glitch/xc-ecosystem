@@ -104,7 +104,7 @@ export function RecruitingFavoritesPanelClient({ programId }: { programId: strin
   }
 
   return (
-    <div className="min-h-0 overflow-auto overflow-x-hidden glass-scrollbar">
+    <div className="min-h-0">
       <div className="space-y-2">
         {rows.map((c) => (
           <RecruitingCandidateChip

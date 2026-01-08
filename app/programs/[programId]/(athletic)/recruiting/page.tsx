@@ -18,8 +18,7 @@ export default async function RecruitingPage({ params }: PageProps) {
         <div className="h-full min-h-0 p-3">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-sm text-muted-foreground">Recruiting</div>
-              <div className="truncate text-xl font-semibold">Stabilization</div>
+              <div className="truncate text-xl font-semibold">Recruiting</div>
             </div>
             <RecruitingDiscoveryModalClient programId={programId} />
           </div>

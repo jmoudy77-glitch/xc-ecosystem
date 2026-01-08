@@ -11,7 +11,13 @@ import type {
 } from "./types";
 
 type SlotAction =
-  | { type: "DROP_IN_SLOT"; eventGroupKey: string; slotId: string; athleteId: string }
+  | {
+      type: "DROP_IN_SLOT";
+      eventGroupKey: string;
+      slotId: string;
+      athleteId: string;
+      athlete?: RecruitingAthleteSummary;
+    }
   | { type: "SET_PRIMARY"; eventGroupKey: string; slotId: string; athleteId: string }
   | { type: "REMOVE_ATHLETE"; eventGroupKey: string; slotId: string; athleteId: string };
 
@@ -63,7 +69,7 @@ function reducer(state: State, action: Action): State {
       return { ...state, rows: action.rows, pendingEvents: [] };
 
     case "DROP_IN_SLOT": {
-      const { eventGroupKey, slotId, athleteId } = action;
+      const { eventGroupKey, slotId, athleteId, athlete } = action;
 
       return {
         ...state,
@@ -71,6 +77,12 @@ function reducer(state: State, action: Action): State {
           if (row.eventGroupKey !== eventGroupKey) return row;
 
           const nextSlots = row.slots.map((slot) => {
+            const hasAthlete = slot.athletesById[athleteId];
+            const nextAthletesById =
+              athlete && !hasAthlete
+                ? { ...slot.athletesById, [athleteId]: athlete }
+                : slot.athletesById;
+
             if (slot.athleteIds.includes(athleteId)) return slot;
 
             if (slot.slotId === slotId && slot.athleteIds.length >= RECRUITING_UI.slotMaxOccupancy) return slot;
@@ -78,13 +90,19 @@ function reducer(state: State, action: Action): State {
             // Remove from any other slot in this event group (recruit uniqueness primitive).
             if (slot.slotId !== slotId) {
               if (!slot.athleteIds.includes(athleteId)) return slot;
-              return removeFromSlotDeterministic(slot, athleteId).nextSlot;
+              return {
+                ...removeFromSlotDeterministic(slot, athleteId).nextSlot,
+                athletesById: nextAthletesById,
+              };
             }
 
             // Add to target slot:
             // - empty slot -> becomes PRIMARY
             // - filled slot -> added as SECONDARY (PRIMARY unchanged)
-            return addToSlot(slot, athleteId);
+            return {
+              ...addToSlot(slot, athleteId),
+              athletesById: nextAthletesById,
+            };
           });
 
           return { ...row, slots: nextSlots };

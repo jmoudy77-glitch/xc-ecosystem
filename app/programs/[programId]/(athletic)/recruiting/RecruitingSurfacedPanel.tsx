@@ -4,7 +4,7 @@ import * as React from "react";
 
 export function RecruitingSurfacedPanel({ children }: { children?: React.ReactNode }) {
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-2xl ring-1 ring-panel panel-muted shadow-elev-2 overflow-hidden">
+    <section className="flex h-full min-h-0 flex-col rounded-2xl ring-1 ring-panel panel-muted shadow-elev-2">
       <div className="relative overflow-hidden border-b border-subtle px-3 py-3">
         <div
           aria-hidden="true"

@@ -10,6 +10,8 @@ export type RecruitingAthleteSummary = {
   // When a recruit is removed from all slots, they must return to their origin list.
   // Optional until recruit discovery portal is implemented.
   originList?: "favorites" | "surfaced";
+  eventGroupKey?: string | null;
+  gradYear?: number | null;
 };
 
 export type RecruitingSlot = {

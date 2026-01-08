@@ -13,6 +13,7 @@ type Athlete = {
   eventGroup: string | null;
   avatarUrl: string | null;
   gender: string | null;
+  scoutScore?: number | null;
 };
 
 type RoleContext = {
@@ -77,6 +78,11 @@ export default function AthleteProfileClient({ athlete, roleContext }: Props) {
                   <h1 className="text-base font-semibold text-slate-100 md:text-lg">
                     {athlete.fullName}
                   </h1>
+                  {typeof athlete.scoutScore === "number" && (
+                    <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
+                      Scout Score: {Math.round(athlete.scoutScore)}
+                    </span>
+                  )}
                   {athlete.gradYear && (
                     <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
                       {athlete.gradYear} Grad

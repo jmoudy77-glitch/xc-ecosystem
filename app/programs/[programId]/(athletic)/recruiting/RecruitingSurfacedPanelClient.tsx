@@ -10,10 +10,12 @@ import {
 } from "./RecruitingCandidateChip";
 import {
   addToFavoritesIfMissing,
+  readHiddenSurfacedIds,
 } from "@/app/lib/recruiting/portalStorage";
 
 export function RecruitingSurfacedPanelClient({ programId }: { programId: string }) {
   const [rows, setRows] = React.useState<RecruitingPanelCandidate[]>([]);
+  const [hiddenIds, setHiddenIds] = React.useState<Set<string>>(new Set());
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
 
@@ -62,6 +64,24 @@ export function RecruitingSurfacedPanelClient({ programId }: { programId: string
     };
   }, [programId]);
 
+  React.useEffect(() => {
+    setHiddenIds(readHiddenSurfacedIds(programId));
+  }, [programId]);
+
+  React.useEffect(() => {
+    const handler = (e: any) => {
+      if (e?.detail?.programId && e.detail.programId !== programId) return;
+      setHiddenIds(readHiddenSurfacedIds(programId));
+    };
+    window.addEventListener("xc:recruiting:surfaced:changed" as any, handler);
+    return () => window.removeEventListener("xc:recruiting:surfaced:changed" as any, handler);
+  }, [programId]);
+
+  const visibleRows = React.useMemo(
+    () => rows.filter((r) => !hiddenIds.has(r.athleteId)),
+    [hiddenIds, rows]
+  );
+
   const addToFavorites = async (c: RecruitingPanelCandidate) => {
     try {
       await fetch("/api/recruiting/favorites", {
@@ -89,25 +109,54 @@ export function RecruitingSurfacedPanelClient({ programId }: { programId: string
   };
 
   if (loading) {
-    return <div className="text-[11px] text-muted">Loading…</div>;
+    return (
+      <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+        <div className="text-sm font-medium">Loading surfaced</div>
+        <div className="mt-1 text-[11px] text-muted">Fetching engine-curated candidates…</div>
+      </div>
+    );
   }
   if (err) {
-    return <div className="text-[11px] text-muted">{err}</div>;
+    return (
+      <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+        <div className="text-sm font-medium">Unable to load surfaced</div>
+        <div className="mt-1 text-[11px] text-muted">{err}</div>
+      </div>
+    );
   }
   if (rows.length === 0) {
-    return <div className="text-[11px] text-muted">No surfaced candidates.</div>;
+    return (
+      <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+        <div className="text-sm font-medium">No surfaced candidates</div>
+        <div className="mt-1 text-[11px] text-muted">
+          Surfaced candidates appear here when the engine curates a cohort.
+        </div>
+      </div>
+    );
+  }
+  if (visibleRows.length === 0) {
+    return (
+      <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">
+        <div className="text-sm font-medium">No surfaced candidates</div>
+        <div className="mt-1 text-[11px] text-muted">
+          All surfaced candidates are currently hidden.
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-2 min-h-0 overflow-auto overflow-x-hidden glass-scrollbar">
-      {rows.map((c) => (
-        <RecruitingCandidateChip
-          key={c.athleteId}
-          programId={programId}
-          candidate={c}
-          onFavorite={() => addToFavorites(c)}
-        />
-      ))}
+    <div className="min-h-0">
+      <div className="space-y-2">
+        {visibleRows.map((c) => (
+          <RecruitingCandidateChip
+            key={c.athleteId}
+            programId={programId}
+            candidate={c}
+            onFavorite={() => addToFavorites(c)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

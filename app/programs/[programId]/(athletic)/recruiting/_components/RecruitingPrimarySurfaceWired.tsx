@@ -8,7 +8,12 @@ import { SlotDropZone } from "./RecruitingPrimarySurfaceInteractions";
 import { AthleteFactsModal } from "./AthleteFactsModal";
 import { useRecruitingSlots } from "./useRecruitingSlots";
 import type { RecruitingEventGroupRow, RecruitingSlot, RecruitingAthleteSummary } from "./types";
-import { readFavorites, readOriginRegistryEntry } from "@/app/lib/recruiting/portalStorage";
+import {
+  addToFavoritesIfMissing,
+  readFavorites,
+  readOriginRegistryEntry,
+  unhideSurfacedCandidate,
+} from "@/app/lib/recruiting/portalStorage";
 import { useRecruitingSlotPresence } from "../_hooks/useRecruitingSlotPresence";
 
 type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
@@ -29,9 +34,27 @@ type SlotAssignment = {
 export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props) {
   const { rows, dispatch } = useRecruitingSlots(initialRows, {
     onRecruitReturn: (ev) => {
-      // Recruit discovery portal will consume this to restore to Favorites or Surfaced.
-      // Intentionally side-effect free for now.
-      console.info("[recruiting] recruit return", ev);
+      const origin = readOriginRegistryEntry(programId, ev.athleteId);
+
+      if (ev.originList === "favorites") {
+        const displayName =
+          origin?.candidate?.displayName ?? (ev.athleteId ? `Athlete ${ev.athleteId.slice(0, 8)}` : "Athlete");
+        addToFavoritesIfMissing(programId, {
+          id: ev.athleteId,
+          displayName,
+          eventGroup: origin?.candidate?.eventGroup ?? null,
+          gradYear: origin?.candidate?.gradYear ?? null,
+        });
+        window.dispatchEvent(
+          new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
+        );
+        return;
+      }
+
+      unhideSurfacedCandidate(programId, ev.athleteId);
+      window.dispatchEvent(
+        new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } })
+      );
     },
   });
 
@@ -183,34 +206,71 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
 
       if (athlete?.type === "recruit") {
         try {
+          await fetch("/api/recruiting/slots/remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              programId,
+              sport: "xc",
+              eventGroupKey,
+              slotId,
+              athleteId,
+            }),
+          });
           await fetch("/api/recruiting/favorites/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ programId, sport: "xc", athleteId }),
           });
+          await loadSlotAssignments();
         } catch {
           // Best-effort delete only.
         }
       }
     },
-    [dispatch, programId, rows]
+    [dispatch, loadSlotAssignments, programId, rows]
+  );
+
+  const onDropIntoSlot = React.useCallback(
+    async (slot: RecruitingSlot, athleteId: string, athlete?: RecruitingAthleteSummary) => {
+      dispatch({
+        type: "DROP_IN_SLOT",
+        eventGroupKey: slot.eventGroupKey,
+        slotId: slot.slotId,
+        athleteId,
+        athlete,
+      });
+
+      try {
+        await fetch("/api/recruiting/slots/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            programId,
+            sport: "xc",
+            eventGroupKey: slot.eventGroupKey,
+            slotId: slot.slotId,
+            athleteId,
+            athleteType: athlete?.type ?? "recruit",
+          }),
+        });
+        await loadSlotAssignments();
+      } catch {
+        // Best-effort persistence; UI stays optimistic.
+      }
+    },
+    [dispatch, loadSlotAssignments, programId]
   );
 
   const renderDropZone = React.useCallback(
     (slot: RecruitingSlot) => (
       <SlotDropZone
+        programId={programId}
         slot={slot}
-        onDropAthlete={(athleteId) =>
-          dispatch({
-            type: "DROP_IN_SLOT",
-            eventGroupKey: slot.eventGroupKey,
-            slotId: slot.slotId,
-            athleteId,
-          })
-        }
+        onDropAthlete={(athleteId, athlete) => onDropIntoSlot(slot, athleteId, athlete)}
       />
     ),
-    [dispatch]
+    [onDropIntoSlot, programId]
   );
 
   return (

@@ -19,7 +19,7 @@ type Props = {
   onDropAthlete: (athleteId: string, athlete?: RecruitingAthleteSummary) => void;
 };
 
-export function SlotDropZone({ programId, slot, onDropAthlete }: Props) {
+export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
   const normalizeEventGroupKey = (value: string | null | undefined) => {
     if (!value) return null;
     const v = value.toLowerCase();
@@ -267,9 +267,17 @@ export function SlotDropZone({ programId, slot, onDropAthlete }: Props) {
     });
   };
 
+  return { onDragOver, onDrop };
+}
+
+export function SlotDropZone({ programId, slot, onDropAthlete }: Props) {
+  const { onDragOver, onDrop } = getSlotDropHandlers({ programId, slot, onDropAthlete });
   return (
-    <div className="h-full w-full" onDragOver={onDragOver} onDrop={onDrop}>
-      {/* wrapper only; visual surface already rendered in skeleton */}
-    </div>
+    <div
+      className="h-full w-full"
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      aria-label={`Drop zone for ${slot.slotId}`}
+    />
   );
 }

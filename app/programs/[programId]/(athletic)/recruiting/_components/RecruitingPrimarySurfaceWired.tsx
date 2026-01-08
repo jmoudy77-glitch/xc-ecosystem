@@ -4,7 +4,7 @@
 
 import * as React from "react";
 import { RecruitingPrimarySurfaceSkeleton } from "./RecruitingPrimarySurfaceSkeleton";
-import { SlotDropZone } from "./RecruitingPrimarySurfaceInteractions";
+import { getSlotDropHandlers } from "./RecruitingPrimarySurfaceInteractions";
 import { AthleteFactsModal } from "./AthleteFactsModal";
 import { useRecruitingSlots } from "./useRecruitingSlots";
 import type { RecruitingEventGroupRow, RecruitingSlot, RecruitingAthleteSummary } from "./types";
@@ -262,14 +262,13 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
     [dispatch, loadSlotAssignments, programId]
   );
 
-  const renderDropZone = React.useCallback(
-    (slot: RecruitingSlot) => (
-      <SlotDropZone
-        programId={programId}
-        slot={slot}
-        onDropAthlete={(athleteId, athlete) => onDropIntoSlot(slot, athleteId, athlete)}
-      />
-    ),
+  const getDropHandlers = React.useCallback(
+    (slot: RecruitingSlot) =>
+      getSlotDropHandlers({
+        programId,
+        slot,
+        onDropAthlete: (athleteId, athlete) => onDropIntoSlot(slot, athleteId, athlete),
+      }),
     [onDropIntoSlot, programId]
   );
 
@@ -283,7 +282,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
         onOpenAthlete={onOpenAthlete}
         onSetPrimary={onSetPrimary}
         onRemoveAthlete={onRemoveAthlete}
-        renderDropZone={renderDropZone}
+        getDropHandlers={getDropHandlers}
         getSlotHasPrimary={presence.hasPrimary}
       />
 

@@ -4,6 +4,7 @@
 
 import * as React from "react";
 import { RECRUITING_UI } from "./recruitingUiConstants";
+import { DRAG_TYPES, type DragAthletePayload } from "./dragTypes";
 import type {
   RecruitingEventGroupRow,
   RecruitingSlot,
@@ -32,7 +33,7 @@ type Props = {
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
 
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
-  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+  getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 };
 
 export function RecruitingPrimarySurfaceSkeleton({
@@ -44,7 +45,7 @@ export function RecruitingPrimarySurfaceSkeleton({
   onSetPrimary,
   onRemoveAthlete,
   getSlotHasPrimary,
-  renderDropZone,
+  getDropHandlers,
 }: Props) {
   const isDev = process.env.NODE_ENV !== "production";
   return (
@@ -75,7 +76,7 @@ export function RecruitingPrimarySurfaceSkeleton({
               onSetPrimary={onSetPrimary}
               onRemoveAthlete={onRemoveAthlete}
               getSlotHasPrimary={getSlotHasPrimary}
-              renderDropZone={renderDropZone}
+              getDropHandlers={getDropHandlers}
             />
           ))
         )}
@@ -102,7 +103,7 @@ function EventGroupRow({
   onSetPrimary,
   onRemoveAthlete,
   getSlotHasPrimary,
-  renderDropZone,
+  getDropHandlers,
 }: {
   programId: string;
   row: RecruitingEventGroupRow;
@@ -112,7 +113,7 @@ function EventGroupRow({
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
-  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+  getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 }) {
   const isDev = process.env.NODE_ENV !== "production";
   const expandedSlot =
@@ -147,7 +148,7 @@ function EventGroupRow({
               onSetPrimary={onSetPrimary}
               onRemoveAthlete={onRemoveAthlete}
               getSlotHasPrimary={getSlotHasPrimary}
-              renderDropZone={renderDropZone}
+              getDropHandlers={getDropHandlers}
             />
           </div>
         ))}
@@ -166,7 +167,7 @@ function SlotCard({
   onSetPrimary,
   onRemoveAthlete,
   getSlotHasPrimary,
-  renderDropZone,
+  getDropHandlers,
 }: {
   programId: string;
   eventGroupKey: string;
@@ -177,7 +178,7 @@ function SlotCard({
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
-  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+  getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 }) {
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
@@ -210,9 +211,22 @@ function SlotCard({
     onToggleExpand();
   };
 
+  const onPrimaryAvatarDragStart = (e: React.DragEvent) => {
+    if (!primary) return;
+    const payload: DragAthletePayload = {
+      athleteId: primary.athleteId,
+      eventGroupKey,
+      displayName: primary.displayName,
+      gradYear: primary.gradYear ?? null,
+      originList: primary.originList,
+    };
+    e.dataTransfer.setData(DRAG_TYPES.ATHLETE, JSON.stringify(payload));
+    e.dataTransfer.setData("text/plain", JSON.stringify(payload));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
   return (
-    <div className="relative">
-      {renderDropZone ? <div className="absolute inset-0 z-10">{renderDropZone(slot)}</div> : null}
+    <div className="relative" {...(getDropHandlers ? getDropHandlers(slot) : {})}>
 
       <div
         className={[
@@ -230,6 +244,8 @@ function SlotCard({
             <button
               type="button"
               className="mt-2 rounded-full"
+              draggable={Boolean(primary)}
+              onDragStart={onPrimaryAvatarDragStart}
               onClick={onPrimaryAvatarClick}
               aria-label={primary ? `Open ${primary.displayName}` : "Primary slot"}
               title={primary ? (total <= 1 ? "Open athlete" : "Expand slot") : undefined}

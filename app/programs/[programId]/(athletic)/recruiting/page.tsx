@@ -11,14 +11,21 @@ export default async function RecruitingPage({ params }: PageProps) {
   const { programId } = await params;
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm text-muted-foreground">Recruiting</div>
-          <div className="truncate text-xl font-semibold">Stabilization</div>
+      <div
+        data-recruiting-tray
+        className="h-full min-h-0 overflow-hidden rounded-2xl ring-1 ring-panel panel-muted shadow-elev-3"
+      >
+        <div className="h-full min-h-0 p-3">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm text-muted-foreground">Recruiting</div>
+              <div className="truncate text-xl font-semibold">Stabilization</div>
+            </div>
+            <RecruitingDiscoveryModalClient programId={programId} />
+          </div>
+          <RecruitingM1Client programId={programId} />
         </div>
-        <RecruitingDiscoveryModalClient programId={programId} />
       </div>
-      <RecruitingM1Client programId={programId} />
     </main>
   );
 }

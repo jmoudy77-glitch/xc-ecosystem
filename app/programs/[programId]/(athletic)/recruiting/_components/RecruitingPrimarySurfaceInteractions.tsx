@@ -10,7 +10,6 @@ import {
   hideSurfacedCandidate,
   removeFromFavorites,
   writeOriginRegistryEntry,
-  type RecruitDiscoveryOriginRegistryEntry,
 } from "@/app/lib/recruiting/portalStorage";
 
 type Props = {
@@ -39,12 +38,14 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     if (!payload.originList) return;
 
     writeOriginRegistryEntry(programId, {
-      candidateId: payload.athleteId,
+      candidate: {
+        id: payload.athleteId,
+        displayName: payload.displayName?.trim() || `Athlete ${payload.athleteId.slice(0, 8)}`,
+        eventGroup: payload.eventGroupKey ?? slot.eventGroupKey,
+        gradYear: payload.gradYear ?? null,
+      },
       originKey: payload.originList,
-      displayName: payload.displayName?.trim() || `Athlete ${payload.athleteId.slice(0, 8)}`,
-      eventGroup: payload.eventGroupKey ?? slot.eventGroupKey,
-      gradYear: payload.gradYear ?? null,
-      createdAt: new Date().toISOString(),
+      originMeta: { recordedAt: new Date().toISOString() },
     });
   };
 
@@ -220,12 +221,14 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     if (normalizeEventGroupKey(discovery.eventGroup) !== slot.eventGroupKey) return;
 
     writeOriginRegistryEntry(programId, {
-      candidateId: discovery.candidateId,
+      candidate: {
+        id: discovery.candidateId,
+        displayName: discovery.displayName,
+        eventGroup: discovery.eventGroup ?? null,
+        gradYear: discovery.gradYear ?? null,
+      },
       originKey: discovery.originKey,
-      displayName: discovery.displayName,
-      eventGroup: discovery.eventGroup ?? null,
-      gradYear: discovery.gradYear ?? null,
-      createdAt: new Date().toISOString(),
+      originMeta: discovery.originMeta ?? {},
     });
 
     if (discovery.originKey === "favorites") {

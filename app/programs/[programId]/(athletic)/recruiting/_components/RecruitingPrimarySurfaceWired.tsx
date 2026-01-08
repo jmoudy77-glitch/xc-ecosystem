@@ -44,7 +44,6 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ programId, sport: "xc", athleteId: ev.athleteId }),
           });
-        }
           if (!res.ok) return;
         } catch {
           return;

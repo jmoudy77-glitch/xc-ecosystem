@@ -4,7 +4,7 @@
 
 import * as React from "react";
 import { RecruitingPrimarySurfaceSkeleton } from "./RecruitingPrimarySurfaceSkeleton";
-import { SlotDropZone } from "./RecruitingPrimarySurfaceInteractions";
+import { getSlotDropHandlers } from "./RecruitingPrimarySurfaceInteractions";
 import { AthleteFactsModal } from "./AthleteFactsModal";
 import { useRecruitingSlots } from "./useRecruitingSlots";
 import type { RecruitingEventGroupRow, RecruitingSlot, RecruitingAthleteSummary } from "./types";
@@ -82,12 +82,17 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
           fav?.displayName ?? fav?.display_name ?? origin?.candidate?.displayName ?? ""
         ).trim();
         const fallbackLabel = id ? `Athlete ${id.slice(0, 8)}` : "Athlete";
+        const eventGroupKey =
+          origin?.candidate?.eventGroup ?? fav?.eventGroup ?? fav?.event_group ?? null;
+        const gradYear = origin?.candidate?.gradYear ?? fav?.gradYear ?? fav?.grad_year ?? null;
 
         return {
           athleteId: id,
           displayName: displayName || fallbackLabel,
           type,
           originList: origin?.originKey ?? (fav ? "favorites" : undefined),
+          eventGroupKey,
+          gradYear,
         };
       };
 
@@ -262,14 +267,13 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
     [dispatch, loadSlotAssignments, programId]
   );
 
-  const renderDropZone = React.useCallback(
-    (slot: RecruitingSlot) => (
-      <SlotDropZone
-        programId={programId}
-        slot={slot}
-        onDropAthlete={(athleteId, athlete) => onDropIntoSlot(slot, athleteId, athlete)}
-      />
-    ),
+  const getDropHandlers = React.useCallback(
+    (slot: RecruitingSlot) =>
+      getSlotDropHandlers({
+        programId,
+        slot,
+        onDropAthlete: (athleteId, athlete) => onDropIntoSlot(slot, athleteId, athlete),
+      }),
     [onDropIntoSlot, programId]
   );
 
@@ -283,7 +287,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
         onOpenAthlete={onOpenAthlete}
         onSetPrimary={onSetPrimary}
         onRemoveAthlete={onRemoveAthlete}
-        renderDropZone={renderDropZone}
+        getDropHandlers={getDropHandlers}
         getSlotHasPrimary={presence.hasPrimary}
       />
 

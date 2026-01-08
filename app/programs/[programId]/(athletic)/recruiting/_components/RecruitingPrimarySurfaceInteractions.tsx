@@ -29,6 +29,27 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     return v.replace(/\s+/g, "");
   };
 
+  const recordOrigin = (payload: {
+    athleteId: string;
+    displayName?: string;
+    eventGroupKey?: string | null;
+    gradYear?: number | null;
+    originList?: "favorites" | "surfaced";
+  }) => {
+    if (!payload.originList) return;
+    const fallbackLabel = payload.athleteId ? `Athlete ${payload.athleteId.slice(0, 8)}` : "Athlete";
+    writeOriginRegistryEntry(programId, {
+      candidate: {
+        id: payload.athleteId,
+        displayName: payload.displayName?.trim() || fallbackLabel,
+        eventGroup: payload.eventGroupKey ?? null,
+        gradYear: payload.gradYear ?? null,
+      },
+      originKey: payload.originList,
+      originMeta: { source: "slot-drop", recordedAt: new Date().toISOString() },
+    });
+  };
+
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -65,6 +86,8 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
           });
           return;
         }
+
+        recordOrigin(payload);
 
         if (payload.originList === "favorites") {
           removeFromFavorites(programId, payload.athleteId);
@@ -121,6 +144,13 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
             });
             return;
           }
+          recordOrigin({
+            athleteId: payload.athleteId,
+            displayName: payload.displayName,
+            eventGroupKey: payload.eventGroupKey,
+            gradYear: payload.gradYear ?? null,
+            originList: payload.originList,
+          });
           if (payload.originList === "favorites") {
             removeFromFavorites(programId, payload.athleteId);
             fetch("/api/recruiting/favorites/delete", {
@@ -174,6 +204,13 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
         });
         return;
       }
+      recordOrigin({
+        athleteId: payload.athleteId,
+        displayName: payload.displayName,
+        eventGroupKey: payload.eventGroup,
+        gradYear: payload.gradYear ?? null,
+        originList: payload.originKey,
+      });
       if (payload.originKey === "favorites") {
         removeFromFavorites(programId, payload.athleteId);
         fetch("/api/recruiting/favorites/delete", {

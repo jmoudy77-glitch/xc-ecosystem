@@ -33,7 +33,7 @@ type Props = {
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
 
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
-  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+  getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 };
 
 export function RecruitingPrimarySurfaceSkeleton({
@@ -45,7 +45,7 @@ export function RecruitingPrimarySurfaceSkeleton({
   onSetPrimary,
   onRemoveAthlete,
   getSlotHasPrimary,
-  renderDropZone,
+  getDropHandlers,
 }: Props) {
   const isDev = process.env.NODE_ENV !== "production";
   return (
@@ -76,7 +76,7 @@ export function RecruitingPrimarySurfaceSkeleton({
               onSetPrimary={onSetPrimary}
               onRemoveAthlete={onRemoveAthlete}
               getSlotHasPrimary={getSlotHasPrimary}
-              renderDropZone={renderDropZone}
+              getDropHandlers={getDropHandlers}
             />
           ))
         )}
@@ -103,7 +103,7 @@ function EventGroupRow({
   onSetPrimary,
   onRemoveAthlete,
   getSlotHasPrimary,
-  renderDropZone,
+  getDropHandlers,
 }: {
   programId: string;
   row: RecruitingEventGroupRow;
@@ -113,7 +113,7 @@ function EventGroupRow({
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
-  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+  getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 }) {
   const isDev = process.env.NODE_ENV !== "production";
   const expandedSlot =
@@ -148,7 +148,7 @@ function EventGroupRow({
               onSetPrimary={onSetPrimary}
               onRemoveAthlete={onRemoveAthlete}
               getSlotHasPrimary={getSlotHasPrimary}
-              renderDropZone={renderDropZone}
+              getDropHandlers={getDropHandlers}
             />
           </div>
         ))}
@@ -167,7 +167,7 @@ function SlotCard({
   onSetPrimary,
   onRemoveAthlete,
   getSlotHasPrimary,
-  renderDropZone,
+  getDropHandlers,
 }: {
   programId: string;
   eventGroupKey: string;
@@ -178,7 +178,7 @@ function SlotCard({
   onSetPrimary: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   onRemoveAthlete: (eventGroupKey: string, slotId: string, athleteId: string) => void;
   getSlotHasPrimary?: (eventGroupKey: string, slotId: string) => boolean;
-  renderDropZone?: (slot: RecruitingSlot) => React.ReactNode;
+  getDropHandlers?: (slot: RecruitingSlot) => Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop">;
 }) {
   const total = slot.athleteIds.length;
   const primary = slot.primaryAthleteId ? slot.athletesById[slot.primaryAthleteId] : null;
@@ -233,8 +233,7 @@ function SlotCard({
   };
 
   return (
-    <div className="relative">
-      {renderDropZone ? <div className="absolute inset-0 z-10">{renderDropZone(slot)}</div> : null}
+    <div className="relative" {...(getDropHandlers ? getDropHandlers(slot) : {})}>
 
       <div
         className={[

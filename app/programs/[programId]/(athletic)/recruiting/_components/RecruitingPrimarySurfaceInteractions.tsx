@@ -37,17 +37,18 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     originList?: "favorites" | "surfaced";
   }) => {
     if (!payload.originList) return;
-    const fallbackLabel = payload.athleteId ? `Athlete ${payload.athleteId.slice(0, 8)}` : "Athlete";
+
     writeOriginRegistryEntry(programId, {
+      athleteId: payload.athleteId,
+      originKey: payload.originList,
       candidate: {
         id: payload.athleteId,
-        displayName: payload.displayName?.trim() || fallbackLabel,
-        eventGroup: payload.eventGroupKey ?? null,
+        displayName: payload.displayName?.trim() || `Athlete ${payload.athleteId.slice(0, 8)}`,
+        eventGroup: payload.eventGroupKey ?? slot.eventGroupKey,
         gradYear: payload.gradYear ?? null,
       },
-      originKey: payload.originList,
-      originMeta: { source: "slot-drop", recordedAt: new Date().toISOString() },
-    });
+      createdAt: new Date().toISOString(),
+    } satisfies RecruitDiscoveryOriginRegistryEntry);
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -63,7 +64,6 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
     if (structured?.kind === "recruit_stabilization_candidate") {
       if (normalizeEventGroupKey(structured.eventGroup) !== slot.eventGroupKey) return;
 
-      // record origin with real displayName (durable return-to-origin)
       recordOrigin({
         athleteId: structured.athleteId,
         eventGroupKey: structured.eventGroup,
@@ -109,26 +109,21 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
       const rawText = dt?.getData("text/plain") ?? "";
       console.info("[recruiting][drop] types=", types, {
         slot: { eventGroupKey: slot.eventGroupKey, slotId: slot.slotId },
-        rawAthlete: rawAthlete ? rawAthlete.slice(0, 200) : "",
-        rawRecruit: rawRecruit ? rawRecruit.slice(0, 200) : "",
-        rawText: rawText ? rawText.slice(0, 200) : "",
+        rawAthlete,
+        rawRecruit,
+        rawText,
       });
     } catch {
       // ignore
     }
 
-    // 1) Existing M1 athlete drag payload (unchanged behavior)
+    // 1) Primary surface payload (DRAG_TYPES.ATHLETE)
     const rawAthlete = e.dataTransfer.getData(DRAG_TYPES.ATHLETE);
     if (rawAthlete) {
       try {
         const payload = JSON.parse(rawAthlete) as DragAthletePayload;
-        if (normalizeEventGroupKey(payload.eventGroupKey) !== slot.eventGroupKey) {
-          console.info("[recruiting][drop] eventGroup mismatch", {
-            payload: payload.eventGroupKey,
-            slot: slot.eventGroupKey,
-          });
-          return;
-        }
+
+        if (normalizeEventGroupKey(payload.eventGroupKey) !== slot.eventGroupKey) return;
 
         recordOrigin(payload);
 
@@ -136,30 +131,20 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
           fetch("/api/recruiting/favorites/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              programId,
-              sport: "xc",
-              athleteId: payload.athleteId,
-            }),
+            body: JSON.stringify({ programId, sport: "xc", athleteId: payload.athleteId }),
           })
             .then((res) => {
               if (!res.ok) throw new Error("favorites/delete failed");
               removeFromFavorites(programId, payload.athleteId);
-              window.dispatchEvent(
-                new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
-              );
+              window.dispatchEvent(new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } }));
             })
-            .catch(() => {
-              // Keep local metadata intact on failure to avoid UI placeholder degradation.
-            });
+            .catch(() => {});
         } else if (payload.originList === "surfaced") {
           hideSurfacedCandidate(programId, payload.athleteId);
-          window.dispatchEvent(
-            new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } })
-          );
+          window.dispatchEvent(new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } }));
         }
 
-        const athlete =
+        const athlete: RecruitingAthleteSummary | undefined =
           payload.displayName
             ? {
                 athleteId: payload.athleteId,
@@ -174,7 +159,7 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
         onDropAthlete(payload.athleteId, athlete);
         return;
       } catch {
-        // fall through to text/plain / custom payloads
+        // fall through
       }
     }
 
@@ -184,13 +169,8 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
       try {
         const payload = JSON.parse(rawText) as Partial<DragAthletePayload>;
         if (payload?.athleteId && payload?.eventGroupKey) {
-          if (normalizeEventGroupKey(payload.eventGroupKey) !== slot.eventGroupKey) {
-            console.info("[recruiting][drop] eventGroup mismatch (text/plain)", {
-              payload: payload.eventGroupKey,
-              slot: slot.eventGroupKey,
-            });
-            return;
-          }
+          if (normalizeEventGroupKey(payload.eventGroupKey) !== slot.eventGroupKey) return;
+
           recordOrigin({
             athleteId: payload.athleteId,
             displayName: payload.displayName,
@@ -198,34 +178,25 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
             gradYear: payload.gradYear ?? null,
             originList: payload.originList,
           });
+
           if (payload.originList === "favorites") {
             fetch("/api/recruiting/favorites/delete", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                programId,
-                sport: "xc",
-                athleteId: payload.athleteId,
-              }),
+              body: JSON.stringify({ programId, sport: "xc", athleteId: payload.athleteId }),
             })
               .then((res) => {
                 if (!res.ok) throw new Error("favorites/delete failed");
-                removeFromFavorites(programId, payload.athleteId);
-                window.dispatchEvent(
-                  new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
-                );
+                removeFromFavorites(programId, payload.athleteId!);
+                window.dispatchEvent(new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } }));
               })
-              .catch(() => {
-                // Keep local metadata intact on failure to avoid UI placeholder degradation.
-              });
+              .catch(() => {});
           } else if (payload.originList === "surfaced") {
             hideSurfacedCandidate(programId, payload.athleteId);
-            window.dispatchEvent(
-              new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } })
-            );
+            window.dispatchEvent(new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } }));
           }
 
-          const athlete =
+          const athlete: RecruitingAthleteSummary | undefined =
             payload.displayName
               ? {
                   athleteId: payload.athleteId,
@@ -244,93 +215,35 @@ export function getSlotDropHandlers({ programId, slot, onDropAthlete }: Props) {
         // ignore
       }
     }
-      recordOrigin({
-        athleteId: payload.athleteId,
-        displayName: payload.displayName,
-        eventGroupKey: payload.eventGroup,
-        gradYear: payload.gradYear ?? null,
-        originList: payload.originKey,
-      });
-      if (payload.originKey === "favorites") {
-        fetch("/api/recruiting/favorites/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            programId,
-            sport: "xc",
-            athleteId: payload.athleteId,
-          }),
-        })
-          .then((res) => {
-            if (!res.ok) throw new Error("favorites/delete failed");
-            removeFromFavorites(programId, payload.athleteId);
-            window.dispatchEvent(
-              new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId } })
-            );
-          })
-          .catch(() => {
-            // Keep local metadata intact on failure to avoid UI placeholder degradation.
-          });
-      } else if (payload.originKey === "surfaced") {
-        hideSurfacedCandidate(programId, payload.athleteId);
-        window.dispatchEvent(
-          new CustomEvent("xc:recruiting:surfaced:changed", { detail: { programId } })
-        );
-      }
-      onDropAthlete(payload.athleteId, {
-        athleteId: payload.athleteId,
-        displayName: payload.displayName,
-        type: "recruit",
-        originList: payload.originKey,
-        eventGroupKey: payload.eventGroup,
-        gradYear: payload.gradYear,
-      });
-      return;
-    }
 
-    // 3) Discovery Portal candidate payload (new)
-    const discovery = payload;
-    if (!discovery || discovery.kind !== "recruit_discovery_candidate") return;
+    // 2) Discovery payloads (for completeness)
+    const discovery = structured?.kind === "recruit_discovery_candidate" ? structured : null;
+    if (!discovery) return;
 
-    if (normalizeEventGroupKey(discovery.eventGroup) !== slot.eventGroupKey) {
-      console.info("[recruiting][drop] eventGroup mismatch (discovery)", {
-        payload: discovery.eventGroup,
-        slot: slot.eventGroupKey,
-      });
-      return;
-    }
+    if (normalizeEventGroupKey(discovery.eventGroup) !== slot.eventGroupKey) return;
 
-    const entry: RecruitDiscoveryOriginRegistryEntry = {
-      candidate: {
-        id: discovery.candidateId,
-        displayName: discovery.displayName,
-        eventGroup: discovery.eventGroup ?? null,
-        gradYear: discovery.gradYear ?? null,
-      },
+    const originEntry: RecruitDiscoveryOriginRegistryEntry = {
+      athleteId: discovery.candidateId,
       originKey: discovery.originKey,
-      originMeta: discovery.originMeta ?? {},
+      candidate: discovery.candidate,
+      createdAt: new Date().toISOString(),
     };
+    writeOriginRegistryEntry(programId, originEntry);
 
-    // Record origin for later restoration on removal.
-    writeOriginRegistryEntry(discovery.programId, entry);
-
-    // While placed, suppress candidate in their origin list.
     if (discovery.originKey === "favorites") {
-      removeFromFavorites(discovery.programId, discovery.candidateId);
       fetch("/api/recruiting/favorites/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          programId: discovery.programId,
-          sport: "xc",
-          athleteId: discovery.candidateId,
-        }),
-      }).catch(() => {
-        // Best-effort delete; client cache already updated.
-      });
-      window.dispatchEvent(
-        new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId: discovery.programId } })
-      );
+        body: JSON.stringify({ programId: discovery.programId, sport: "xc", athleteId: discovery.candidateId }),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("favorites/delete failed");
+          removeFromFavorites(discovery.programId, discovery.candidateId);
+          window.dispatchEvent(
+            new CustomEvent("xc:recruiting:favorites:changed", { detail: { programId: discovery.programId } })
+          );
+        })
+        .catch(() => {});
     } else {
       hideSurfacedCandidate(discovery.programId, discovery.candidateId);
       window.dispatchEvent(

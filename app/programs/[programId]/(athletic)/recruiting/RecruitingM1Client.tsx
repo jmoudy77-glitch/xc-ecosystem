@@ -12,9 +12,10 @@ import { RecruitingFavoritesPanelClient } from "./RecruitingFavoritesPanelClient
 
 type Props = {
   programId: string;
+  teamSeasonId: string | null;
 };
 
-export default function RecruitingM1Client({ programId }: Props) {
+export default function RecruitingM1Client({ programId, teamSeasonId }: Props) {
   const initialRows = React.useMemo<RecruitingEventGroupRow[]>(
     () => [
       {
@@ -45,7 +46,17 @@ export default function RecruitingM1Client({ programId }: Props) {
       </div>
 
       <div className="col-span-12 min-h-0 lg:col-span-6">
-        <RecruitingPrimarySurfaceWired programId={programId} initialRows={initialRows} />
+        {teamSeasonId ? (
+          <RecruitingPrimarySurfaceWired
+            programId={programId}
+            teamSeasonId={teamSeasonId}
+            initialRows={initialRows}
+          />
+        ) : (
+          <div className="rounded-2xl border border-subtle bg-surface p-6 text-[12px] text-slate-100">
+            Select a Team and Season from the program header to load roster slots.
+          </div>
+        )}
       </div>
 
       <div className="col-span-12 min-h-0 lg:col-span-3">

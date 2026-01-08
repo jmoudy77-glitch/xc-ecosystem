@@ -25,9 +25,10 @@ export async function POST(req: Request) {
   );
 
   const { data, error } = await supabase.rpc(
-    "rpc_recruiting_slot_assignments_read_v1",
+    "rpc_recruiting_slot_assignments_read_v2",
     {
       p_program_id: body.programId,
+      p_team_season_id: body.teamSeasonId,
       p_sport: body.sport,
     }
   );

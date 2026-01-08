@@ -2,13 +2,38 @@
 
 import RecruitingDiscoveryModalClient from "./RecruitingDiscoveryModalClient";
 import RecruitingM1Client from "./RecruitingM1Client";
+import { cookies } from "next/headers";
 
 type PageProps = {
   params: Promise<{ programId: string }>;
 };
 
+type PersistedContext = {
+  teamId?: string | null;
+  seasonId?: string | null;
+  teamName?: string | null;
+  seasonName?: string | null;
+  seasonStatus?: string | null;
+};
+
+async function readPersistedProgramContext(programId: string): Promise<PersistedContext> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(`xc_ctx_${programId}`)?.value;
+    if (!raw) return {};
+    const decoded = decodeURIComponent(raw);
+    const parsed = JSON.parse(decoded);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as PersistedContext;
+  } catch {
+    return {};
+  }
+}
+
 export default async function RecruitingPage({ params }: PageProps) {
   const { programId } = await params;
+  const ctx = await readPersistedProgramContext(programId);
+  const teamSeasonId = ctx.seasonId ?? null;
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6">
       <div
@@ -22,7 +47,7 @@ export default async function RecruitingPage({ params }: PageProps) {
             </div>
             <RecruitingDiscoveryModalClient programId={programId} />
           </div>
-          <RecruitingM1Client programId={programId} />
+          <RecruitingM1Client programId={programId} teamSeasonId={teamSeasonId} />
         </div>
       </div>
     </main>

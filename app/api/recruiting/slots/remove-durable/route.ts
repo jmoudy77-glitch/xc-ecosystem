@@ -6,6 +6,7 @@ import { createServerClient } from "@supabase/ssr";
 
 type Body = {
   programId: string;
+  teamSeasonId: string;
   sport: string;
   eventGroupKey: string;
   slotId: string;
@@ -35,8 +36,9 @@ export async function POST(req: Request) {
     }
   );
 
-  const { error } = await supabase.rpc("rpc_recruiting_slot_remove_durable_v1", {
+  const { error } = await supabase.rpc("rpc_recruiting_slot_remove_durable_v2", {
     p_program_id: body.programId,
+    p_team_season_id: body.teamSeasonId,
     p_sport: body.sport,
     p_event_group_key: body.eventGroupKey,
     p_slot_id: body.slotId,

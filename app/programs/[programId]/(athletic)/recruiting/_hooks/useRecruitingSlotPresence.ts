@@ -16,22 +16,23 @@ function keyOf(row: { event_group_key: string; slot_id: string }): RecruitingSlo
 
 export function useRecruitingSlotPresence(args: {
   programId: string;
+  teamSeasonId: string;
   sport: string;
 }) {
-  const { programId, sport } = args;
+  const { programId, teamSeasonId, sport } = args;
 
   const [rows, setRows] = useState<RecruitingSlotPresenceRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
-    if (!programId || !sport) return;
+    if (!programId || !teamSeasonId || !sport) return;
 
     setIsLoading(true);
     try {
       const res = await fetch("/api/recruiting/slots/presence/read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programId, sport }),
+        body: JSON.stringify({ programId, teamSeasonId, sport }),
       });
 
       const json = await res.json();
@@ -39,7 +40,7 @@ export function useRecruitingSlotPresence(args: {
     } finally {
       setIsLoading(false);
     }
-  }, [programId, sport]);
+  }, [programId, teamSeasonId, sport]);
 
   useEffect(() => {
     refresh();

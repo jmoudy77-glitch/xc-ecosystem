@@ -25,9 +25,10 @@ export async function POST(req: Request) {
   );
 
   const { error } = await supabase.rpc(
-    "rpc_recruiting_slot_set_primary_v1",
+    "rpc_recruiting_slot_set_primary_v2",
     {
       p_program_id: body.programId,
+      p_team_season_id: body.teamSeasonId,
       p_sport: body.sport ?? "xc",
       p_event_group_key: body.eventGroupKey,
       p_slot_id: body.slotId,

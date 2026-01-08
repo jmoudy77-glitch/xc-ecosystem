@@ -21,6 +21,7 @@ type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
 
 type Props = {
   programId: string;
+  teamSeasonId: string;
   initialRows: RecruitingEventGroupRow[];
 };
 
@@ -41,7 +42,7 @@ function normalizeEventGroupKey(value: string | null | undefined) {
   return v.replace(/\s+/g, "");
 }
 
-export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props) {
+export function RecruitingPrimarySurfaceWired({ programId, teamSeasonId, initialRows }: Props) {
   const { rows, dispatch } = useRecruitingSlots(initialRows, {
     onRecruitReturn: async (ev) => {
       const origin = readOriginRegistryEntry(programId, ev.athleteId);
@@ -82,7 +83,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
   const [expanded, setExpanded] = React.useState<ExpandedKey>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalAthlete, setModalAthlete] = React.useState<RecruitingAthleteSummary | null>(null);
-  const presence = useRecruitingSlotPresence({ programId, sport: "xc" });
+  const presence = useRecruitingSlotPresence({ programId, teamSeasonId, sport: "xc" });
 
   const buildRowsFromAssignments = React.useCallback(
     (assignments: SlotAssignment[]) => {
@@ -150,11 +151,12 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
   );
 
   const loadSlotAssignments = React.useCallback(async () => {
+    if (!teamSeasonId) return;
     try {
       const res = await fetch("/api/recruiting/slots/read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programId, sport: "xc" }),
+        body: JSON.stringify({ programId, teamSeasonId, sport: "xc" }),
       });
       if (!res.ok) return;
       const json = await res.json();
@@ -164,7 +166,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
     } catch {
       // Best-effort; UI can operate locally if read fails.
     }
-  }, [buildRowsFromAssignments, dispatch, programId]);
+  }, [buildRowsFromAssignments, dispatch, programId, teamSeasonId]);
 
   React.useEffect(() => {
     loadSlotAssignments();
@@ -219,6 +221,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             programId,
+            teamSeasonId,
             sport: "xc",
             eventGroupKey,
             slotId,
@@ -231,7 +234,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
         // Best-effort persistence; UI remains authoritative.
       }
     },
-    [rows, programId, loadSlotAssignments]
+    [rows, programId, teamSeasonId, loadSlotAssignments]
   );
 
   const onSetPrimary = React.useCallback(
@@ -262,6 +265,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               programId,
+              teamSeasonId,
               sport: "xc",
               eventGroupKey,
               slotId,
@@ -275,6 +279,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               programId,
+              teamSeasonId,
               sport: "xc",
               eventGroupKey,
               slotId,
@@ -296,7 +301,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
     }
 
     },
-    [dispatch, loadSlotAssignments, programId, rows]
+    [dispatch, loadSlotAssignments, programId, teamSeasonId, rows]
   );
 
   const onDropIntoSlot = React.useCallback(
@@ -316,6 +321,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               programId,
+              teamSeasonId,
               sport: "xc",
               eventGroupKey: slot.eventGroupKey,
               slotId: slot.slotId,
@@ -333,6 +339,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               programId,
+              teamSeasonId,
               sport: "xc",
               eventGroupKey: slot.eventGroupKey,
               slotId: slot.slotId,
@@ -357,7 +364,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
         // Best-effort persistence; UI stays optimistic.
       }
     },
-    [dispatch, loadSlotAssignments, programId]
+    [dispatch, loadSlotAssignments, programId, teamSeasonId]
   );
 
   const getDropHandlers = React.useCallback(
@@ -367,7 +374,7 @@ export function RecruitingPrimarySurfaceWired({ programId, initialRows }: Props)
         slot,
         onDropAthlete: (athleteId, athlete) => onDropIntoSlot(slot, athleteId, athlete),
       }),
-    [onDropIntoSlot, programId]
+    [onDropIntoSlot, programId, teamSeasonId]
   );
 
   return (

@@ -1,221 +1,378 @@
+// app/programs/[programId]/teams/[teamId]/RosterSandboxClient.tsx
+
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import * as React from "react";
+import { RecruitingPrimarySurfaceSkeleton } from "./(administration)/roster-planning/_components/RecruitingPrimarySurfaceSkeleton";
+import { DRAG_TYPES } from "@/app/programs/[programId]/(athletic)/recruiting/_components/dragTypes";
+import type {
+  RecruitingEventGroupRow,
+  RecruitingSlot,
+  RecruitingAthleteSummary,
+} from "@/app/programs/[programId]/(athletic)/recruiting/_components/types";
 
-type Scenario = {
-  id: string;
-  name: string;
-  target_season_label: string | null;
-  target_season_year: number | null;
-  notes: string | null;
-  created_at: string;
+type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
+
+type Assignment = {
+  eventGroupKey: string;
+  slotId: string;
+  athleteId: string;
+  athleteType: "returning" | "recruit";
+  isPrimary: boolean;
+  position: number;
+  displayName: string;
+  avatarUrl?: string | null;
+  gradYear?: number | null;
 };
 
-type Props = {
+type ReadPayload = {
+  ok: boolean;
+  teamSeasonId: string;
   programId: string;
-  teamId: string;
-  isManager: boolean;
+  sport: "xc" | "tf";
+  rosterLockDate: string | null;
+  state: {
+    isLocked: boolean;
+    autoSyncOnOpen: boolean;
+    lockedAt: string | null;
+    lastSyncedAt: string | null;
+    autoLockedThisRead: boolean;
+  };
+  assignments: Assignment[];
 };
 
-function isUuidLike(id: string): boolean {
-  return /^[0-9a-fA-F-]{36}$/.test(id);
+async function postJson<T>(url: string, body: any): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.error || "Request failed");
+  }
+  return json.data as T;
 }
 
-export default function RosterSandboxClient({ programId, teamId, isManager }: Props) {
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function groupToRows(assignments: Assignment[]): RecruitingEventGroupRow[] {
+  const byEventGroup = new Map<string, Map<string, Assignment[]>>();
 
-  const [name, setName] = useState("");
-  const [targetSeasonLabel, setTargetSeasonLabel] = useState("");
-  const [targetSeasonYear, setTargetSeasonYear] = useState<string>("");
-  const [notes, setNotes] = useState("");
+  for (const a of assignments) {
+    if (!byEventGroup.has(a.eventGroupKey)) byEventGroup.set(a.eventGroupKey, new Map());
+    const bySlot = byEventGroup.get(a.eventGroupKey)!;
+    if (!bySlot.has(a.slotId)) bySlot.set(a.slotId, []);
+    bySlot.get(a.slotId)!.push(a);
+  }
 
-  const router = useRouter();
+  const rows: RecruitingEventGroupRow[] = [];
+  for (const [eventGroupKey, bySlot] of byEventGroup.entries()) {
+    const slots: RecruitingSlot[] = [];
+    for (const [slotId, list] of bySlot.entries()) {
+      const sorted = [...list].sort((x, y) => (x.position ?? 0) - (y.position ?? 0));
+      const athletesById: Record<string, RecruitingAthleteSummary> = {};
+      for (const x of sorted) {
+        athletesById[x.athleteId] = {
+          athleteId: x.athleteId,
+          displayName: x.displayName,
+          avatarUrl: x.avatarUrl ?? null,
+          type: x.athleteType,
+          gradYear: x.gradYear ?? null,
+          eventGroupKey,
+        };
+      }
+      const athleteIds = sorted.map((x) => x.athleteId);
+      const primary = sorted.find((x) => x.isPrimary)?.athleteId ?? null;
 
-  async function loadScenarios() {
+      slots.push({
+        slotId,
+        eventGroupKey,
+        primaryAthleteId: primary ?? (athleteIds.length > 0 ? athleteIds[0] : null),
+        athleteIds,
+        athletesById,
+      });
+    }
+
+    rows.push({
+      eventGroupKey,
+      label: eventGroupKey,
+      slots: slots.sort((a, b) => a.slotId.localeCompare(b.slotId)),
+    });
+  }
+
+  return rows.sort((a, b) => a.eventGroupKey.localeCompare(b.eventGroupKey));
+}
+
+export default function RosterSandboxClient({
+  programId,
+  teamId,
+}: {
+  programId: string;
+  teamId: string;
+}) {
+  const [teamSeasonId, setTeamSeasonId] = React.useState<string | null>(null);
+  const [state, setState] = React.useState<ReadPayload["state"] | null>(null);
+  const [sport, setSport] = React.useState<"xc" | "tf" | null>(null);
+  const [rosterLockDate, setRosterLockDate] = React.useState<string | null>(null);
+  const [rows, setRows] = React.useState<RecruitingEventGroupRow[]>([]);
+  const [expanded, setExpanded] = React.useState<ExpandedKey>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState<boolean>(true);
+
+  const refresh = React.useCallback(async () => {
+    if (!teamSeasonId) return;
     setLoading(true);
     setError(null);
-
     try {
-      const res = await fetch(`/api/programs/${programId}/teams/${teamId}/roster-scenarios`);
-      const body = await res.json();
+      const data = await postJson<ReadPayload>("/api/roster-planning/slots/read", { teamSeasonId });
+      setState(data.state);
+      setSport(data.sport);
+      setRosterLockDate(data.rosterLockDate);
+      setRows(groupToRows(data.assignments || []));
+    } catch (e: any) {
+      setError(e?.message || "Failed to load roster planning");
+    } finally {
+      setLoading(false);
+    }
+  }, [teamSeasonId]);
 
-      if (!res.ok) {
-        setError(body.error || "Failed to load scenarios");
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await postJson<{
+          teamSeasonId: string;
+          rosterLockDate: string | null;
+          isTeamSeasonLocked: boolean | null;
+          sport: "xc" | "tf" | null;
+        }>(
+          "/api/programs/" + programId + "/teams/" + teamId + "/team-season/current",
+          {
+            programId,
+            teamId,
+          }
+        );
+
+        if (!mounted) return;
+        setTeamSeasonId(data.teamSeasonId);
+        setSport((data.sport ?? "xc") as any);
+        setRosterLockDate(data.rosterLockDate ?? null);
+      } catch (e: any) {
+        if (!mounted) return;
+        setError(e?.message || "Failed to load team season");
         setLoading(false);
         return;
       }
 
-      setScenarios(body.scenarios || []);
-    } catch (e: any) {
-      setError(e?.message || "Unexpected error");
-    }
+      if (!mounted) return;
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [programId, teamId]);
 
-    setLoading(false);
-  }
+  React.useEffect(() => {
+    if (!teamSeasonId) return;
+    refresh();
+  }, [teamSeasonId, refresh]);
 
-  useEffect(() => {
-    loadScenarios();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const onToggleExpand = (eventGroupKey: string, slotId: string) => {
+    setExpanded((prev) =>
+      prev?.eventGroupKey === eventGroupKey && prev?.slotId === slotId
+        ? null
+        : { eventGroupKey, slotId }
+    );
+  };
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const setLockState = async (isLocked: boolean, syncWithRecruiting: boolean) => {
+    if (!teamSeasonId) return;
+    await postJson("/api/roster-planning/state/set-lock", {
+      teamSeasonId,
+      isLocked,
+      syncWithRecruiting,
+    });
+    await refresh();
+  };
 
-    setCreating(true);
-    setError(null);
+  const onToggleLock = async () => {
+    if (!state) return;
 
-    try {
-      const res = await fetch(`/api/programs/${programId}/teams/${teamId}/roster-scenarios`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          target_season_label: targetSeasonLabel.trim() || null,
-          target_season_year: targetSeasonYear ? Number(targetSeasonYear) : null,
-          notes: notes.trim() || null,
-        }),
-      });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        setError(body.error || "Failed to create scenario");
-        setCreating(false);
-        return;
-      }
-
-      const created: Scenario = body.scenario;
-
-      // Clear form
-      setName("");
-      setTargetSeasonLabel("");
-      setTargetSeasonYear("");
-      setNotes("");
-
-      // Add to local list
-      setScenarios((prev) => [created, ...prev]);
-
-      // Navigate to scenario page if UUID
-      if (isUuidLike(created.id)) {
-        router.push(`/programs/${programId}/teams/${teamId}/scenarios/${created.id}`);
-      } else {
-        console.log("[RosterSandbox] Created non-persisted scenario stub, staying on page:", created.id);
-      }
-    } catch (e: any) {
-      setError(e?.message || "Unexpected error");
-    }
-
-    setCreating(false);
-  }
-
-  function handleOpenScenario(sc: Scenario) {
-    if (!isUuidLike(sc.id)) {
-      console.log("[RosterSandbox] Scenario has non-UUID id; probably stubbed only:", sc.id);
+    if (state.isLocked) {
+      const sync = window.confirm(
+        "Unlock roster planning. Sync with Recruiting now? This overwrites membership and order."
+      );
+      await setLockState(false, sync);
       return;
     }
 
-    router.push(`/programs/${programId}/teams/${teamId}/scenarios/${sc.id}`);
-  }
+    await setLockState(true, false);
+  };
+
+  const onOpenAthlete = (_a: RecruitingAthleteSummary) => {
+    // Roster Planning surface does not open modals (per scope). No-op.
+  };
+
+  const onSetPrimary = (_eventGroupKey: string, _slotId: string, _athleteId: string) => {
+    // Primary setting is a Recruiting behavior; Roster Planning does not change Recruiting. No-op.
+  };
+
+  const onRemoveAthlete = (_eventGroupKey: string, _slotId: string, _athleteId: string) => {
+    // Removing is not part of this Roster Planning surface scope. No-op.
+  };
+
+  const getDropHandlers = (_slot: RecruitingSlot) => {
+    return {};
+  };
+
+  const getSlotHasPrimary = (eventGroupKey: string, slotId: string) => {
+    const row = rows.find((r) => r.eventGroupKey === eventGroupKey);
+    const slot = row?.slots.find((s) => s.slotId === slotId);
+    return Boolean(slot?.primaryAthleteId);
+  };
+
+  React.useEffect(() => {
+    if (!expanded) return;
+    if (!teamSeasonId) return;
+    if (!state || state.isLocked) return;
+
+    const overlay = document.querySelector("[data-recruiting-expanded-overlay]") as HTMLElement | null;
+    if (!overlay) return;
+
+    const onDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    };
+
+    const onDrop = async (e: DragEvent) => {
+      if (!e.dataTransfer) return;
+      const raw = e.dataTransfer.getData(DRAG_TYPES.ATHLETE) || e.dataTransfer.getData("text/plain");
+      if (!raw) return;
+
+      let payload: any = null;
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        return;
+      }
+
+      const draggedAthleteId = payload?.athleteId as string | undefined;
+      const draggedEventGroupKey = payload?.eventGroupKey as string | undefined;
+      if (!draggedAthleteId) return;
+      if (draggedEventGroupKey && draggedEventGroupKey !== expanded.eventGroupKey) return;
+
+      const target = (e.target as HTMLElement | null)?.closest(
+        "[data-roster-chip-athlete-id]"
+      ) as HTMLElement | null;
+      const beforeAthleteId = target?.getAttribute("data-roster-chip-athlete-id") || null;
+
+      const row = rows.find((r) => r.eventGroupKey === expanded.eventGroupKey);
+      const slot = row?.slots.find((s) => s.slotId === expanded.slotId);
+      if (!slot) return;
+
+      if (!slot.athleteIds.includes(draggedAthleteId)) return;
+      if (beforeAthleteId && !slot.athleteIds.includes(beforeAthleteId)) return;
+
+      try {
+        await postJson("/api/roster-planning/slots/reorder", {
+          teamSeasonId,
+          eventGroupKey: expanded.eventGroupKey,
+          slotId: expanded.slotId,
+          athleteId: draggedAthleteId,
+          beforeAthleteId: beforeAthleteId === draggedAthleteId ? null : beforeAthleteId,
+        });
+        await refresh();
+      } catch {
+        // Best-effort; refresh errors surface elsewhere.
+      }
+    };
+
+    const row = rows.find((r) => r.eventGroupKey === expanded.eventGroupKey);
+    const slot = row?.slots.find((s) => s.slotId === expanded.slotId);
+    if (slot) {
+      const chipButtons = Array.from(
+        overlay.querySelectorAll("button[draggable='true']")
+      ) as HTMLButtonElement[];
+      chipButtons.forEach((btn, idx) => {
+        const athleteId = slot.athleteIds[idx];
+        const wrap = btn.closest("div.shrink-0") as HTMLElement | null;
+        if (wrap && athleteId) wrap.setAttribute("data-roster-chip-athlete-id", athleteId);
+      });
+    }
+
+    overlay.addEventListener("dragover", onDragOver);
+    overlay.addEventListener("drop", onDrop);
+
+    return () => {
+      overlay.removeEventListener("dragover", onDragOver);
+      overlay.removeEventListener("drop", onDrop);
+    };
+  }, [expanded, teamSeasonId, state, rows, refresh]);
+
+  const isLocked = Boolean(state?.isLocked);
+  const lockLabel = isLocked ? "Locked" : "Unlocked";
+  const lockDate = rosterLockDate ? new Date(rosterLockDate) : null;
+  const unlockDisabled = Boolean(lockDate && Date.now() >= lockDate.getTime());
 
   return (
-    <div className="mt-3 space-y-4">
-      {error && <p className="text-[11px] text-rose-500">{error}</p>}
-
-      {isManager ? (
-        <form
-          onSubmit={handleCreate}
-          className="space-y-2 rounded-lg border border-border-subtle bg-surface-1 p-3"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">New scenario</p>
-
-          <div className="space-y-1">
-            <label className="text-[10px] text-muted">Scenario name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="2026 XC scholarship projection"
-              className="w-full rounded-md border border-border-subtle bg-surface-2 px-2 py-1 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--brand)]"
-            />
+    <div className="w-full">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-100">Roster Planning</div>
+          <div className="text-[11px] text-muted truncate">
+            {teamSeasonId ? `Team Season: ${teamSeasonId}` : "Team Season: —"}
           </div>
+        </div>
 
-          <div className="flex gap-2">
-            <div className="flex-1 space-y-1">
-              <label className="text-[10px] text-muted">Target season label</label>
-              <input
-                value={targetSeasonLabel}
-                onChange={(e) => setTargetSeasonLabel(e.target.value)}
-                placeholder="Fall 2026"
-                className="w-full rounded-md border border-border-subtle bg-surface-2 px-2 py-1 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--brand)]"
-              />
-            </div>
-            <div className="w-24 space-y-1">
-              <label className="text-[10px] text-muted">Year</label>
-              <input
-                value={targetSeasonYear}
-                onChange={(e) => setTargetSeasonYear(e.target.value)}
-                placeholder="2026"
-                inputMode="numeric"
-                className="w-full rounded-md border border-border-subtle bg-surface-2 px-2 py-1 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--brand)]"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] text-muted">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Assumes current sophomores all return, plus 3 new distance recruits…"
-              className="w-full rounded-md border border-border-subtle bg-surface-2 px-2 py-1 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--brand)]"
-            />
-          </div>
-
+        <div className="flex items-center gap-2">
+          <div className="text-[11px] text-muted">{lockLabel}</div>
           <button
-            type="submit"
-            disabled={creating || !name.trim()}
-            className="mt-1 rounded-md bg-[color:var(--brand)] px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            type="button"
+            disabled={loading || !!error || (!isLocked && unlockDisabled)}
+            onClick={onToggleLock}
+            className={[
+              "rounded-lg border border-subtle bg-surface px-3 py-1 text-xs font-semibold",
+              "text-slate-100",
+              loading || !!error || (!isLocked && unlockDisabled)
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-surface/80",
+            ].join(" ")}
+            aria-label="Toggle roster planning lock"
+            title={
+              unlockDisabled
+                ? "Unlock disabled after roster lock date"
+                : "Toggle locked/unlocked"
+            }
           >
-            {creating ? "Creating…" : "Create scenario"}
+            {isLocked ? "Unlock" : "Lock"}
           </button>
-        </form>
-      ) : (
-        <p className="text-[11px] text-muted">Only head coaches / admins can create roster scenarios.</p>
-      )}
-
-      <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Existing scenarios</p>
-
-        {loading ? (
-          <p className="text-[11px] text-muted">Loading scenarios…</p>
-        ) : scenarios.length === 0 ? (
-          <p className="text-[11px] text-muted">No roster scenarios yet. Create one to begin planning.</p>
-        ) : (
-          <div className="space-y-2">
-            {scenarios.map((sc) => (
-              <button
-                key={sc.id}
-                onClick={() => handleOpenScenario(sc)}
-                className="flex w-full items-center justify-between rounded-lg border border-border-subtle bg-surface-1 px-3 py-2 text-left hover:bg-surface-2"
-              >
-                <div>
-                  <p className="text-sm font-medium text-[color:var(--text)]">{sc.name}</p>
-                  <p className="text-[10px] text-muted">
-                    {sc.target_season_label ||
-                      (sc.target_season_year ? `Season ${sc.target_season_year}` : "No target year")}
-                  </p>
-                </div>
-                <span className="text-[10px] text-muted">{new Date(sc.created_at).toLocaleDateString()}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        </div>
       </div>
+
+      {error ? (
+        <div className="rounded-xl border border-subtle bg-surface p-3 text-[12px] text-slate-100">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="rounded-xl border border-subtle bg-surface p-6 text-[12px] text-muted">
+          Loading...
+        </div>
+      ) : (
+        <RecruitingPrimarySurfaceSkeleton
+          programId={programId}
+          rows={rows}
+          expanded={expanded}
+          onToggleExpand={onToggleExpand}
+          onOpenAthlete={onOpenAthlete}
+          onSetPrimary={onSetPrimary}
+          onRemoveAthlete={onRemoveAthlete}
+          getSlotHasPrimary={getSlotHasPrimary}
+          getDropHandlers={getDropHandlers}
+        />
+      )}
     </div>
   );
 }

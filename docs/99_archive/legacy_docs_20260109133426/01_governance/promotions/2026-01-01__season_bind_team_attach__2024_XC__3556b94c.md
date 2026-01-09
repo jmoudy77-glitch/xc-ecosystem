@@ -1,0 +1,7 @@
+BEGIN PROMOTION
+SURFACE season.bind.team.attach
+TARGET season_code=2024_XC
+TEAM 3556b94c-4a9b-462b-9e64-7d76d0d46335
+PROGRAM 6252113e-0eb1-482f-8438-50415db05617
+LABEL "William Carey University Men's Cross Country"
+END PROMOTION

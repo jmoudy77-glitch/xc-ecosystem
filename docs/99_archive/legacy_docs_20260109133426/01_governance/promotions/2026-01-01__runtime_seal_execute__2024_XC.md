@@ -1,0 +1,5 @@
+BEGIN PROMOTION
+SURFACE runtime.seal.execute
+TARGET season_code=2024_XC
+ACTION seal
+END PROMOTION

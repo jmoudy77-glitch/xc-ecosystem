@@ -13,9 +13,9 @@ export type DocIndexItem = {
 };
 
 function docsRoot(): string {
-  // Docs live under /public/docs
+  // Docs live under /docs (canon)
   // Allow override via env for future flexibility
-  return process.env.DOCS_ROOT || path.join(process.cwd(), "public", "docs");
+  return process.env.DOCS_ROOT || path.join(process.cwd(), "docs");
 }
 
 function toPosix(p: string) {

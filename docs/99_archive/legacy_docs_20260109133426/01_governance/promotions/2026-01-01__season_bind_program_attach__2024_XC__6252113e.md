@@ -1,0 +1,6 @@
+BEGIN PROMOTION
+SURFACE season.bind.program.attach
+TARGET season_code=2024_XC
+PROGRAM 6252113e-0eb1-482f-8438-50415db05617
+LABEL "WCU Men's Track & Field"
+END PROMOTION

@@ -94,6 +94,8 @@ const SLICE_DEG = 360 / SLICE_COUNT;
 const READ_LINE_DEG = -55;
 const READ_MATH_OFFSET_DEG = -20;
 const DISC_RADIUS_PX = 440;
+const RING_RADII_PX = [140, 240, 340, 440] as const;
+const RING_RADII_RATIO = [0.14, 0.24, 0.34, 0.44] as const;
 
 // A1 overlays (feature-flagged)
 // Enable via: NEXT_PUBLIC_PH_A1_OVERLAYS=1
@@ -267,12 +269,13 @@ function a1ClassForAbsence(a: DriftAbsence): A1AbsenceClass {
   return "capability";
 }
 
-function polarTransform(localDeg: number, radiusPx: number) {
+function polarTransform(localDeg: number, radius: string) {
   // Canonical placement contract for all on-disc elements:
   // 1) anchor at disc center via left/top 50%
   // 2) translate element origin to center (-50%,-50%)
   // 3) rotate to angle, translate outward, rotate back to keep upright
-  return `translate(-50%, -50%) rotate(${localDeg}deg) translateX(${radiusPx}px) rotate(-${localDeg}deg)`;
+  const rotateBack = -localDeg;
+  return `translate(-50%, -50%) rotate(${localDeg}deg) translateX(${radius}) rotate(${rotateBack}deg)`;
 }
 
 const SECTOR_SUMMARY: Record<string, string> = {
@@ -365,10 +368,24 @@ function horizonDepthClass(h: string | null | undefined) {
   return "hdepth-h1";
 }
 
-function RadialPlaneScaffold(props: { hoverHorizon: Horizon | null; activeSliceIdx: number }) {
+function RadialPlaneScaffold(props: {
+  hoverHorizon: Horizon | null;
+  activeSliceIdx: number;
+  holes?: Array<{
+    id: string;
+    cx: number;
+    cy: number;
+    nodeId: string | null;
+    title: string;
+    onClick: () => void;
+    onHover: () => void;
+    onUnhover: () => void;
+    isActive: boolean;
+  }>;
+}) {
   const center = 500;
   const outerRadius = DISC_RADIUS_PX;
-  const ringRadii = [140, 240, 340, 440];
+  const ringRadii = RING_RADII_PX;
   const ringLabels = ["H0", "H1", "H2", "H3"];
 
   const hoverBand = React.useMemo(() => {
@@ -494,6 +511,27 @@ function RadialPlaneScaffold(props: { hoverHorizon: Horizon | null; activeSliceI
             fill="none"
             stroke="rgba(255,255,255,0.10)"
             strokeWidth="2"
+          />
+        ))}
+
+        {(props.holes ?? []).map((hole) => (
+          <circle
+            key={hole.id}
+            cx={hole.cx}
+            cy={hole.cy}
+            r={6}
+            fill="transparent"
+            stroke="rgba(255, 60, 60, 0.95)"
+            strokeWidth={2}
+            style={{ filter: "drop-shadow(0 0 16px rgba(255,60,60,0.45))" }}
+            className={["ph-disc-hole-dot", hole.isActive ? "is-active" : ""].join(" ")}
+            pointerEvents="auto"
+            onClick={(evt) => {
+              evt.stopPropagation();
+              hole.onClick();
+            }}
+            onMouseEnter={hole.onHover}
+            onMouseLeave={hole.onUnhover}
           />
         ))}
 
@@ -633,10 +671,7 @@ export function CapabilityDriftMap({
     // Canonical UI truth for holes/plates must derive from the view-model absences list,
     // because overlay layers (A1/A2) operate on ProgramHealthViewModel.absences.
     // Snapshot.full_payload is retained for diagnostics but is not authoritative for rendering.
-    const effectiveHorizon = (hoverHorizon ?? selectedHorizon).toString().toUpperCase();
-
     return (absences ?? [])
-      .filter((a) => (a?.horizon ?? "").toString().toUpperCase() === effectiveHorizon)
       .map((a) => {
         const details: any = (a as any)?.details ?? {};
         const capability_node_id =
@@ -728,6 +763,70 @@ export function CapabilityDriftMap({
 
     return { mapped: m, unmapped };
   }, [snapshotAbsences, driftNodesById]);
+
+  const discHoles = React.useMemo(() => {
+    const bySector = new Map<string, DriftAbsence[]>();
+    for (const a of snapshotAbsences) {
+      const nodeId = (a as any)?.capability_node_id ?? (a as any)?.capabilityNodeId ?? "";
+      const node = nodeId ? nodesById.get(nodeId) : null;
+      const key = (node?.sector_key ?? a.sector_key ?? "").toString().trim().toLowerCase();
+      if (!key) continue;
+      const list = bySector.get(key) ?? [];
+      list.push(a);
+      bySector.set(key, list);
+    }
+
+    const sectorIndexByKey = new Map(SECTORS.map((s, idx) => [s.key, idx]));
+    const ringByHorizon: Record<string, number> = {
+      H0: RING_RADII_PX[0],
+      H1: RING_RADII_PX[1],
+      H2: RING_RADII_PX[2],
+      H3: RING_RADII_PX[3],
+    };
+
+    const holes: Array<{
+      id: string;
+      cx: number;
+      cy: number;
+      nodeId: string | null;
+      title: string;
+    }> = [];
+
+    const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+    for (const [sectorKey, list] of bySector.entries()) {
+      const sectorIndex = sectorIndexByKey.get(sectorKey);
+      if (sectorIndex == null) continue;
+      const sectorMidDeg = sectorIndex * (360 / SECTORS.length) + 60;
+      const sectorStartDeg = sectorIndex * (360 / SECTORS.length);
+      const sectorEndDeg = sectorStartDeg + 360 / SECTORS.length;
+      const spreadDeg = 6;
+      const count = list.length;
+
+      list.forEach((absence, idx) => {
+        const nodeId =
+          (absence as any)?.capability_node_id ?? (absence as any)?.capabilityNodeId ?? null;
+        const node = nodeId ? nodesById.get(nodeId) : null;
+        const offsetIdx = idx - (count - 1) / 2;
+        const rawDeg = sectorMidDeg + offsetIdx * spreadDeg;
+        const deg = clamp(rawDeg, sectorStartDeg + 4, sectorEndDeg - 4);
+        const rad = (deg * Math.PI) / 180;
+        const horizonKey = (absence.horizon ?? "").toString().trim().toUpperCase();
+        const r = ringByHorizon[horizonKey] ?? RING_RADII_PX[1];
+        const cx = 500 + r * Math.cos(rad);
+        const cy = 500 + r * Math.sin(rad);
+        const id =
+          absence.id ??
+          absence.absence_key ??
+          `${sectorKey}:${nodeId ?? "unknown"}:${idx}`;
+        const title = node?.node_code ?? absence.absence_key ?? "absence";
+
+        holes.push({ id: String(id), cx, cy, nodeId, title });
+      });
+    }
+
+    return holes;
+  }, [nodesById, snapshotAbsences]);
 
   const hasSelection = Boolean(selectedAbsenceId);
   const planeRef = React.useRef<HTMLDivElement | null>(null);
@@ -980,352 +1079,24 @@ export function CapabilityDriftMap({
                 <div className="ph-disc-saucer" aria-hidden />
 {(() => {
                   const activeIdx = sliceIndexUnderReadLine(discSpinDeg);
-                  return <RadialPlaneScaffold hoverHorizon={hoverHorizon} activeSliceIdx={activeIdx} />;
+                  return (
+                    <RadialPlaneScaffold
+                      hoverHorizon={hoverHorizon}
+                      activeSliceIdx={activeIdx}
+                      holes={discHoles.map((hole) => ({
+                        ...hole,
+                        isActive: hole.nodeId === activeCapabilityNodeId,
+                        onClick: () => onSelect(hole.id),
+                        onHover: () =>
+                          onAbsenceHover?.(hole.id, {
+                            capabilityLabel: hole.title,
+                            level: "low",
+                          }),
+                        onUnhover: () => onAbsenceHover?.(null, null),
+                      }))}
+                    />
+                  );
                 })()}
-
-                <div className="ph-radial-layer absolute inset-0">
-                  {SECTORS.map((sector, sectorIndex) => {
-                    const angleStart = (sectorIndex * 360) / SECTORS.length;
-                    const sectorCards = cardsBySector.get(sector.key) ?? [];
-                    const sectorCount = Math.max(1, sectorCards.length);
-                    const sectorAbsencesAll = snapshotAbsences.filter((a) => {
-                      const k = (a.sector_key ?? "").toString().trim().toLowerCase();
-                      return k === sector.key;
-                    });
-                    // Canonical truth list for this sector: snapshot payload filtered to active horizon.
-                    const sectorAbsences = sectorAbsencesAll;
-
-                    return (
-                      <div key={sector.key} className="absolute inset-0" style={{ transform: `rotate(${angleStart}deg)` }}>
-                        {sectorCards.length > 0 && (
-                          <div className="ph-disc-hole-layer absolute inset-0" aria-hidden>
-                            {(() => {
-                              const spanDeg = 360 / SECTORS.length;
-                              const radiusPx = 420;
-                              return sectorCards.map((card, idx) => {
-                                const t = (idx + 0.5) / sectorCount;
-                                const localDeg = -spanDeg / 2 + t * spanDeg;
-                                const holeKey = `${sector.key}:${card.capability_node_id}:${card.ui_slot ?? "na"}:${idx}`;
-                                const isActive = activeCapabilityNodeId === card.capability_node_id;
-                                return (
-                                  <div
-                                    key={holeKey}
-                                    className={["ph-disc-hole-dot", isActive ? "is-active" : ""].join(" ")}
-                                    style={{
-                                      position: "absolute",
-                                      left: "50%",
-                                      top: "50%",
-                                      transform: polarTransform(localDeg, radiusPx),
-                                    }}
-                                    title={card.node_code}
-                                    onPointerEnter={() => setHoveredCapabilityNodeId(card.capability_node_id)}
-                                    onPointerLeave={() => setHoveredCapabilityNodeId(null)}
-                                    onClick={(evt) => {
-                                      evt.stopPropagation();
-                                      setSelectedCapabilityNodeId((prev) =>
-                                        prev === card.capability_node_id ? null : card.capability_node_id
-                                      );
-                                    }}
-                                  />
-                                );
-                              });
-                            })()}
-                          </div>
-                        )}
-                        {sectorCards.map((card, idx) => {
-                          const n = nodesById.get(card.capability_node_id);
-                          if (!n) return null;
-
-                          // Plates must be backed by snapshot payload (disc truth), not prop absences (can drift).
-                          // Plates use the same horizon-filtered payload list as the disc dots (1:1 truth).
-                          const nodeAbsences = sectorAbsences.filter((a: any) => {
-                            const id = (a?.capability_node_id ?? a?.capabilityNodeId) as string | undefined;
-                            return id === n.id;
-                          });
-                          const isFocusedCell = nodeAbsences.some((a) => a.id === selectedAbsenceId);
-                          const isActive = activeCapabilityNodeId === card.capability_node_id;
-                          // Anchor node plates to the same deterministic sloting model as disc holes.
-                          // Parent wrapper already applies `rotate(angleStart)`; child must use LOCAL sector angle only.
-                          const spanDeg = 360 / SECTORS.length;
-                          const maxSlots = 12;
-                          const rawSlot = Number.isFinite(Number(card.ui_slot)) ? Number(card.ui_slot) : idx;
-                          const slot = ((Math.floor(rawSlot) % maxSlots) + maxSlots) % maxSlots;
-                          const t = (slot + 0.5) / maxSlots;
-                          const localDeg = -spanDeg / 2 + t * spanDeg;
-                          const stack = Math.floor(idx / maxSlots);
-                          // Canonical plate radius: keep inside the disc while remaining legible.
-                          const r = 260 + stack * 56;
-
-                          return (
-                            <div
-                              key={card.capability_node_id}
-                              id={`ph-node-${card.capability_node_id}`}
-                              data-node-id={card.capability_node_id}
-                              className={[
-                                "ph-node-cell",
-                                "ph-node-plate",
-                                "ph-node-radial",
-                                isFocusedCell ? "is-focused" : "",
-                                hasSelection && !isFocusedCell ? "is-dimmed" : "",
-                                isActive ? "is-active" : "",
-                              ].join(" ")}
-                              style={{
-                                position: "absolute",
-                                left: "50%",
-                                top: "50%",
-                                transform: polarTransform(localDeg, r),
-                              }}
-                              onMouseEnter={() => setHoveredCapabilityNodeId(card.capability_node_id)}
-                              onMouseLeave={() => setHoveredCapabilityNodeId(null)}
-                              onClick={(evt) => {
-                                evt.stopPropagation();
-                                setSelectedCapabilityNodeId(card.capability_node_id);
-                              }}
-                            >
-                              <div className="ph-node-cell-header">
-                                <div className="ph-node-name" title={n.name}>
-                                  {n.name}
-                                </div>
-                                <div className="ph-node-code ph-mono" title={n.node_code}>
-                                  {n.node_code}
-                                </div>
-                              </div>
-
-                              {nodeAbsences.length > 0 ? (
-                                <div
-                                  className="ph-mono"
-                                  style={{
-                                    position: "absolute",
-                                    right: "10px",
-                                    top: "10px",
-                                    fontSize: "11px",
-                                    padding: "2px 8px",
-                                    borderRadius: "999px",
-                                    background: "rgba(255,0,0,0.65)",
-                                    border: "1px solid rgba(255,255,255,0.35)",
-                                    color: "white",
-                                    zIndex: 50,
-                                    pointerEvents: "none",
-                                  }}
-                                >
-                                  HOLES:{nodeAbsences.length}
-                                </div>
-                              ) : null}
-                              <div className="ph-node-holes ph-node-holes-plane">
-                                {nodeAbsences.slice(0, 4).map((a, holeIdx) => {
-                                  const sev = sevBucket(a.severity);
-                                  const size = sizeBucket(sev);
-                                  const lvl = normalizeLevel(sev);
-                                  const absenceId: string | null =
-                                    (a?.id ?? a?.absence_key ?? null) as string | null;
-                                  const isSelected = absenceId != null && selectedAbsenceId === absenceId;
-                                  const isHighlighted = absenceId != null && highlightSet.has(absenceId) && !isSelected;
-                                  const depthCls = horizonDepthClass(a.horizon);
-
-                                  const offsetCls = `ph-hole-pos-${holeIdx}`;
-
-                                  const cls = [
-                                    "ph-hole",
-                                    "ph-hole-v2",
-                                    `sev-${sev}`,
-                                    `size-${size}`,
-                                    depthCls,
-                                    offsetCls,
-                                    isSelected ? "is-selected" : "",
-                                    isHighlighted ? "is-highlighted" : "",
-                                  ].join(" ");
-
-                                  const handleSelect = () => {
-                                    if (!absenceId) return;
-                                    if (onAbsenceSelect) {
-                                      onAbsenceSelect(absenceId);
-                                      return;
-                                    }
-                                    onSelect(absenceId);
-                                  };
-
-                                  return (
-                                    <button
-                                      key={
-                                        a.id ??
-                                        a.absence_key ??
-                                        `${n.id}:${a.absence_type ?? "absence"}:${holeIdx}`
-                                      }
-                                      type="button"
-                                      className={cls}
-                                      style={{
-                                        ...(A1_ENABLED && overlayMode === "a1"
-                                          ? (() => {
-                                              const clsKey = a1ClassForAbsence(a);
-                                              const sevKey = normalizeLevel(sevBucket(a.severity));
-                                              const sevTok = A1_SEVERITY_TOKENS[sevKey];
-                                              const hzKey = a1NormalizeHorizon(a.horizon);
-                                              const hzTok = A1_HORIZON_EDGE[hzKey];
-
-                                              const interaction = isSelected
-                                                ? A1_INTERACTION.selected
-                                                : isHighlighted
-                                                  ? A1_INTERACTION.hover
-                                                  : null;
-
-                                              const base = A1_CLASS_COLOR[clsKey].base;
-                                              const glow = A1_CLASS_COLOR[clsKey].glow;
-
-                                              const bgAlpha = Math.min(
-                                                0.9,
-                                                sevTok.opacity + (interaction?.liftOpacityDelta ?? 0)
-                                              );
-
-                                              const depthPx = Math.max(
-                                                1,
-                                                Math.round(18 * sevTok.depthPct)
-                                              );
-                                              const feather = hzTok.featherPx;
-                                              const blur = hzTok.blurPx;
-
-                                              const structuralPattern =
-                                                clsKey === "structural"
-                                                  ? {
-                                                      backgroundImage:
-                                                        "repeating-linear-gradient(45deg, rgba(255,255,255,0.22) 0 2px, rgba(255,255,255,0) 2px 6px)",
-                                                      backgroundBlendMode: "screen" as const,
-                                                      opacity: Math.min(
-                                                        1,
-                                                        bgAlpha * A1_STRUCTURAL_PATTERN.dashOpacityMultiplier
-                                                      ),
-                                                    }
-                                                  : null;
-
-                                              return {
-                                                outline: interaction
-                                                  ? `${interaction.outlinePx}px solid ${interaction.outlineColor}`
-                                                  : "1px solid rgba(255,255,255,0.10)",
-                                                background: a1SetAlpha(base, bgAlpha),
-                                                boxShadow: [
-                                                  `inset 0 0 0 ${depthPx}px rgba(0,0,0,0.35)`,
-                                                  feather > 0
-                                                    ? `0 0 ${feather}px ${a1SetAlpha(glow, 0.28)}`
-                                                    : "",
-                                                  `0 0 10px ${a1SetAlpha(glow, 0.18)}`,
-                                                ]
-                                                  .filter(Boolean)
-                                                  .join(", "),
-                                                filter: blur > 0 ? `blur(${blur}px)` : "none",
-                                                ...(structuralPattern ?? {}),
-                                              };
-                                            })()
-                                          : A2_ENABLED && overlayMode === "a2"
-                                            ? (() => {
-                                                const stroke = isSelected
-                                                  ? A2_STROKE.selectedBoostColor
-                                                  : isHighlighted
-                                                    ? A2_STROKE.hoverBoostColor
-                                                    : A2_STROKE.color;
-                                                const ck = a2ConfidenceKey(a as any);
-                                                const ct = A2_CONFIDENCE[ck];
-                                                const borderAlpha = ct.alpha > 0 ? ct.alpha : 0.35;
-                                                const borderColor = a1SetAlpha(stroke, borderAlpha);
-                                                return {
-                                                  outline: "none",
-                                                  background: "transparent",
-                                                  border: `${A2_STROKE.widthPx}px ${ct.dash === "0" ? "solid" : "dashed"} ${borderColor}`,
-                                                  boxShadow: "none",
-                                                  filter: "none",
-                                                };
-                                              })()
-                                            : {
-                                                outline: "2px solid rgba(255,0,0,0.9)",
-                                                background: "rgba(255,0,0,0.18)",
-                                              }),
-                                        pointerEvents:
-                                          A2_ENABLED && overlayMode === "a2"
-                                            ? A2_LAYERING.pointerEvents
-                                            : "auto",
-                                        zIndex:
-                                          A2_ENABLED && overlayMode === "a2"
-                                            ? A2_LAYERING.zIndex
-                                            : 60,
-                                      }}
-                                      onClick={handleSelect}
-                                      onMouseEnter={() => {
-                                        if (!onAbsenceHover) return;
-                                        onAbsenceHover(absenceId, {
-                                          capabilityLabel: n.name ?? n.node_code ?? "Unknown capability",
-                                          level: lvl,
-                                        });
-                                      }}
-                                      onMouseLeave={() => {
-                                        onAbsenceHover?.(null, null);
-                                      }}
-                                    >
-                                      {A2_ENABLED && overlayMode === "a2" && (
-                                        <>
-                                          <span
-                                            aria-hidden="true"
-                                            style={{
-                                              position: "absolute",
-                                              top: 2,
-                                              right: 4,
-                                              fontSize: A2_PROVENANCE.present.sizePx,
-                                              lineHeight: 1,
-                                              color: a2HasProvenance(a as any)
-                                                ? A2_PROVENANCE.present.color
-                                                : A2_PROVENANCE.missing.color,
-                                              pointerEvents: "none",
-                                              userSelect: "none",
-                                            }}
-                                          >
-                                            {a2HasProvenance(a as any)
-                                              ? A2_PROVENANCE.present.glyph
-                                              : A2_PROVENANCE.missing.glyph}
-                                          </span>
-
-                                          {a2GroupLabel(a as any) && (
-                                            <span
-                                              aria-hidden="true"
-                                              style={{
-                                                position: "absolute",
-                                                left: "50%",
-                                                top: "100%",
-                                                transform: "translate(-50%, 8px)",
-                                                maxWidth: A2_BADGE.maxWidthPx,
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                fontSize: A2_BADGE.fontSizePx,
-                                                padding: `${A2_BADGE.paddingY}px ${A2_BADGE.paddingX}px`,
-                                                borderRadius: A2_BADGE.radiusPx,
-                                                background: A2_BADGE.bg,
-                                                border: `1px solid ${A2_BADGE.border}`,
-                                                color: A2_BADGE.text,
-                                                pointerEvents: "none",
-                                                userSelect: "none",
-                                              }}
-                                              title={a2GroupLabel(a as any) ?? undefined}
-                                            >
-                                              {a2GroupLabel(a as any)}
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
-                                      <span className="ph-hole-rim" />
-                                      <span className="ph-hole-void" />
-                                      <span className="ph-hole-below" />
-                                    </button>
-                                  );
-                                })}
-
-                                {nodeAbsences.length > 4 ? (
-                                  <div className="ph-node-more ph-mono">+{nodeAbsences.length - 4}</div>
-                                ) : null}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             </div>
 

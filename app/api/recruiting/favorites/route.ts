@@ -1,43 +1,22 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { supabaseRouteClient } from "@/lib/supabase/route";
+import { favoritesUpsert } from "@/lib/modules/recruiting/services/favoritesUpsert";
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const cookieStore = (await cookies()) as any;
+  try {
+    const body = await req.json();
+    const supabase = await supabaseRouteClient();
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name, value, options) {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove(name, options) {
-          cookieStore.set({ name, value: "", ...options, maxAge: 0 });
-        },
-      },
-    }
-  );
+    await favoritesUpsert(supabase, {
+      programId: body.programId,
+      sport: body.sport ?? "xc",
+      athleteId: body.athleteId,
+      position: body.position ?? 0,
+      pinned: body.pinned ?? false,
+    });
 
-  const { error } = await supabase.rpc(
-    "rpc_recruiting_favorites_upsert_v1",
-    {
-      p_program_id: body.programId,
-      p_sport: body.sport ?? "xc",
-      p_athlete_id: body.athleteId,
-      p_position: body.position ?? 0,
-      p_pinned: body.pinned ?? false,
-    }
-  );
-
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 400 });
   }
-
-  return NextResponse.json({ ok: true });
 }

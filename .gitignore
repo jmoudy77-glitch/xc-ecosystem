@@ -51,3 +51,6 @@ __MACOSX/
 
 # Editor/patch backups
 *.bak_*
+
+# governance build outputs (derived artifacts)
+governance/artifacts/

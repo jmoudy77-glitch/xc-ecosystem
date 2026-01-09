@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 
 const repoRoot = process.cwd();
 const govRoot = path.join(repoRoot, "governance");
-const distDir = path.join(govRoot, "dist");
+const distDir = path.join(govRoot, "artifacts");
 
 function die(msg) {
   console.error(msg);

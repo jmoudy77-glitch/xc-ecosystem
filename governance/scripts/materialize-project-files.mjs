@@ -85,7 +85,7 @@ const moduleGenesis = path.join(govRoot, "modules", moduleKey, "genesis");
 if (!fs.existsSync(kernelGenesis)) die(`missing kernel genesis: ${kernelGenesis}`);
 if (!fs.existsSync(moduleGenesis)) die(`missing module genesis: ${moduleGenesis}`);
 
-const outRoot = path.join(govRoot, "dist", "materialized", moduleKey);
+const outRoot = path.join(govRoot, "artifacts", "materialized", moduleKey);
 rmrf(outRoot);
 ensureDir(outRoot);
 
@@ -161,7 +161,7 @@ writeText(
     "Goal: make law + ledger searchable as plaintext within the Project.",
     "",
     "Upload ALL plaintext files under this folder:",
-    `- governance/dist/materialized/${moduleKey}/`,
+    `- governance/artifacts/materialized/${moduleKey}/`,
     "",
     "Minimum required uploads (if you want the smallest set):",
     "- KERNEL_VERSION.md",

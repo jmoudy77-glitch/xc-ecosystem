@@ -3,373 +3,260 @@
 "use client";
 
 import * as React from "react";
-import { RecruitingPrimarySurfaceSkeleton } from "./(administration)/roster-planning/_components/RecruitingPrimarySurfaceSkeleton";
-import { DRAG_TYPES } from "@/app/programs/[programId]/(athletic)/recruiting/_components/dragTypes";
-import type {
-  RecruitingEventGroupRow,
-  RecruitingSlot,
-  RecruitingAthleteSummary,
-} from "@/app/programs/[programId]/(athletic)/recruiting/_components/types";
+import RecruitingPrimarySurfaceSkeleton from "@/app/programs/[programId]/teams/[teamId]/(administration)/roster-planning/_components/RecruitingPrimarySurfaceSkeleton";
 
-type ExpandedKey = { eventGroupKey: string; slotId: string } | null;
+type Sport = "xc" | "tf";
 
-type Assignment = {
+type SlotRow = {
   eventGroupKey: string;
   slotId: string;
-  athleteId: string;
-  athleteType: "returning" | "recruit";
-  isPrimary: boolean;
-  position: number;
-  displayName: string;
-  avatarUrl?: string | null;
-  gradYear?: number | null;
+  label: string;
+  primaryAthleteId: string | null;
+  primaryAthleteName: string | null;
+  primaryAthleteAvatarUrl: string | null;
+  primaryAthleteType: "returning" | "recruit" | null;
+  secondaryAthletes: Array<{
+    athleteId: string;
+    name: string | null;
+    avatarUrl: string | null;
+    athleteType: "returning" | "recruit";
+  }>;
 };
-
-type ReadPayload = {
-  ok: boolean;
-  teamSeasonId: string;
-  programId: string;
-  sport: "xc" | "tf";
-  rosterLockDate: string | null;
-  state: {
-    isLocked: boolean;
-    autoSyncOnOpen: boolean;
-    lockedAt: string | null;
-    lastSyncedAt: string | null;
-    autoLockedThisRead: boolean;
-  };
-  assignments: Assignment[];
-};
-
-async function postJson<T>(url: string, body: any): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  if (!res.ok || json?.ok === false) {
-    throw new Error(json?.error || "Request failed");
-  }
-  return json.data as T;
-}
-
-function groupToRows(assignments: Assignment[]): RecruitingEventGroupRow[] {
-  const byEventGroup = new Map<string, Map<string, Assignment[]>>();
-
-  for (const a of assignments) {
-    if (!byEventGroup.has(a.eventGroupKey)) byEventGroup.set(a.eventGroupKey, new Map());
-    const bySlot = byEventGroup.get(a.eventGroupKey)!;
-    if (!bySlot.has(a.slotId)) bySlot.set(a.slotId, []);
-    bySlot.get(a.slotId)!.push(a);
-  }
-
-  const rows: RecruitingEventGroupRow[] = [];
-  for (const [eventGroupKey, bySlot] of byEventGroup.entries()) {
-    const slots: RecruitingSlot[] = [];
-    for (const [slotId, list] of bySlot.entries()) {
-      const sorted = [...list].sort((x, y) => (x.position ?? 0) - (y.position ?? 0));
-      const athletesById: Record<string, RecruitingAthleteSummary> = {};
-      for (const x of sorted) {
-        athletesById[x.athleteId] = {
-          athleteId: x.athleteId,
-          displayName: x.displayName,
-          avatarUrl: x.avatarUrl ?? null,
-          type: x.athleteType,
-          gradYear: x.gradYear ?? null,
-          eventGroupKey,
-        };
-      }
-      const athleteIds = sorted.map((x) => x.athleteId);
-      const primary = sorted.find((x) => x.isPrimary)?.athleteId ?? null;
-
-      slots.push({
-        slotId,
-        eventGroupKey,
-        primaryAthleteId: primary ?? (athleteIds.length > 0 ? athleteIds[0] : null),
-        athleteIds,
-        athletesById,
-      });
-    }
-
-    rows.push({
-      eventGroupKey,
-      label: eventGroupKey,
-      slots: slots.sort((a, b) => a.slotId.localeCompare(b.slotId)),
-    });
-  }
-
-  return rows.sort((a, b) => a.eventGroupKey.localeCompare(b.eventGroupKey));
-}
 
 export default function RosterSandboxClient({
   programId,
   teamId,
+  teamSeasonId,
+  sport,
 }: {
   programId: string;
   teamId: string;
+  teamSeasonId: string | null;
+  sport: Sport | null;
 }) {
-  const [teamSeasonId, setTeamSeasonId] = React.useState<string | null>(null);
-  const [state, setState] = React.useState<ReadPayload["state"] | null>(null);
-  const [sport, setSport] = React.useState<"xc" | "tf" | null>(null);
-  const [rosterLockDate, setRosterLockDate] = React.useState<string | null>(null);
-  const [rows, setRows] = React.useState<RecruitingEventGroupRow[]>([]);
-  const [expanded, setExpanded] = React.useState<ExpandedKey>(null);
+  const [isLocked, setIsLocked] = React.useState<boolean>(false);
+  const [rows, setRows] = React.useState<SlotRow[]>([]);
+  const [busy, setBusy] = React.useState<boolean>(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState<boolean>(true);
 
-  const refresh = React.useCallback(async () => {
-    if (!teamSeasonId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await postJson<ReadPayload>("/api/roster-planning/slots/read", { teamSeasonId });
-      setState(data.state);
-      setSport(data.sport);
-      setRosterLockDate(data.rosterLockDate);
-      setRows(groupToRows(data.assignments || []));
-    } catch (e: any) {
-      setError(e?.message || "Failed to load roster planning");
-    } finally {
-      setLoading(false);
+  const canOperate = Boolean(teamSeasonId && sport);
+
+  async function postJson<T>(url: string, body: any): Promise<T> {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok || json?.ok === false) {
+      const msg = json?.error || `Request failed (${res.status})`;
+      throw new Error(msg);
     }
-  }, [teamSeasonId]);
+    return json as T;
+  }
+
+  async function loadStateAndRows(nextLock?: boolean) {
+    if (!canOperate) return;
+
+    const lockResp = await postJson<{ ok: true; data: { is_locked: boolean } }>(
+      "/api/roster-planning/lock/read",
+      { programId, teamId, teamSeasonId }
+    );
+
+    const locked = typeof nextLock === "boolean" ? nextLock : Boolean(lockResp.data?.is_locked);
+    setIsLocked(locked);
+
+    const readResp = await postJson<{ ok: true; data: any[] }>(
+      "/api/roster-planning/slots/read",
+      { programId, teamSeasonId, sport }
+    );
+
+    const mapped: SlotRow[] = (readResp.data ?? []).map((r: any) => {
+      const primary = r.primary ?? null;
+      const secondaries = Array.isArray(r.secondaries) ? r.secondaries : [];
+      return {
+        eventGroupKey: String(r.event_group_key ?? ""),
+        slotId: String(r.slot_id ?? ""),
+        label: String(r.slot_label ?? "Slot"),
+        primaryAthleteId: primary?.athlete_id ?? null,
+        primaryAthleteName: primary?.name ?? null,
+        primaryAthleteAvatarUrl: primary?.avatar_url ?? null,
+        primaryAthleteType: primary?.athlete_type ?? null,
+        secondaryAthletes: secondaries.map((s: any) => ({
+          athleteId: String(s.athlete_id ?? ""),
+          name: s.name ?? null,
+          avatarUrl: s.avatar_url ?? null,
+          athleteType: s.athlete_type as "returning" | "recruit",
+        })),
+      };
+    });
+
+    setRows(mapped);
+  }
+
+  async function syncFromRecruiting() {
+    if (!canOperate) return;
+    await postJson<{ ok: true }>(
+      "/api/roster-planning/sync",
+      { programId, teamId, teamSeasonId, sport }
+    );
+  }
 
   React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setLoading(true);
+    let cancelled = false;
+
+    async function boot() {
       setError(null);
+
+      if (!teamSeasonId) {
+        setRows([]);
+        setIsLocked(false);
+        return;
+      }
+      if (!sport) {
+        setRows([]);
+        setIsLocked(false);
+        return;
+      }
+
+      setBusy(true);
       try {
-        const data = await postJson<{
-          teamSeasonId: string;
-          rosterLockDate: string | null;
-          isTeamSeasonLocked: boolean | null;
-          sport: "xc" | "tf" | null;
-        }>(
-          "/api/programs/" + programId + "/teams/" + teamId + "/team-season/current",
-          {
-            programId,
-            teamId,
-          }
+        // If unlocked, sync-on-open from Recruiting before reading.
+        const lockResp = await postJson<{ ok: true; data: { is_locked: boolean } }>(
+          "/api/roster-planning/lock/read",
+          { programId, teamId, teamSeasonId }
         );
 
-        if (!mounted) return;
-        setTeamSeasonId(data.teamSeasonId);
-        setSport((data.sport ?? "xc") as any);
-        setRosterLockDate(data.rosterLockDate ?? null);
+        const locked = Boolean(lockResp.data?.is_locked);
+        if (!locked) {
+          await syncFromRecruiting();
+        }
+
+        if (!cancelled) {
+          await loadStateAndRows(locked);
+        }
       } catch (e: any) {
-        if (!mounted) return;
-        setError(e?.message || "Failed to load team season");
-        setLoading(false);
-        return;
+        if (!cancelled) setError(e?.message || "Failed to load roster planning.");
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    }
+
+    boot();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programId, teamId, teamSeasonId, sport]);
+
+  async function onToggleLock(nextLocked: boolean) {
+    if (!canOperate) return;
+    setError(null);
+    setBusy(true);
+    try {
+      if (!nextLocked) {
+        const ok = window.confirm("Unlock roster planning?\n\nSync with Recruiting now?");
+        if (ok) await syncFromRecruiting();
       }
 
-      if (!mounted) return;
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [programId, teamId]);
-
-  React.useEffect(() => {
-    if (!teamSeasonId) return;
-    refresh();
-  }, [teamSeasonId, refresh]);
-
-  const onToggleExpand = (eventGroupKey: string, slotId: string) => {
-    setExpanded((prev) =>
-      prev?.eventGroupKey === eventGroupKey && prev?.slotId === slotId
-        ? null
-        : { eventGroupKey, slotId }
-    );
-  };
-
-  const setLockState = async (isLocked: boolean, syncWithRecruiting: boolean) => {
-    if (!teamSeasonId) return;
-    await postJson("/api/roster-planning/state/set-lock", {
-      teamSeasonId,
-      isLocked,
-      syncWithRecruiting,
-    });
-    await refresh();
-  };
-
-  const onToggleLock = async () => {
-    if (!state) return;
-
-    if (state.isLocked) {
-      const sync = window.confirm(
-        "Unlock roster planning. Sync with Recruiting now? This overwrites membership and order."
+      await postJson<{ ok: true }>(
+        "/api/roster-planning/lock/set",
+        { programId, teamId, teamSeasonId, isLocked: nextLocked }
       );
-      await setLockState(false, sync);
-      return;
+
+      await loadStateAndRows(nextLocked);
+    } catch (e: any) {
+      setError(e?.message || "Failed to update lock state.");
+    } finally {
+      setBusy(false);
     }
+  }
 
-    await setLockState(true, false);
-  };
+  async function onReorderWithinSlot(slotId: string, orderedAthleteIds: string[]) {
+    if (!canOperate) return;
+    setError(null);
 
-  const onOpenAthlete = (_a: RecruitingAthleteSummary) => {
-    // Roster Planning surface does not open modals (per scope). No-op.
-  };
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.slotId !== slotId) return r;
+        const byId = new Map(r.secondaryAthletes.map((a) => [a.athleteId, a]));
+        const next = orderedAthleteIds.map((id) => byId.get(id)).filter(Boolean) as SlotRow["secondaryAthletes"];
+        return { ...r, secondaryAthletes: next };
+      })
+    );
 
-  const onSetPrimary = (_eventGroupKey: string, _slotId: string, _athleteId: string) => {
-    // Primary setting is a Recruiting behavior; Roster Planning does not change Recruiting. No-op.
-  };
-
-  const onRemoveAthlete = (_eventGroupKey: string, _slotId: string, _athleteId: string) => {
-    // Removing is not part of this Roster Planning surface scope. No-op.
-  };
-
-  const getDropHandlers = (_slot: RecruitingSlot) => {
-    return {};
-  };
-
-  const getSlotHasPrimary = (eventGroupKey: string, slotId: string) => {
-    const row = rows.find((r) => r.eventGroupKey === eventGroupKey);
-    const slot = row?.slots.find((s) => s.slotId === slotId);
-    return Boolean(slot?.primaryAthleteId);
-  };
-
-  React.useEffect(() => {
-    if (!expanded) return;
-    if (!teamSeasonId) return;
-    if (!state || state.isLocked) return;
-
-    const overlay = document.querySelector("[data-recruiting-expanded-overlay]") as HTMLElement | null;
-    if (!overlay) return;
-
-    const onDragOver = (e: DragEvent) => {
-      if (!e.dataTransfer) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-    };
-
-    const onDrop = async (e: DragEvent) => {
-      if (!e.dataTransfer) return;
-      const raw = e.dataTransfer.getData(DRAG_TYPES.ATHLETE) || e.dataTransfer.getData("text/plain");
-      if (!raw) return;
-
-      let payload: any = null;
-      try {
-        payload = JSON.parse(raw);
-      } catch {
-        return;
-      }
-
-      const draggedAthleteId = payload?.athleteId as string | undefined;
-      const draggedEventGroupKey = payload?.eventGroupKey as string | undefined;
-      if (!draggedAthleteId) return;
-      if (draggedEventGroupKey && draggedEventGroupKey !== expanded.eventGroupKey) return;
-
-      const target = (e.target as HTMLElement | null)?.closest(
-        "[data-roster-chip-athlete-id]"
-      ) as HTMLElement | null;
-      const beforeAthleteId = target?.getAttribute("data-roster-chip-athlete-id") || null;
-
-      const row = rows.find((r) => r.eventGroupKey === expanded.eventGroupKey);
-      const slot = row?.slots.find((s) => s.slotId === expanded.slotId);
-      if (!slot) return;
-
-      if (!slot.athleteIds.includes(draggedAthleteId)) return;
-      if (beforeAthleteId && !slot.athleteIds.includes(beforeAthleteId)) return;
-
-      try {
-        await postJson("/api/roster-planning/slots/reorder", {
-          teamSeasonId,
-          eventGroupKey: expanded.eventGroupKey,
-          slotId: expanded.slotId,
-          athleteId: draggedAthleteId,
-          beforeAthleteId: beforeAthleteId === draggedAthleteId ? null : beforeAthleteId,
-        });
-        await refresh();
-      } catch {
-        // Best-effort; refresh errors surface elsewhere.
-      }
-    };
-
-    const row = rows.find((r) => r.eventGroupKey === expanded.eventGroupKey);
-    const slot = row?.slots.find((s) => s.slotId === expanded.slotId);
-    if (slot) {
-      const chipButtons = Array.from(
-        overlay.querySelectorAll("button[draggable='true']")
-      ) as HTMLButtonElement[];
-      chipButtons.forEach((btn, idx) => {
-        const athleteId = slot.athleteIds[idx];
-        const wrap = btn.closest("div.shrink-0") as HTMLElement | null;
-        if (wrap && athleteId) wrap.setAttribute("data-roster-chip-athlete-id", athleteId);
-      });
+    try {
+      await postJson<{ ok: true }>(
+        "/api/roster-planning/slots/reorder",
+        { programId, teamId, teamSeasonId, slotId, orderedAthleteIds }
+      );
+    } catch (e: any) {
+      setError(e?.message || "Failed to persist reorder.");
+      await loadStateAndRows();
     }
+  }
 
-    overlay.addEventListener("dragover", onDragOver);
-    overlay.addEventListener("drop", onDrop);
+  if (!teamSeasonId) {
+    return (
+      <div className="p-6 text-sm text-muted">
+        Select a Team + Season in the top-right header to open Roster Planning.
+      </div>
+    );
+  }
 
-    return () => {
-      overlay.removeEventListener("dragover", onDragOver);
-      overlay.removeEventListener("drop", onDrop);
-    };
-  }, [expanded, teamSeasonId, state, rows, refresh]);
-
-  const isLocked = Boolean(state?.isLocked);
-  const lockLabel = isLocked ? "Locked" : "Unlocked";
-  const lockDate = rosterLockDate ? new Date(rosterLockDate) : null;
-  const unlockDisabled = Boolean(lockDate && Date.now() >= lockDate.getTime());
+  if (!sport) {
+    return (
+      <div className="p-6 text-sm text-muted">
+        Roster Planning is unavailable for this program because the program sport is not supported.
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-100">Roster Planning</div>
-        </div>
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between px-6 py-4">
+        <div className="text-sm font-medium text-[var(--text)]">Roster Planning</div>
 
         <div className="flex items-center gap-2">
-          <div className="text-[11px] text-muted">{lockLabel}</div>
+          {error ? <div className="text-xs text-red-400">{error}</div> : null}
+
           <button
             type="button"
-            disabled={loading || !!error || (!isLocked && unlockDisabled)}
-            onClick={onToggleLock}
-            className={[
-              "rounded-lg border border-subtle bg-surface px-3 py-1 text-xs font-semibold",
-              "text-slate-100",
-              loading || !!error || (!isLocked && unlockDisabled)
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-surface/80",
-            ].join(" ")}
-            aria-label="Toggle roster planning lock"
-            title={
-              unlockDisabled
-                ? "Unlock disabled after roster lock date"
-                : "Toggle locked/unlocked"
-            }
+            className="rounded-full border border-subtle bg-panel px-3 py-1 text-xs text-[var(--text)] hover:bg-panel-muted disabled:opacity-50"
+            onClick={() => onToggleLock(!isLocked)}
+            disabled={busy}
+            aria-label={isLocked ? "Unlock roster planning" : "Lock roster planning"}
           >
-            {isLocked ? "Unlock" : "Lock"}
+            {isLocked ? "Locked" : "Unlocked"}
           </button>
         </div>
       </div>
 
-      {error ? (
-        <div className="rounded-xl border border-subtle bg-surface p-3 text-[12px] text-slate-100">
-          {error}
-        </div>
-      ) : null}
-
-      {loading ? (
-        <div className="rounded-xl border border-subtle bg-surface p-6 text-[12px] text-muted">
-          Loading...
-        </div>
-      ) : (
+      <div className="flex-1 overflow-hidden">
         <RecruitingPrimarySurfaceSkeleton
-          programId={programId}
-          rows={rows}
-          expanded={expanded}
-          onToggleExpand={onToggleExpand}
-          onOpenAthlete={onOpenAthlete}
-          onSetPrimary={onSetPrimary}
-          onRemoveAthlete={onRemoveAthlete}
-          getSlotHasPrimary={getSlotHasPrimary}
-          getDropHandlers={getDropHandlers}
+          rows={rows.map((r) => ({
+            eventGroupKey: r.eventGroupKey,
+            slotId: r.slotId,
+            label: r.label,
+            primaryAthlete: r.primaryAthleteId
+              ? {
+                  athleteId: r.primaryAthleteId,
+                  name: r.primaryAthleteName,
+                  avatarUrl: r.primaryAthleteAvatarUrl,
+                  athleteType: r.primaryAthleteType as any,
+                }
+              : null,
+            secondaryAthletes: r.secondaryAthletes.map((a) => ({
+              athleteId: a.athleteId,
+              name: a.name,
+              avatarUrl: a.avatarUrl,
+              athleteType: a.athleteType,
+            })),
+          }))}
+          onReorderWithinSlot={onReorderWithinSlot}
+          busy={busy}
         />
-      )}
+      </div>
     </div>
   );
 }

@@ -1,78 +1,77 @@
-# Recruiting Promotion Ledger
-
-This file is the canonical, append-only ledger of all sovereign Codex promotions applied to the Recruiting module.
+# RECRUITING LEDGER
 
 ---
 
-## 2026-01-03 — Recruiting Stabilization (M1) + Boundary Enforcement
+## R-0001 — Recruiting Runtime Constitution (First Edition)
 
-- 0010 — 2026-01-03 — program_health: annotate absences with explicit recruitability classification
-  - Migration: 20260103001000_program_health_absence_recruitability_annotation.sql
-  - Contract linkage: Boundary + Residual Absence Awareness (Recruiting can filter explicitly)
+**Date:** 2026-01-09  
+**Type:** Constitutional Ratification  
+**Scope:** Recruiting Runtime (Sovereign)  
+**Upstream Dependencies:** XC-Ecosystem Kernel Constitution  
+**Downstream Impact:** All Recruiting schema, logic, UI, and promotions
 
-- 0011 — 2026-01-03 — recruiting(m1): add recruitable-only deficits read model
-  - Migration: 20260103001100_recruiting_read_model_view.sql
-  - Surface: recruiting_recruitable_deficits (view)
+---
 
-- 0012 — 2026-01-03 — recruiting(m1): add RPC for recruitable deficits read model
-  - Migration: 20260103001200_recruiting_read_model_rpc.sql
-  - Surface: RPC read access for Recruiting M1
+### Summary
 
-- 0013 — 2026-01-03 — recruiting(m1): add partial indexes for recruitable deficits
-  - Migration: 20260103001300_recruiting_recruitable_deficits_indexes.sql
-  - Purpose: performance + stability for recruitable-only reads
+This promotion ratifies the **Recruiting Runtime Constitution — First Edition**, formally establishing Recruiting as a sovereign runtime within the XC-Ecosystem and locking its canonical laws, boundaries, and invariants.
 
-- 0014 — 2026-01-03 — recruiting(m1): add recruiting state signal table
-  - Migration: 20260103001400_recruiting_state_signal_table.sql
-  - Purpose: non-terminal, coach-owned state signaling (tone decay posture)
+This entry does **not** introduce functional changes. It establishes binding law governing all future Recruiting development.
 
-- 0015 — 2026-01-03 — recruiting(m1): add RPC for latest recruiting state signal
-  - Migration: 20260103001500_recruiting_state_signal_rpc.sql
-  - Surface: RLS-safe retrieval for UI posture
+---
 
-- 0016 — 2026-01-03 — recruiting(m2-m3): add candidate impact advisory table
-  - Migration: 20260103001600_recruiting_candidate_impact_table.sql
-  - Note: advisory storage only; computation/workflows follow later
+### Ratified Artifacts
 
-- 0017 — 2026-01-03 — recruiting(m3): add RPC for ranked candidate cohorts
-  - Migration: 20260103001700_recruiting_candidate_impact_rpc.sql
-  - Posture: comparative/advisory only (no obligation/certainty)
+- Recruiting Runtime Constitution (First Edition)
+- Canon surfaces defined under:
+  - `/docs/01_governance/modules/recruiting/ratified/*`
+  - `/docs/03_domain_models/recruiting/*`
+  - `/docs/04_operational_modules/recruiting/*`
 
-- 0018 — 2026-01-03 — recruiting(security): RLS + grants (with COMMENT ON POLICY syntax fix)
-  - Migration: 20260103001800_recruiting_rls_and_grants.sql
-  - Purpose: enforce tenant boundary + read-only posture for M1 surfaces
+---
 
-- 0020 — 2026-01-03 — recruiting(m1): add deterministic horizon defaulting RPC
-  - Migration: 20260103002000_recruiting_read_model_horizon_default.sql
-  - Behavior: deterministic default horizon selection
+### Constitutional Effects
 
-- 0021 — 2026-01-03 — recruiting(m1): stabilization status RPC (aggregation fix applied)
-  - Migration: 20260103002100_recruiting_stabilization_status_rpc.sql
-  - Behavior: returns stabilization banding without completion semantics
+- Declares Recruiting a **sovereign runtime**
+- Locks **slot-centric design** as the canonical recruiting model
+- Establishes **module boundary law** (`lib/modules/recruiting` as sole domain plane)
+- Enforces **canonical event emission** and causal chain integrity
+- Formalizes **promotion + ledger discipline** via the Triple-Lock Rule
+- Locks **Recruiting Primary Surface UI invariants**
+- Codifies **drift prevention law**
 
-- 0022 — 2026-01-03 — recruiting(m1): add validation checks for boundary enforcement
-  - Migration: 20260103002200_recruiting_m1_validation_checks.sql
-  - Surfaces:
-    - recruiting_m1_validation_no_leak
-    - rpc_recruiting_m1_validation_status_rowcount(...)
+---
 
-- 0023 — 2026-01-03 — recruiting(m1): add audit-only view for recruitable deficits
-  - Migration: 20260103002300_recruiting_m1_read_audit_view.sql
-  - Surface: recruiting_m1_audit_view
+### Explicit Invariants Introduced
 
-- 0024 — 2026-01-03 — recruiting(m1): seed initial stabilization state signals
-  - Migration: 20260103002400_recruiting_m1_seed_state_signal.sql
-  - Behavior: bootstrap state signals from current recruitable deficit counts
+- Recruiting operates **only on recruitable deficits**
+- Non-recruitable deficits are **constitutionally invisible**
+- Recruiting is **coach-owned and non-terminal**
+- AI posture is **advisory and comparative only**
+- **Slots may be unoccupied, partially stabilized, or provisionally stabilized, but never bypassed**
 
-| 20260103165948 | recruiting | m3 | schema | recruiting_candidate_impacts schema hardening + RLS |
+---
 
-| 20260103170139 | recruiting | m3 | compute | materialize recruiting_candidate_impacts |
+### Migration
 
-| 20260103170243 | recruiting | m3 | read | candidate impact cohort read surface |
+None  
+(Constitutional ratification only)
 
-| 20260103171117 | recruiting | m3 | compute-trigger | on-demand ensure impacts by inputs_hash |
-20260103173500 | recruiting(m3) | candidate impacts validation surface (rpc_recruiting_candidate_impacts_validate_v1)
+---
 
-| 20260103172338 | recruiting | m3 | read | cohort read model enrich recruit_name |
+### Schema Changes
 
-| 20260103172910 | recruiting | m3 | perf | cohort rpc add pagination (limit/offset) |
+None
+
+---
+
+### Notes
+
+This ledger entry serves as the **root authority** for all subsequent Recruiting promotions.  
+Any Recruiting change that violates this constitution is invalid, regardless of implementation correctness.
+
+---
+
+**Status:** Ratified  
+**Authority:** Recruiting Runtime Constitution  
+**Effective:** Immediately upon publication

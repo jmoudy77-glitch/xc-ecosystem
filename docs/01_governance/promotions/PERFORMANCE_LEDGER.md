@@ -95,3 +95,29 @@ None.
 
 ### Governance
 Modifications require a formal Performance Runtime promotion.
+
+## P-0004 — Performance Balance Instrument: Instrumentation Implementation Specification
+
+**Date:** 2026-01-09  
+**Status:** Ratified  
+**Scope:** Performance Runtime  
+**Type:** Canonical Implementation Specification  
+
+### Artifact Ratified
+/docs/01_governance/modules/performance/ratified/PERFORMANCE_BALANCE_INSTRUMENT_IMPLEMENTATION_SPEC.md
+
+### Summary
+Ratifies the concrete implementation requirements for the Performance Balance Instrument, including rendering architecture, data flow contracts, performance constraints, interaction enforcement, glyph implementation, and drift validation.
+
+### Canonical Effects
+- Binds all implementations to deterministic, read-only volumetric rendering
+- Enforces single-source data flow across volumetric, projection, and glyph layers
+- Locks performance and transition budgets
+- Establishes validation hooks for drift detection
+- Defines lawful degradation and accessibility behavior
+
+### Cross-Runtime Impact
+None.
+
+### Governance
+Modifications require a formal Performance Runtime promotion.

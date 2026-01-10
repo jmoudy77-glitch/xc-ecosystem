@@ -69,3 +69,29 @@ None.
 
 ### Governance
 Modifications require a formal Performance Runtime promotion.
+
+## P-0003 — Performance Balance Instrument: Derivation Law (Model → Summary Glyph)
+
+**Date:** 2026-01-09  
+**Status:** Ratified  
+**Scope:** Performance Runtime  
+**Type:** Canonical Derivation Law  
+
+### Artifact Ratified
+/docs/01_governance/modules/performance/ratified/PERFORMANCE_BALANCE_DERIVATION_LAW.md
+
+### Summary
+Ratifies the lawful derivation rules binding the Performance Summary Glyph to the Performance Balance Instrument, including canonical inputs, per-dichotomy components, five-tier quantization, global aggregation, rendering constraints, and drift prevention.
+
+### Canonical Effects
+- Locks the Summary Glyph as strictly downstream of the instrument at t0
+- Prevents adaptive or relative thresholds in the glyph
+- Establishes fixed quantization tiers and net-bias aggregation
+- Defines volatility as optional, categorical, and non-historical in display
+- Establishes derivation drift as a promotable defect class
+
+### Cross-Runtime Impact
+None.
+
+### Governance
+Modifications require a formal Performance Runtime promotion.

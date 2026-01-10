@@ -260,3 +260,13 @@ Ratifies the Recruiting M3 Horizon Contribution Semantics Canon. Establishes aut
 Ratifies the Recruiting M3 Negative & Null Impact Emission Canon. Establishes explicit, first-class semantics for non-impact, zero-impact, and horizon-excluded outcomes. Forbids silent optimism and ambiguity, mandates zero-impact emission where applicable, and satisfies Activation Gate Precondition #4.
 
 **Status:** Ratified
+
+## R-M3-0009 — Ratify Recruiting M3 Rationale Quality Gate Canon
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_RATIONALE_QUALITY_GATE_CANON.md
+
+**Summary:**  
+Ratifies the Recruiting M3 Rationale Quality Gate Canon. Establishes mandatory human-readable, coach-safe explanation standards for all M3 impact records. Explicitly prohibits certainty language, enforces advisory posture, and satisfies Activation Gate Precondition #5.
+
+**Status:** Ratified

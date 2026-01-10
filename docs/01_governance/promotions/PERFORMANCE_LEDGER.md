@@ -121,3 +121,29 @@ None.
 
 ### Governance
 Modifications require a formal Performance Runtime promotion.
+
+## P-0005 — Performance Balance Instrument: Validation & Test Canon
+
+**Date:** 2026-01-09  
+**Status:** Ratified  
+**Scope:** Performance Runtime  
+**Type:** Canonical Validation & Test Law  
+
+### Artifact Ratified
+/docs/01_governance/modules/performance/ratified/PERFORMANCE_BALANCE_VALIDATION_TEST_CANON.md
+
+### Summary
+Ratifies the mandatory validation and test canon governing canonical compliance for the Performance Balance Instrument, including structural boundaries, projection-only interaction enforcement, derivation correctness, determinism/parity requirements, performance budgets, and CI gating.
+
+### Canonical Effects
+- Establishes four required compliance test classes
+- Locks failure severity classification and drift definitions
+- Requires deterministic outputs for identical canonical inputs
+- Mandates CI gating to prevent shipping canonical violations
+- Defines DRIFT as an auditable, promotable defect class
+
+### Cross-Runtime Impact
+None.
+
+### Governance
+Modifications require a formal Performance Runtime promotion.

@@ -2,6 +2,29 @@
 
 ---
 
+### R-M3-0014 — Recruiting M3 Activation Closeout
+Status: SEALED  
+Scope: Program-level only  
+Runtime: recruiting_m3  
+Program: 6252113e-0eb1-482f-8438-50415db05617
+
+This entry seals the Recruiting M3 activation sequence.
+All required governance steps have been completed:
+- Constitutional ratification
+- Program-scoped activation
+- Post-activation verification
+- Positive-path evidence capture
+
+Recruiting M3 is now considered:
+- Constitutionally active
+- Technically active
+- Program Health–isolated
+- Safe for downstream advisory consumption
+
+No further activation steps remain.
+
+---
+
 ### R-M3-0013 — Positive-Path Evidence Capture (Recruitable Absence Present)
 Status: EXECUTED  
 Scope: Program-level only  

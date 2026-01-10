@@ -174,3 +174,39 @@ All future Recruiting promotions must:
 **Status:** Ratified  
 **Authority:** Recruiting Runtime Constitution  
 **Effective:** Immediately
+
+## R-M3-0001 — Ratify Recruiting M3 Canon Surface
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_CANON.md
+
+**Summary:**  
+Formally ratifies Recruiting M3 as a canonical, non-authoritative candidate impact modeling surface. Establishes scope, authority boundaries, and gating rules. Confirms M3 is advisory only and may not mutate Program Health or A2 state.
+
+**Status:** Ratified
+
+---
+
+## R-M3-0002 — Ratify Recruiting M3 Input Canon
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_INPUT_CANON.md
+
+**Summary:**  
+Locks the exclusive set of evidence streams permitted in M3 modeling. Defines structural alignment gates, plausibility rules, temporal constraints, program-relative context usage, and explicit prohibited inputs to prevent authority leakage.
+
+**Status:** Ratified
+
+---
+
+## R-M3-0003 — Ratify Recruiting M3 Output Semantics
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_OUTPUT_SEMANTICS.md
+
+**Summary:**  
+Defines the canonical meaning and interpretation of all M3 outputs, including impact_score, cohort_tier, horizon, rationale, and inputs_hash. Strictly bounds how outputs may be consumed and forbids their use as Program Health truth.
+
+**Status:** Ratified
+
+---

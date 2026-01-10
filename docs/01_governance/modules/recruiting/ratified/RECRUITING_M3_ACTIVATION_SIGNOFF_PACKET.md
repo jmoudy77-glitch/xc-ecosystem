@@ -64,3 +64,26 @@ Final Determination:
 ELIGIBLE to apply R-M3-0011
 or
 NOT ELIGIBLE to apply R-M3-0011
+
+---
+
+Evidence Run — Program: 6252113e-0eb1-482f-8438-50415db05617
+Executed: 2026-01-10
+
+Step 1 — Eligibility Recompute
+Status: ineligible
+Recruits count: 12 (program_recruits)
+Absences count: 0
+Reason codes: ["NO_RECRUITABLE_ABSENCES"]
+
+Step 2 — Dry-Run Output (raw)
+{ "ok": true, "scope": { "programId": "6252113e-0eb1-482f-8438-50415db05617", "teamId": null, "horizon": null }, "runtime": { "programId": "6252113e-0eb1-482f-8438-50415db05617", "runtimeKey": "recruiting_m3", "isActive": false, "eligibility": { "status": "ineligible", "reasonCodes": ["NO_RECRUITABLE_ABSENCES"], "computedAt": "2026-01-10T23:20:29.635+00:00" }, "mode": "inactive" }, "counts": { "absencesCount": 0, "recruitsCount": 12 }, "plan": { "wouldCompute": false, "wouldPersist": false, "reasonCodes": ["RUNTIME_INACTIVE", "PROGRAM_NOT_ELIGIBLE", "NO_RECRUITABLE_ABSENCES"], "inputsHash": "e6b5c5fe3da7fbc781b524056d29c238c477b8be457abaac945584dca7861ce7", "modelVersion": "m3_dry_run_v3" }, "invariants": { "noPersistence": true, "noProgramHealthMutation": true }, "generatedAt": "2026-01-10T23:22:59.611Z" }
+
+Step 3 — Isolation Test Output (raw)
+{ "ok": true, "scope": { "programId": "6252113e-0eb1-482f-8438-50415db05617", "teamId": null }, "checks": [ { "table": "absence_determinations", "status": "checked", "beforeCount": 0, "afterCount": 0, "changed": false }, { "table": "program_health_absences", "status": "checked", "beforeCount": 4, "afterCount": 4, "changed": false }, { "table": "program_health_snapshots", "status": "checked", "beforeCount": 2, "afterCount": 2, "changed": false }, { "table": "program_health_ledger", "status": "checked", "beforeCount": 18, "afterCount": 18, "changed": false }, { "table": "recruiting_candidate_impacts", "status": "checked", "beforeCount": 0, "afterCount": 0, "changed": false } ], "invariants": { "programHealthMutation": false, "impactsWritten": false }, "evidence": { "runtimeStateMode": "inactive", "dryRunReasonCodes": ["RUNTIME_INACTIVE", "PROGRAM_NOT_ELIGIBLE", "NO_RECRUITABLE_ABSENCES"], "impactsReturnedCount": 0 }, "generatedAt": "2026-01-10T23:23:17.870Z" }
+
+Canon Interpretation
+Runtime inactive.
+Program ineligible due to zero recruitable absences.
+Dry-run confirms no compute and no persistence.
+Isolation test confirms zero Program Health mutation and zero impact writes.

@@ -147,3 +147,28 @@ None.
 
 ### Governance
 Modifications require a formal Performance Runtime promotion.
+
+## P-0006 — Performance Runtime Diagnostics & Disclosure Surface Canon
+
+**Date:** 2026-01-09  
+**Status:** Ratified  
+**Scope:** Performance Runtime  
+**Type:** Canonical Diagnostics & Disclosure Law  
+
+### Artifact Ratified
+/docs/01_governance/modules/performance/ratified/PERFORMANCE_RUNTIME_DIAGNOSTICS_SURFACE_CANON.md
+
+### Summary
+Ratifies the diagnostic and disclosure rules governing how system health, drift, violations, and degradation are surfaced to coaches and operators without contaminating Performance Balance semantics.
+
+### Canonical Effects
+- Partitions diagnostics by audience
+- Prevents diagnostics from polluting instrument visuals
+- Locks severity classification and disclosure rules
+- Establishes audit continuity and canonical anchoring
+
+### Cross-Runtime Impact
+None.
+
+### Governance
+Modifications require a formal Performance Runtime promotion.

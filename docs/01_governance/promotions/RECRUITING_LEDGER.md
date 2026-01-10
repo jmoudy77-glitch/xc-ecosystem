@@ -210,3 +210,13 @@ Defines the canonical meaning and interpretation of all M3 outputs, including im
 **Status:** Ratified
 
 ---
+
+## R-M3-0004 — Ratify Recruiting M3 Activation Gate Canon
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_ACTIVATION_GATE_CANON.md
+
+**Summary:**  
+Ratifies the Recruiting M3 Activation Gate Canon, formally defining the mandatory preconditions required before any M3 computation, persistence, or downstream consumption may occur. Explicitly prohibits partial or implicit activation and enforces Program Health isolation until a named activation promotion is applied.
+
+**Status:** Ratified

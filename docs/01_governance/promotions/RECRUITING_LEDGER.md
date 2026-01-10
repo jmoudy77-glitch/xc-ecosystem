@@ -303,3 +303,16 @@ This entry is intentionally non-applied. Application of R-M3-0011 without verifi
 Ratifies the Recruiting M3 Activation Readiness Checklist as the binding execution gate for applying R-M3-0011. Translates M3 activation law into concrete, verifiable engineering and governance proofs. Explicitly prohibits M3 activation unless all checklist items pass and are signed off.
 
 **Status:** Ratified
+
+## R-M3-0013 — Add inactive-safe M3 debug UI wiring
+**Date:** 2026-01-11  
+**Surfaces:**
+- /app/components/m3/M3RuntimePanel.tsx  
+- /app/components/m3/M3ImpactsPanel.tsx  
+- /app/recruiting/m3/page.tsx  
+- /app/program-health/m3/page.tsx
+
+**Summary:**  
+Adds reusable client panels that read M3 runtime state and impacts from existing APIs, plus two debug pages for Recruiting and Program Health. No activation, writes, or Program Health truth mutation.
+
+**Status:** Ratified

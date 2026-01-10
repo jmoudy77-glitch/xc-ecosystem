@@ -338,3 +338,14 @@ Introduces a validator for M3 rationale text that enforces advisory language, st
 Adds a guarded dry-run endpoint that reads runtime state and eligibility, counts absences and recruits, and emits a deterministic report. No activation, writes, or Program Health mutation.
 
 **Status:** Ratified
+
+## R-M3-0016 — Add M3 Program Health isolation test automation
+**Date:** 2026-01-11  
+**Surfaces:**
+- /app/lib/m3/isolationTest.ts  
+- /app/api/recruiting/m3/isolation-test/route.ts
+
+**Summary:**  
+Adds a guarded isolation test endpoint that captures before/after counts on Program Health tables, runs M3 read paths plus dry-run, and asserts zero mutations. Missing tables are reported as skipped.
+
+**Status:** Ratified

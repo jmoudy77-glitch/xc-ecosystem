@@ -62,9 +62,9 @@ export function M3RuntimePanel(props: {
         throw new Error(json?.error ?? `Request failed: ${res.status}`);
       }
       setState(json as M3RuntimeState);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setState(null);
-      setErr(e?.message ?? "Unknown error");
+      setErr(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }

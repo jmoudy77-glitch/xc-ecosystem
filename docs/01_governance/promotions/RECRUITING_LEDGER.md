@@ -316,3 +316,14 @@ Ratifies the Recruiting M3 Activation Readiness Checklist as the binding executi
 Adds reusable client panels that read M3 runtime state and impacts from existing APIs, plus two debug pages for Recruiting and Program Health. No activation, writes, or Program Health truth mutation.
 
 **Status:** Ratified
+
+## R-M3-0014 — Add M3 rationale validator (advisory gates)
+**Date:** 2026-01-11  
+**Surfaces:**
+- /app/lib/m3/rationale.ts  
+- /app/lib/m3/rationale.test.ts
+
+**Summary:**  
+Introduces a validator for M3 rationale text that enforces advisory language, structural alignment, evidence, constraint context, and optional temporal references. Includes a lightweight test harness.
+
+**Status:** Ratified

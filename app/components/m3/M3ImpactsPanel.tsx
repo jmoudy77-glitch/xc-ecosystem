@@ -71,9 +71,9 @@ export function M3ImpactsPanel(props: {
         throw new Error(json?.error ?? `Request failed: ${res.status}`);
       }
       setData(json as ImpactsResponse);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setData(null);
-      setErr(e?.message ?? "Unknown error");
+      setErr(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }

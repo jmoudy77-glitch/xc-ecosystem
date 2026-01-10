@@ -185,6 +185,20 @@ Formally ratifies Recruiting M3 as a canonical, non-authoritative candidate impa
 
 **Status:** Ratified
 
+### R-M3-0011 — Program-Scoped Activation Authorization
+Status: APPROVED  
+Scope: Program-level only  
+Runtime: recruiting_m3  
+Activation Model: Explicit flag flip (no global default)
+
+This entry authorizes activation of the Recruiting M3 runtime on a per-program basis.
+All constitutional, isolation, determinism, and rationale-quality requirements have been satisfied.
+Activation emits canonical runtime events and preserves Program Health isolation.
+
+Approved Program(s):
+- 6252113e-0eb1-482f-8438-50415db05617
+
+---
 ---
 
 ## R-M3-0002 — Ratify Recruiting M3 Input Canon

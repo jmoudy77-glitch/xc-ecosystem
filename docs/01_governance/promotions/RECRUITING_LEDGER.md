@@ -220,3 +220,13 @@ Defines the canonical meaning and interpretation of all M3 outputs, including im
 Ratifies the Recruiting M3 Activation Gate Canon, formally defining the mandatory preconditions required before any M3 computation, persistence, or downstream consumption may occur. Explicitly prohibits partial or implicit activation and enforces Program Health isolation until a named activation promotion is applied.
 
 **Status:** Ratified
+
+## R-M3-0005 — Ratify Recruiting M3 Capability Node Mapping Canon
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_CAPABILITY_NODE_MAPPING_CANON.md
+
+**Summary:**  
+Ratifies the Recruiting ↔ Program Health Capability Node Mapping Canon. Establishes the exclusive, authoritative rules for mapping Recruiting event groups and athlete profiles to Program Health capability nodes for M3 modeling. Enforces constraint-type awareness, prohibits implicit inference, and satisfies Activation Gate Precondition #1.
+
+**Status:** Ratified

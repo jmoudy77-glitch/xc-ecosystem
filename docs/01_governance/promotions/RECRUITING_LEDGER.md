@@ -2,6 +2,23 @@
 
 ---
 
+### R-M3-0013 — Positive-Path Evidence Capture (Recruitable Absence Present)
+Status: EXECUTED  
+Scope: Program-level only  
+Runtime: recruiting_m3  
+Program: 6252113e-0eb1-482f-8438-50415db05617
+
+This entry records the first positive-path evidence run for Recruiting M3 after activation.
+The run is executed only if ≥1 recruitable absence exists at compute time.
+Evidence validates:
+- Eligibility transitions to eligible
+- Impact scores are computed and persisted
+- Rationale quality gate is enforced
+- Canonical events and provenance are emitted
+- Program Health remains fully isolated
+
+---
+
 ### R-M3-0012 — Post-Activation Verification (Program-Scoped)
 Status: EXECUTED  
 Scope: Program-level only  

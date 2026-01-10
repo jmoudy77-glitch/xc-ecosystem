@@ -250,3 +250,13 @@ Ratifies the Recruiting M3 Constraint-Type Contribution Rules Canon. Formally de
 Ratifies the Recruiting M3 Horizon Contribution Semantics Canon. Establishes authoritative temporal eligibility, horizon-specific contribution rules, and explicit prohibitions against premature or accelerated impact inference. Satisfies Activation Gate Precondition #3.
 
 **Status:** Ratified
+
+## R-M3-0008 — Ratify Recruiting M3 Negative & Null Impact Emission Canon
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_NEGATIVE_NULL_IMPACT_EMISSION_CANON.md
+
+**Summary:**  
+Ratifies the Recruiting M3 Negative & Null Impact Emission Canon. Establishes explicit, first-class semantics for non-impact, zero-impact, and horizon-excluded outcomes. Forbids silent optimism and ambiguity, mandates zero-impact emission where applicable, and satisfies Activation Gate Precondition #4.
+
+**Status:** Ratified

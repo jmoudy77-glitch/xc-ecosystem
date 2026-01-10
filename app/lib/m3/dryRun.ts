@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readM3RuntimeState, type M3RuntimeState } from "@/app/lib/m3/runtime";
+import { buildM3InputsHash } from "@/app/lib/m3/hash";
+import { logM3Provenance } from "@/app/lib/m3/provenance";
 
 export type M3DryRunReport = {
   ok: boolean;
@@ -17,6 +19,8 @@ export type M3DryRunReport = {
     wouldCompute: boolean;
     wouldPersist: false;
     reasonCodes: string[];
+    inputsHash: string;
+    modelVersion: string;
   };
   invariants: {
     noPersistence: true;
@@ -101,6 +105,27 @@ export async function runM3DryRun(params: {
   if (absencesCount <= 0) reasonCodes.push("NO_RECRUITABLE_ABSENCES");
   if (recruitsCount <= 0) reasonCodes.push("NO_RECRUITS");
 
+  const modelVersion = "m3_dry_run_v1";
+  const inputsHash = buildM3InputsHash({
+    modelVersion,
+    programId,
+    teamId: params.teamId ?? null,
+    horizon: params.horizon ?? null,
+    counts: { absencesCount, recruitsCount },
+    runtime: {
+      isActive: state.isActive,
+      eligibility: state.eligibility.status,
+    },
+  });
+
+  logM3Provenance({
+    modelVersion,
+    inputsHash,
+    programId,
+    generatedAt: new Date().toISOString(),
+    notes: reasonCodes,
+  });
+
   return {
     ok: true,
     scope: {
@@ -114,6 +139,8 @@ export async function runM3DryRun(params: {
       wouldCompute,
       wouldPersist: false,
       reasonCodes,
+      inputsHash,
+      modelVersion,
     },
     invariants: {
       noPersistence: true,

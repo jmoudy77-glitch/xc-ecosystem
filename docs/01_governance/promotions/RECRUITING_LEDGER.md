@@ -349,3 +349,16 @@ Adds a guarded dry-run endpoint that reads runtime state and eligibility, counts
 Adds a guarded isolation test endpoint that captures before/after counts on Program Health tables, runs M3 read paths plus dry-run, and asserts zero mutations. Missing tables are reported as skipped.
 
 **Status:** Ratified
+
+## R-M3-0017 — Add deterministic inputs_hash + provenance logging (audit proofs)
+**Date:** 2026-01-11  
+**Surfaces:**
+- /app/lib/m3/hash.ts  
+- /app/lib/m3/provenance.ts  
+- /app/lib/m3/hash.test.ts  
+- /app/lib/m3/dryRun.ts
+
+**Summary:**  
+Adds canonical JSON hashing for inputs_hash, a minimal provenance logger, and a determinism test. Extends the dry-run report with inputs_hash and model version.
+
+**Status:** Ratified

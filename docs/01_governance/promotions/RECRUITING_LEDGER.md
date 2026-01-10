@@ -293,3 +293,13 @@ Defines the explicit, singular promotion required to activate the Recruiting M3 
 
 **Notes:**  
 This entry is intentionally non-applied. Application of R-M3-0011 without verified satisfaction of all prerequisite canons and tests constitutes a constitutional violation and requires immediate rollback and incident recording.
+
+## R-M3-0012 — Ratify Recruiting M3 Activation Readiness Checklist
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_ACTIVATION_READINESS_CHECKLIST.md
+
+**Summary:**  
+Ratifies the Recruiting M3 Activation Readiness Checklist as the binding execution gate for applying R-M3-0011. Translates M3 activation law into concrete, verifiable engineering and governance proofs. Explicitly prohibits M3 activation unless all checklist items pass and are signed off.
+
+**Status:** Ratified

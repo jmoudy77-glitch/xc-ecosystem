@@ -240,3 +240,13 @@ Ratifies the Recruiting ↔ Program Health Capability Node Mapping Canon. Establ
 Ratifies the Recruiting M3 Constraint-Type Contribution Rules Canon. Formally defines distinct modeling semantics for coverage, redundancy, authority, and certification constraints. Enforces strict separation between constraint types, prohibits cross-constraint inference, and satisfies Activation Gate Precondition #2.
 
 **Status:** Ratified
+
+## R-M3-0007 — Ratify Recruiting M3 Horizon Contribution Semantics Canon
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_HORIZON_CONTRIBUTION_SEMANTICS_CANON.md
+
+**Summary:**  
+Ratifies the Recruiting M3 Horizon Contribution Semantics Canon. Establishes authoritative temporal eligibility, horizon-specific contribution rules, and explicit prohibitions against premature or accelerated impact inference. Satisfies Activation Gate Precondition #3.
+
+**Status:** Ratified

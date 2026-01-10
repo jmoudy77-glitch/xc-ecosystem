@@ -44,3 +44,28 @@ None.
 
 ### Governance
 Modifications require a formal Performance Runtime promotion.
+
+## P-0002 — Performance Balance Instrument: Projection Interaction Law
+
+**Date:** 2026-01-09  
+**Status:** Ratified  
+**Scope:** Performance Runtime  
+**Type:** Canonical Interaction Law  
+
+### Artifact Ratified
+/docs/01_governance/modules/performance/ratified/PERFORMANCE_BALANCE_PROJECTION_INTERACTION_LAW.md
+
+### Summary
+Establishes the authoritative interaction rules for the Performance Balance Instrument, defining snap thresholds, projection states, interaction permissions, and mutual exclusivity between time and dichotomy navigation.
+
+### Canonical Effects
+- Locks interaction authority to projection states only
+- Formalizes snap thresholds and restoration behavior
+- Prevents mixed-mode interaction ambiguity
+- Supersedes all informal projection behaviors
+
+### Cross-Runtime Impact
+None.
+
+### Governance
+Modifications require a formal Performance Runtime promotion.

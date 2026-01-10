@@ -327,3 +327,14 @@ Adds reusable client panels that read M3 runtime state and impacts from existing
 Introduces a validator for M3 rationale text that enforces advisory language, structural alignment, evidence, constraint context, and optional temporal references. Includes a lightweight test harness.
 
 **Status:** Ratified
+
+## R-M3-0015 — Add M3 dry-run harness (end-to-end, zero writes)
+**Date:** 2026-01-11  
+**Surfaces:**
+- /app/lib/m3/dryRun.ts  
+- /app/api/recruiting/m3/dry-run/route.ts
+
+**Summary:**  
+Adds a guarded dry-run endpoint that reads runtime state and eligibility, counts absences and recruits, and emits a deterministic report. No activation, writes, or Program Health mutation.
+
+**Status:** Ratified

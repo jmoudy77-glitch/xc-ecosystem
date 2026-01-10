@@ -43,31 +43,14 @@ async function countAbsences(
   return count ?? 0;
 }
 
-async function getProgramOrganizationId(
+async function countProgramRecruits(
   supabase: SupabaseClient,
   programId: string
-): Promise<string> {
-  const { data, error } = await supabase
-    .from("programs")
-    .select("organization_id")
-    .eq("id", programId)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data?.organization_id) throw new Error("Program not found or missing organization_id");
-
-  return String(data.organization_id);
-}
-
-async function countRecruitsByOrg(
-  supabase: SupabaseClient,
-  organizationId: string
 ): Promise<number> {
   const { count, error } = await supabase
-    .from("recruits")
+    .from("program_recruits")
     .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .neq("pipeline_stage", "archived");
+    .eq("program_id", programId);
 
   if (error) throw error;
   return count ?? 0;
@@ -85,11 +68,10 @@ export async function runM3DryRun(params: {
   });
 
   const programId = state.programId;
-  const organizationId = await getProgramOrganizationId(params.supabase, programId);
 
   const [absencesCount, recruitsCount] = await Promise.all([
     countAbsences(params.supabase, programId),
-    countRecruitsByOrg(params.supabase, organizationId),
+    countProgramRecruits(params.supabase, programId),
   ]);
 
   const reasonCodes: string[] = [];
@@ -103,15 +85,16 @@ export async function runM3DryRun(params: {
 
   // Additional guardrails for meaningful preview
   if (absencesCount <= 0) reasonCodes.push("NO_RECRUITABLE_ABSENCES");
-  if (recruitsCount <= 0) reasonCodes.push("NO_RECRUITS");
+  if (recruitsCount <= 0) reasonCodes.push("NO_PROGRAM_RECRUITS");
 
-  const modelVersion = "m3_dry_run_v1";
+  const modelVersion = "m3_dry_run_v3";
   const inputsHash = buildM3InputsHash({
     modelVersion,
     programId,
     teamId: params.teamId ?? null,
     horizon: params.horizon ?? null,
     counts: { absencesCount, recruitsCount },
+    linkage: { recruitsLinkage: "program_recruits(program_id -> recruit_id)" },
     runtime: {
       isActive: state.isActive,
       eligibility: state.eligibility.status,

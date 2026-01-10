@@ -28,17 +28,14 @@ async function countAbsences(supabase: any, programId: string): Promise<number> 
   return count ?? 0;
 }
 
-async function countRecruitsByOrg(
+async function countProgramRecruits(
   supabase: any,
-  organizationId: string
+  programId: string
 ): Promise<number> {
-  // Recruiting candidates source: recruits (organization-scoped)
-  // Exclude archived pipeline stage when present.
   const { count, error } = await supabase
-    .from("recruits")
+    .from("program_recruits")
     .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .neq("pipeline_stage", "archived");
+    .eq("program_id", programId);
 
   if (error) throw error;
   return count ?? 0;
@@ -53,19 +50,17 @@ function deriveEligibility(params: {
   const reasonCodes: string[] = [];
 
   if (absencesCount <= 0) reasonCodes.push("NO_RECRUITABLE_ABSENCES");
-  if (recruitsCount <= 0) reasonCodes.push("NO_RECRUITS");
+  if (recruitsCount <= 0) reasonCodes.push("NO_PROGRAM_RECRUITS");
 
-  if (reasonCodes.length > 0) {
+  if (reasonCodes.includes("NO_RECRUITABLE_ABSENCES")) {
     return { status: "ineligible", reasonCodes };
   }
 
-  // NOTE:
-  // Current schema links recruits to organization, not directly to athlete performance artifacts.
-  // Until evidence linkage & M3 compute exist, remain conservatively UNKNOWN rather than ELIGIBLE.
-  return {
-    status: "unknown",
-    reasonCodes: ["EVIDENCE_LINKAGE_NOT_YET_MODELED"],
-  };
+  if (reasonCodes.includes("NO_PROGRAM_RECRUITS")) {
+    return { status: "unknown", reasonCodes };
+  }
+
+  return { status: "eligible", reasonCodes };
 }
 
 export async function POST(req: Request) {
@@ -80,7 +75,7 @@ export async function POST(req: Request) {
     // Resolve program set
     const programsQuery = supabase
       .from("programs")
-      .select("id, organization_id")
+      .select("id")
       .order("created_at", { ascending: true })
       .limit(2000);
 
@@ -90,7 +85,7 @@ export async function POST(req: Request) {
 
     if (programsErr) throw programsErr;
 
-    const rows = (programs ?? []).filter((p: any) => p?.id && p?.organization_id);
+    const rows = (programs ?? []).filter((p: any) => p?.id);
 
     let updated = 0;
     let ineligible = 0;
@@ -99,7 +94,6 @@ export async function POST(req: Request) {
 
     const results: Array<{
       programId: string;
-      organizationId: string;
       absencesCount: number;
       recruitsCount: number;
       status: EligibilityStatus;
@@ -108,11 +102,9 @@ export async function POST(req: Request) {
 
     for (const p of rows) {
       const pid = String(p.id);
-      const oid = String(p.organization_id);
-
       const [absencesCount, recruitsCount] = await Promise.all([
         countAbsences(supabase, pid),
-        countRecruitsByOrg(supabase, oid),
+        countProgramRecruits(supabase, pid),
       ]);
 
       const { status, reasonCodes } = deriveEligibility({
@@ -130,10 +122,11 @@ export async function POST(req: Request) {
         reason_codes: reasonCodes,
         min_data_snapshot: {
           absences_count: absencesCount,
-          recruits_count: recruitsCount,
+          program_recruits_count: recruitsCount,
+          recruits_linkage: "program_recruits(program_id -> recruit_id)",
         },
         computed_at: new Date().toISOString(),
-        computed_by: "system:m3_eligibility_recompute_v1",
+        computed_by: "system:m3_eligibility_recompute_v2",
       };
 
       const { error: upsertErr } = await supabase
@@ -146,7 +139,6 @@ export async function POST(req: Request) {
 
       results.push({
         programId: pid,
-        organizationId: oid,
         absencesCount,
         recruitsCount,
         status,

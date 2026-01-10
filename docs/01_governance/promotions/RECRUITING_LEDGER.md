@@ -2,6 +2,21 @@
 
 ---
 
+### R-M3-0012 — Post-Activation Verification (Program-Scoped)
+Status: EXECUTED  
+Scope: Program-level only  
+Runtime: recruiting_m3  
+Program: 6252113e-0eb1-482f-8438-50415db05617
+
+This entry records the mandatory post-activation verification run for Recruiting M3.
+The verification confirms:
+- Runtime executes only when program-scoped flag is active
+- Eligibility gate is enforced
+- Impacts persist only under valid conditions
+- Program Health remains fully isolated
+
+---
+
 ## R-0001 — Recruiting Runtime Constitution (First Edition)
 
 **Date:** 2026-01-09  

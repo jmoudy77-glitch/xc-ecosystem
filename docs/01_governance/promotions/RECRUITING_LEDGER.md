@@ -304,7 +304,17 @@ Ratifies the Recruiting M3 Activation Readiness Checklist as the binding executi
 
 **Status:** Ratified
 
-## R-M3-0013 — Add inactive-safe M3 debug UI wiring
+## R-M3-0013 — Ratify Recruiting M3 Activation Sign-Off Packet
+**Date:** 2026-01-10  
+**Canon Surfaces:**
+- /docs/01_governance/modules/recruiting/ratified/RECRUITING_M3_ACTIVATION_SIGNOFF_PACKET.md
+
+**Summary:**  
+Ratifies the Recruiting M3 Activation Sign-Off Packet as the required governance artifact prior to applying R-M3-0011. Establishes the official evidence capture runbook for eligibility recompute, deterministic dry-run with inputs hash and model version, and Program Health isolation testing. This promotion does not activate M3.
+
+**Status:** Ratified
+
+## R-M3-0014 — Add inactive-safe M3 debug UI wiring
 **Date:** 2026-01-11  
 **Surfaces:**
 - /app/components/m3/M3RuntimePanel.tsx  
@@ -317,7 +327,7 @@ Adds reusable client panels that read M3 runtime state and impacts from existing
 
 **Status:** Ratified
 
-## R-M3-0014 — Add M3 rationale validator (advisory gates)
+## R-M3-0015 — Add M3 rationale validator (advisory gates)
 **Date:** 2026-01-11  
 **Surfaces:**
 - /app/lib/m3/rationale.ts  
@@ -328,7 +338,7 @@ Introduces a validator for M3 rationale text that enforces advisory language, st
 
 **Status:** Ratified
 
-## R-M3-0015 — Add M3 dry-run harness (end-to-end, zero writes)
+## R-M3-0016 — Add M3 dry-run harness (end-to-end, zero writes)
 **Date:** 2026-01-11  
 **Surfaces:**
 - /app/lib/m3/dryRun.ts  
@@ -339,7 +349,7 @@ Adds a guarded dry-run endpoint that reads runtime state and eligibility, counts
 
 **Status:** Ratified
 
-## R-M3-0016 — Add M3 Program Health isolation test automation
+## R-M3-0017 — Add M3 Program Health isolation test automation
 **Date:** 2026-01-11  
 **Surfaces:**
 - /app/lib/m3/isolationTest.ts  
@@ -350,7 +360,7 @@ Adds a guarded isolation test endpoint that captures before/after counts on Prog
 
 **Status:** Ratified
 
-## R-M3-0017 — Add deterministic inputs_hash + provenance logging (audit proofs)
+## R-M3-0018 — Add deterministic inputs_hash + provenance logging (audit proofs)
 **Date:** 2026-01-11  
 **Surfaces:**
 - /app/lib/m3/hash.ts  

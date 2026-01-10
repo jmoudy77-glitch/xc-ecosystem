@@ -280,3 +280,16 @@ Ratifies the Recruiting M3 Rationale Quality Gate Canon. Establishes mandatory h
 Ratifies the Recruiting M3 Program Health Isolation Test Canon. Establishes mandatory isolation guarantees and verification tests to ensure Recruiting M3 cannot mutate, trigger, or substitute Program Health canonical state. Satisfies Activation Gate Precondition #6 and enforces strict cross-runtime sovereignty.
 
 **Status:** Ratified
+
+## R-M3-0011 — Activate Recruiting M3 Runtime
+**Date:** —  
+**Canon Surfaces:**
+- /docs/01_governance/promotions/R-M3-0011_ACTIVATE_RECRUITING_M3_RUNTIME.md
+
+**Summary:**  
+Defines the explicit, singular promotion required to activate the Recruiting M3 runtime. Authorizes M3 computation, persistence, and controlled advisory consumption **only after** all activation gate preconditions are verifiably satisfied. Reaffirms strict prohibitions against Program Health mutation, A2 recomputation, or representation of modeled impact as canonical truth.
+
+**Status:** Pending (Not Applied)
+
+**Notes:**  
+This entry is intentionally non-applied. Application of R-M3-0011 without verified satisfaction of all prerequisite canons and tests constitutes a constitutional violation and requires immediate rollback and incident recording.

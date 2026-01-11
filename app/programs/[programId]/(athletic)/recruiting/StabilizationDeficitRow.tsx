@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { M3CapabilitySupportDot } from "./m3/M3CapabilitySupportDot";
+import { useRecruitingM3UI } from "./m3/RecruitingM3UIContext";
 
 type Props = {
   // existing props unchanged
@@ -16,7 +17,11 @@ export function StabilizationDeficitRow({
   m3SupportById,
   ...rest
 }: Props) {
-  const supported = !!m3SupportById?.[capabilityNodeId]?.isSupported;
+  const m3 = useRecruitingM3UI();
+
+  const supported =
+    !!m3SupportById?.[capabilityNodeId]?.isSupported ||
+    !!m3?.capabilitySupportById?.[capabilityNodeId]?.isSupported;
 
   return (
     <div className="flex items-center justify-between gap-2" {...rest}>

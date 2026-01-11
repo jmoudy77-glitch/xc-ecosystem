@@ -1,5 +1,3 @@
-// app/programs/[programId]/(athletic)/recruiting/RecruitingM1Client.tsx
-
 "use client";
 
 import * as React from "react";
@@ -9,6 +7,7 @@ import { RecruitingSurfacedPanel } from "./RecruitingSurfacedPanel";
 import { RecruitingFavoritesPanel } from "./RecruitingFavoritesPanel";
 import { RecruitingSurfacedPanelClient } from "./RecruitingSurfacedPanelClient";
 import { RecruitingFavoritesPanelClient } from "./RecruitingFavoritesPanelClient";
+import { useRecruitingM3UIPayload } from "./m3/useRecruitingM3UIPayload";
 
 type Props = {
   programId: string;
@@ -37,11 +36,16 @@ export default function RecruitingM1Client({ programId, teamSeasonId }: Props) {
     []
   );
 
+  const m3 = useRecruitingM3UIPayload(programId, "xc");
+
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-4">
       <div className="col-span-12 min-h-0 lg:col-span-3">
         <RecruitingSurfacedPanel>
-          <RecruitingSurfacedPanelClient programId={programId} />
+          <RecruitingSurfacedPanelClient
+            programId={programId}
+            m3SummariesById={m3?.recruitSummariesById ?? null}
+          />
         </RecruitingSurfacedPanel>
       </div>
 
@@ -61,7 +65,10 @@ export default function RecruitingM1Client({ programId, teamSeasonId }: Props) {
 
       <div className="col-span-12 min-h-0 lg:col-span-3">
         <RecruitingFavoritesPanel>
-          <RecruitingFavoritesPanelClient programId={programId} />
+          <RecruitingFavoritesPanelClient
+            programId={programId}
+            m3SummariesById={m3?.recruitSummariesById ?? null}
+          />
         </RecruitingFavoritesPanel>
       </div>
     </div>

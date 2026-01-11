@@ -1,5 +1,3 @@
-// app/programs/[programId]/(athletic)/recruiting/RecruitingFavoritesPanelClient.tsx
-
 "use client";
 
 import * as React from "react";
@@ -7,12 +5,17 @@ import {
   RecruitingCandidateChip,
   type RecruitingPanelCandidate,
 } from "./RecruitingCandidateChip";
-import {
-  type StabilizationFavorite,
-} from "./_helpers/stabilizationFavorites";
+import { type StabilizationFavorite } from "./_helpers/stabilizationFavorites";
 import { readFavorites, removeFromFavorites } from "@/app/lib/recruiting/portalStorage";
+import type { M3RecruitImpactSummary } from "./m3/useRecruitingM3UIPayload";
 
-export function RecruitingFavoritesPanelClient({ programId }: { programId: string }) {
+export function RecruitingFavoritesPanelClient({
+  programId,
+  m3SummariesById,
+}: {
+  programId: string;
+  m3SummariesById?: Record<string, M3RecruitImpactSummary> | null;
+}) {
   const [rows, setRows] = React.useState<StabilizationFavorite[]>([]);
 
   const refresh = React.useCallback(async () => {
@@ -121,6 +124,7 @@ export function RecruitingFavoritesPanelClient({ programId }: { programId: strin
               } as RecruitingPanelCandidate
             }
             onRemoveFavorite={() => remove(c.athleteId)}
+            m3Summary={m3SummariesById?.[c.athleteId] ?? null}
           />
         ))}
       </div>

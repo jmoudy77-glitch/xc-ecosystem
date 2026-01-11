@@ -1,5 +1,3 @@
-// app/programs/[programId]/(athletic)/recruiting/RecruitingSurfacedPanelClient.tsx
-
 "use client";
 
 import * as React from "react";
@@ -12,8 +10,15 @@ import {
   addToFavoritesIfMissing,
   readHiddenSurfacedIds,
 } from "@/app/lib/recruiting/portalStorage";
+import type { M3RecruitImpactSummary } from "./m3/useRecruitingM3UIPayload";
 
-export function RecruitingSurfacedPanelClient({ programId }: { programId: string }) {
+export function RecruitingSurfacedPanelClient({
+  programId,
+  m3SummariesById,
+}: {
+  programId: string;
+  m3SummariesById?: Record<string, M3RecruitImpactSummary> | null;
+}) {
   const [rows, setRows] = React.useState<RecruitingPanelCandidate[]>([]);
   const [hiddenIds, setHiddenIds] = React.useState<Set<string>>(new Set());
   const [loading, setLoading] = React.useState(true);
@@ -154,6 +159,7 @@ export function RecruitingSurfacedPanelClient({ programId }: { programId: string
             programId={programId}
             candidate={c}
             onFavorite={() => addToFavorites(c)}
+            m3Summary={m3SummariesById?.[c.athleteId] ?? null}
           />
         ))}
       </div>

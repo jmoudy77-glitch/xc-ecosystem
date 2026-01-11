@@ -34,6 +34,12 @@ function horizonLabel(horizons: Horizon[]) {
   return `${first}–${last}`;
 }
 
+function fallbackNodeLabel(id: string) {
+  const s = String(id ?? "");
+  if (!s) return "—";
+  return s.length <= 10 ? s : `${s.slice(0, 8)}…`;
+}
+
 export function M3StabilizationContributionSection({
   summary,
   capabilityNodeNameById,
@@ -54,7 +60,7 @@ export function M3StabilizationContributionSection({
 
       <ul className="mt-1 text-[12px] text-muted space-y-0.5">
         {summary.capabilityNodeIds.map((id) => (
-          <li key={id}>{capabilityNodeNameById[id] ?? "—"}</li>
+          <li key={id}>{capabilityNodeNameById[id] ?? fallbackNodeLabel(id)}</li>
         ))}
       </ul>
 

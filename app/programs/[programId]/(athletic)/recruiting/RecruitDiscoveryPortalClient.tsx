@@ -12,6 +12,8 @@ import {
   clearFavoritesOrder,
   favoritesStorageKey,
 } from "@/app/lib/recruiting/portalStorage";
+import { useRecruitingM3UIPayload } from "./m3/useRecruitingM3UIPayload";
+import { M3StabilizationContributionSection } from "./m3/M3StabilizationContributionSection";
 
 type OriginKey = "surfaced" | "favorites";
 type SortKey = "fit" | "name" | "gradYear";
@@ -32,6 +34,10 @@ type Props = {
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
+}
+
+function coerceSport(v: string): "xc" | "tf" {
+  return v === "tf" ? "tf" : "xc";
 }
 
 function buildAthleteProfileInput(c: Candidate) {
@@ -224,6 +230,8 @@ function Badge({
 }
 
 export default function RecruitDiscoveryPortalClient({ programId, sport }: Props) {
+  const sportKey = coerceSport(sport);
+  const m3 = useRecruitingM3UIPayload(programId, sportKey);
   const [surfaced, setSurfaced] = useState<Candidate[]>([]);
   const [favorites, setFavorites] = useState<Candidate[]>([]);
   const [stabilizationFavIds, setStabilizationFavIds] = useState<Set<string>>(new Set());
@@ -1138,6 +1146,11 @@ export default function RecruitDiscoveryPortalClient({ programId, sport }: Props
               {selected ? (
                 <div className="min-w-0">
                   <AthleteProfileClient {...buildAthleteProfileInput(selected)} />
+
+                  <M3StabilizationContributionSection
+                    summary={m3?.recruitSummariesById?.[selected.id] ?? null}
+                    capabilityNodeNameById={{}}
+                  />
                 </div>
               ) : (
                 <div className="rounded-xl ring-1 ring-panel panel-muted px-3 py-3">

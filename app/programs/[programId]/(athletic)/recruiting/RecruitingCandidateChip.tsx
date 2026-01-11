@@ -1,9 +1,8 @@
-// app/programs/[programId]/(athletic)/recruiting/RecruitingCandidateChip.tsx
-
 "use client";
 
 import * as React from "react";
 import { DRAG_TYPES } from "./_components/dragTypes";
+import { M3ImpactGlyph, type M3RecruitImpactSummary } from "./m3/M3ImpactGlyph";
 
 type RecruitingPanelCandidate = {
   athleteId: string;
@@ -19,6 +18,9 @@ type Props = {
   candidate: RecruitingPanelCandidate;
   onFavorite?: () => void;
   onRemoveFavorite?: () => void;
+
+  // ADDITIVE: M3 UI consumption (inactive-safe)
+  m3Summary?: M3RecruitImpactSummary | null;
 };
 
 function toDnDPayload(programId: string, c: RecruitingPanelCandidate) {
@@ -39,10 +41,11 @@ export function RecruitingCandidateChip({
   candidate,
   onFavorite,
   onRemoveFavorite,
+  m3Summary,
 }: Props) {
   return (
     <div
-      className="flex items-center justify-between gap-2 rounded-xl ring-1 ring-panel panel-muted px-3 py-2"
+      className="relative flex items-center justify-between gap-2 rounded-xl ring-1 ring-panel panel-muted px-3 py-2"
       draggable
       onDragStart={(e) => {
         const payload = {
@@ -62,7 +65,12 @@ export function RecruitingCandidateChip({
       }}
       title="Drag into a slot"
     >
-      <div className="min-w-0">
+      {/* M3 Impact Glyph (read-only; renders null when absent) */}
+      <div className="absolute right-2 top-2">
+        <M3ImpactGlyph summary={m3Summary ?? null} />
+      </div>
+
+      <div className="min-w-0 pr-5">
         <div className="truncate text-sm font-semibold">{candidate.displayName}</div>
         <div className="text-[11px] text-muted truncate">
           {candidate.eventGroup ?? "—"} · {candidate.gradYear ?? "—"}
